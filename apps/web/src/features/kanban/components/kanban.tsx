@@ -28,7 +28,9 @@ import {
   CircleCheckIcon,
   CircleDot,
   CircleIcon,
+  PlayIcon,
   PlusIcon,
+  RotateCcwIcon,
   XIcon,
 } from "lucide-react";
 import {
@@ -223,16 +225,6 @@ export function Kanban({
     if (activeColId === overColId) {
       const newTasks = arrayMove(activeTasks, activeIndex, overIndex);
       onValueChange({ ...value, [activeColId]: newTasks });
-    } else {
-      const newActiveTasks = [...activeTasks];
-      const [movedTask] = newActiveTasks.splice(activeIndex, 1);
-      const newOverTasks = [...overTasks];
-      newOverTasks.splice(overIndex, 0, movedTask);
-      onValueChange({
-        ...value,
-        [activeColId]: newActiveTasks,
-        [overColId]: newOverTasks,
-      });
     }
   }
 
@@ -274,16 +266,6 @@ export function Kanban({
     if (activeColId === overColId) {
       const newTasks = arrayMove(activeTasks, activeIndex, overIndex);
       onValueChange({ ...value, [activeColId]: newTasks });
-    } else {
-      const newActiveTasks = [...activeTasks];
-      const [movedTask] = newActiveTasks.splice(activeIndex, 1);
-      const newOverTasks = [...overTasks];
-      newOverTasks.splice(overIndex, 0, movedTask);
-      onValueChange({
-        ...value,
-        [activeColId]: newActiveTasks,
-        [overColId]: newOverTasks,
-      });
     }
   }
 
@@ -367,11 +349,13 @@ function KanbanItem({
   value,
   children,
   className,
+  disabled,
   ...props
 }: {
   value: string;
   children: React.ReactNode;
   className?: string;
+  disabled?: boolean;
 } & ComponentProps<"div">) {
   const {
     attributes,
@@ -390,11 +374,14 @@ function KanbanItem({
 
   return (
     <div
-      className={cn("cursor-grab active:cursor-grabbing", className)}
+      className={cn(
+        disabled ? "" : "cursor-grab active:cursor-grabbing",
+        className
+      )}
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
+      {...(disabled ? {} : attributes)}
+      {...(disabled ? {} : listeners)}
       {...props}
     >
       {children}
@@ -424,7 +411,7 @@ const COLUMNS: Record<string, { title: string; icon: React.ReactNode }> = {
     icon: <CircleDot className="size-3.5 text-muted-foreground" />,
   },
   approve: {
-    title: "Approve",
+    title: "Review",
     icon: <AlertCircle className="size-3.5 text-amber-500" />,
   },
   done: {
@@ -435,18 +422,22 @@ const COLUMNS: Record<string, { title: string; icon: React.ReactNode }> = {
 
 interface TaskCardProps {
   asHandle?: boolean;
+  draggable?: boolean;
   showApprovalControls?: boolean;
   showDone?: boolean;
   showOutput?: boolean;
+  showPlay?: boolean;
   task: Task;
 }
 
 function TaskCard({
   task,
   asHandle,
+  draggable,
   showOutput,
   showDone,
   showApprovalControls,
+  showPlay,
 }: TaskCardProps) {
   const content = (
     <div className="group flex flex-col gap-2.5 rounded-xl border border-border/50 bg-card p-3.5 shadow-sm transition-all hover:border-border hover:shadow-md dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-white/20 dark:hover:bg-white/[0.06]">
@@ -497,6 +488,19 @@ function TaskCard({
         </div>
       )}
 
+      {showPlay && (
+        <div className="flex items-center justify-end pt-1">
+          <button
+            className="flex items-center gap-1.5 rounded-md bg-white/8 px-2.5 py-1.5 font-medium text-[0.7rem] text-white/60 transition-all hover:bg-emerald-500/15 hover:text-emerald-400 active:scale-95"
+            title="Run task"
+            type="button"
+          >
+            <PlayIcon className="size-3 fill-current" />
+            Run
+          </button>
+        </div>
+      )}
+
       {showApprovalControls && (
         <div className="flex items-center justify-end gap-1.5 pt-1">
           <button
@@ -515,17 +519,31 @@ function TaskCard({
           </button>
         </div>
       )}
+
+      {showDone && (
+        <div className="flex items-center justify-end pt-1">
+          <button
+            className="flex items-center gap-1.5 rounded-md bg-white/5 px-2.5 py-1.5 font-medium text-[0.7rem] text-white/35 transition-all hover:bg-white/10 hover:text-white/60 active:scale-95"
+            title="Retry task"
+            type="button"
+          >
+            <RotateCcwIcon className="size-3" />
+            Retry
+          </button>
+        </div>
+      )}
     </div>
   );
 
-  const contentNode = asHandle ? (
-    <KanbanItemHandle>{content}</KanbanItemHandle>
-  ) : (
-    content
-  );
+  const contentNode =
+    asHandle && draggable ? (
+      <KanbanItemHandle>{content}</KanbanItemHandle>
+    ) : (
+      content
+    );
 
   return (
-    <KanbanItem value={task.id}>
+    <KanbanItem disabled={!draggable} value={task.id}>
       {showOutput ? (
         // In-progress: task card + vertical connector + agent output card
         <>
@@ -586,7 +604,14 @@ function defaultColumns(): Columns {
         labelVariant: "primary-light",
       },
     ],
-    approve: [],
+    approve: [
+      {
+        id: `${Date.now()}-6`,
+        title: "Update color palette for dark mode compatibility",
+        label: "Design",
+        labelVariant: "info-light",
+      },
+    ],
     done: [
       {
         id: `${Date.now()}-5`,
@@ -610,6 +635,8 @@ export function KanbanCardContent({
   data: KanbanCardData;
   onColumnsChange: (columns: Columns) => void;
 }) {
+  const [autoAccept, setAutoAccept] = useState(false);
+
   return (
     <Kanban
       getItemValue={(item) => item.id}
@@ -624,6 +651,7 @@ export function KanbanCardContent({
           {Object.entries(data.columns).map(([columnId, tasks], index, arr) => {
             const col = COLUMNS[columnId];
             const isQueue = columnId === "queue";
+            const isReview = columnId === "approve";
             return (
               <Fragment key={columnId}>
                 <ResizablePanel
@@ -640,9 +668,52 @@ export function KanbanCardContent({
                           <h3 className="truncate font-medium text-[0.75rem] text-muted-foreground uppercase tracking-wider dark:text-white/50">
                             {col.title}
                           </h3>
-                          <div className="ml-auto flex size-5 shrink-0 items-center justify-center rounded-full bg-background font-semibold text-[10px] dark:bg-white/10 dark:text-white/80">
-                            {tasks.length}
-                          </div>
+                          {isReview ? (
+                            <div className="ml-auto flex items-center gap-2">
+                              <button
+                                className="flex items-center gap-1.5 rounded-md px-1.5 py-0.5 transition-colors hover:bg-white/5"
+                                onClick={() => setAutoAccept((v) => !v)}
+                                title={
+                                  autoAccept
+                                    ? "Switch to manual review"
+                                    : "Switch to auto-accept"
+                                }
+                                type="button"
+                              >
+                                <span
+                                  className={`font-medium text-[0.6rem] uppercase tracking-wider transition-colors ${
+                                    autoAccept
+                                      ? "text-emerald-400"
+                                      : "text-white/30"
+                                  }`}
+                                >
+                                  {autoAccept ? "Auto" : "Manual"}
+                                </span>
+                                <span
+                                  className={`relative inline-flex h-3.5 w-6 shrink-0 items-center rounded-full transition-all ${
+                                    autoAccept
+                                      ? "bg-emerald-500/40"
+                                      : "bg-white/10"
+                                  }`}
+                                >
+                                  <span
+                                    className={`absolute size-2.5 rounded-full transition-all ${
+                                      autoAccept
+                                        ? "left-[calc(100%-2px)] -translate-x-full bg-emerald-400"
+                                        : "left-[2px] bg-white/40"
+                                    }`}
+                                  />
+                                </span>
+                              </button>
+                              <div className="flex size-5 shrink-0 items-center justify-center rounded-full bg-background font-semibold text-[10px] dark:bg-white/10 dark:text-white/80">
+                                {tasks.length}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="ml-auto flex size-5 shrink-0 items-center justify-center rounded-full bg-background font-semibold text-[10px] dark:bg-white/10 dark:text-white/80">
+                              {tasks.length}
+                            </div>
+                          )}
                         </div>
 
                         {/* Queue: create task button */}
@@ -663,10 +734,14 @@ export function KanbanCardContent({
                           {tasks.map((task) => (
                             <TaskCard
                               asHandle
+                              draggable={columnId === "queue"}
                               key={task.id}
-                              showApprovalControls={columnId === "approve"}
+                              showApprovalControls={
+                                columnId === "approve" && !autoAccept
+                              }
                               showDone={columnId === "done"}
                               showOutput={columnId === "in_progress"}
+                              showPlay={columnId === "queue"}
                               task={task}
                             />
                           ))}
