@@ -68,12 +68,18 @@ describe("message-builder", () => {
       expect(result).toBe("Policy blocked action.");
     });
 
-    test("returns default message for unknown type", () => {
-      const result = buildNotificationMessage(
-        "task_summary" as never,
-        defaultSettings
-      );
-      expect(result).toBe("Notification received.");
+    test("returns concise summary message for task_summary", () => {
+      const result = buildNotificationMessage("task_summary", defaultSettings);
+      expect(result).toBe("Summary ready.");
+    });
+
+    test("returns verbose summary message for task_summary", () => {
+      const verboseSettings: VoiceSettings = {
+        ...defaultSettings,
+        narrationMode: "verbose",
+      };
+      const result = buildNotificationMessage("task_summary", verboseSettings);
+      expect(result).toBe("Task summary available.");
     });
 
     test("returns verbose message when narrationMode is verbose", () => {

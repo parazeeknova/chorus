@@ -74,7 +74,80 @@ export const voiceRoutes = new Elysia({ prefix: "/voice" })
       };
     },
     {
+      body: VoiceNotificationRequestSchema.extend({
+        text: VoiceNotificationRequestSchema.shape.text.optional(),
+      }),
+    }
+  )
+  .post(
+    "/tts",
+    async ({ body, set }) => {
+      const svc = getVoiceService();
+      if (!svc) {
+        set.status = 503;
+        return { ...UNAVAILABLE, accepted: false };
+      }
+
+      const result = await svc.generateSpeech(body);
+
+      if (result.status === "failed") {
+        set.status = 502;
+        return {
+          accepted: false,
+          error: result.error,
+          timestamp: new Date().toISOString(),
+        };
+      }
+
+      return {
+        accepted: true,
+        notificationId: result.id,
+        audioBase64: result.audioBase64,
+        mimeType: result.mimeType,
+        timestamp: new Date().toISOString(),
+      };
+    },
+    {
       body: VoiceNotificationRequestSchema,
+    }
+  )
+  .post(
+    "/stt",
+    async ({ body }) => {
+      const { audio, modelId, diarize, mimeType, filename } = body;
+
+      const audioBuffer = Buffer.from(audio, "base64").buffer as ArrayBuffer;
+
+      const detectedMimeType = mimeType ?? detectMimeType(audioBuffer);
+
+      const svc = getVoiceService();
+      if (!svc) {
+        return UNAVAILABLE;
+      }
+
+      const result = await svc.transcribeSpeech({
+        audioBuffer,
+        modelId,
+        diarize: diarize ?? false,
+        mimeType: detectedMimeType,
+        filename,
+      });
+
+      return {
+        text: result.text,
+        confidence: result.confidence,
+        words: result.words,
+        timestamp: new Date().toISOString(),
+      };
+    },
+    {
+      body: t.Object({
+        audio: t.String(),
+        modelId: t.Optional(t.String()),
+        diarize: t.Optional(t.Boolean()),
+        mimeType: t.Optional(t.String()),
+        filename: t.Optional(t.String()),
+      }),
     }
   )
   .post(

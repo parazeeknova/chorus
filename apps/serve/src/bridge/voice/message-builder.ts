@@ -1,4 +1,8 @@
-import type { VoiceNotificationRequest, VoiceSettings } from "@chorus/voice";
+import type {
+  VoiceNotificationRequest,
+  VoiceNotificationType,
+  VoiceSettings,
+} from "@chorus/voice";
 
 const APPROVAL_MESSAGES: Record<string, string> = {
   default: "Task requires your approval. Please review and take action.",
@@ -29,12 +33,16 @@ const POLICY_BLOCKED_MESSAGES: Record<string, string> = {
   concise: "Policy blocked action.",
 };
 
-const MESSAGE_MAP: Record<string, Record<string, string>> = {
+const MESSAGE_MAP: Record<VoiceNotificationType, Record<string, string>> = {
   approval_needed: APPROVAL_MESSAGES,
   task_blocked: BLOCKED_MESSAGES,
   task_failed: FAILED_MESSAGES,
   task_completed: COMPLETED_MESSAGES,
   policy_blocked: POLICY_BLOCKED_MESSAGES,
+  task_summary: {
+    default: "Task summary available.",
+    concise: "Summary ready.",
+  },
 };
 
 export function buildNotificationMessage(
@@ -48,10 +56,6 @@ export function buildNotificationMessage(
 
   const mode = settings.narrationMode ?? "concise";
   const messages = MESSAGE_MAP[type];
-
-  if (!messages) {
-    return "Notification received.";
-  }
 
   return messages[mode] ?? messages.default ?? "Notification received.";
 }
