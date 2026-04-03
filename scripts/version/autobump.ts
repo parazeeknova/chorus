@@ -1,6 +1,6 @@
 import { Glob } from "bun";
 
-interface PackageManifest {
+export interface PackageManifest {
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
   name: string;
@@ -10,7 +10,7 @@ interface PackageManifest {
   [key: string]: unknown;
 }
 
-interface WorkspacePackage {
+export interface WorkspacePackage {
   currentVersion: string;
   directory: string;
   headVersion: string | null;
@@ -18,7 +18,7 @@ interface WorkspacePackage {
   name: string;
 }
 
-interface VersionState {
+export interface VersionState {
   head: string;
   rootVersion: string;
 }
@@ -50,7 +50,7 @@ function runGit(args: string[]) {
   return result.stdout.toString().trim();
 }
 
-function nextVersion(version: string) {
+export function nextVersion(version: string) {
   const parts = parseVersion(version);
 
   if (parts.patch < 99) {
@@ -60,7 +60,7 @@ function nextVersion(version: string) {
   return `${parts.major}.${parts.minor + 1}.0`;
 }
 
-function parseVersion(version: string) {
+export function parseVersion(version: string) {
   if (!semverPattern.test(version)) {
     throw new Error(`Invalid version format: ${version}`);
   }
@@ -78,7 +78,7 @@ function parseVersion(version: string) {
   return { major, minor, patch };
 }
 
-function getWorkspaceDirectory(manifestPath: string) {
+export function getWorkspaceDirectory(manifestPath: string) {
   return manifestPath.replace(packageJsonSuffixPattern, "");
 }
 
@@ -163,7 +163,7 @@ async function writeState(state: VersionState) {
   await Bun.write(statePath, toStateString(state));
 }
 
-function createTemporaryChangeset(packages: WorkspacePackage[]) {
+export function createTemporaryChangeset(packages: WorkspacePackage[]) {
   const frontmatter = packages.map((pkg) => `"${pkg.name}": patch`).join("\n");
 
   return `---\n${frontmatter}\n---\n\nAuto-generated pre-commit changeset.\n`;
@@ -199,7 +199,7 @@ async function discoverWorkspacePackages() {
   return packages;
 }
 
-function getChangedWorkspaces(
+export function getChangedWorkspaces(
   workspacePackages: WorkspacePackage[],
   stagedFiles: string[]
 ) {
@@ -209,6 +209,36 @@ function getChangedWorkspaces(
         file === workspacePackage.manifestPath ||
         file.startsWith(`${workspacePackage.directory}/`)
     )
+  );
+}
+
+export function getWorkspacesNeedingBump(
+  changedWorkspaces: WorkspacePackage[]
+) {
+  return changedWorkspaces.filter(
+    (workspacePackage) =>
+      workspacePackage.headVersion === null ||
+      workspacePackage.currentVersion === workspacePackage.headVersion
+  );
+}
+
+export function shouldBumpRootVersion({
+  currentVersion,
+  headRef,
+  headVersion,
+  state,
+}: {
+  currentVersion: string;
+  headRef: string;
+  headVersion: string | null;
+  state: VersionState | null;
+}) {
+  const rootAlreadyBumpedForHead =
+    state?.head === headRef && state.rootVersion === currentVersion;
+
+  return (
+    !rootAlreadyBumpedForHead &&
+    (headVersion === null || currentVersion === headVersion)
   );
 }
 
@@ -236,25 +266,21 @@ async function main() {
     }
   })();
   const state = await readState();
-  const rootAlreadyBumpedForHead =
-    state?.head === headRef &&
-    typeof rootManifest.version === "string" &&
-    state.rootVersion === rootManifest.version;
   const rootNeedsBump =
     typeof rootManifest.version === "string" &&
-    !rootAlreadyBumpedForHead &&
-    (rootHeadVersion === null || rootManifest.version === rootHeadVersion);
+    shouldBumpRootVersion({
+      currentVersion: rootManifest.version,
+      headRef,
+      headVersion: rootHeadVersion,
+      state,
+    });
 
   const workspacePackages = await discoverWorkspacePackages();
   const changedWorkspaces = getChangedWorkspaces(
     workspacePackages,
     stagedFiles
   );
-  const workspacesNeedingBump = changedWorkspaces.filter(
-    (workspacePackage) =>
-      workspacePackage.headVersion === null ||
-      workspacePackage.currentVersion === workspacePackage.headVersion
-  );
+  const workspacesNeedingBump = getWorkspacesNeedingBump(changedWorkspaces);
 
   if (isDryRun) {
     const changedNames = workspacesNeedingBump.map(
@@ -317,4 +343,6 @@ async function main() {
   }
 }
 
-await main();
+if (import.meta.main) {
+  await main();
+}
