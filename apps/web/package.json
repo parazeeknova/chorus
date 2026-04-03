@@ -1,12 +1,12 @@
 {
-  "name": "@chorus/web",
-  "version": "0.0.1",
-  "type": "module",
+  "name": "chorus",
+  "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --port 3000",
+    "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "check-types": "tsc --noEmit"
   },
   "dependencies": {
     "next": "^16.2.2",
@@ -14,9 +14,20 @@
     "react-dom": "^19.2.4"
   },
   "devDependencies": {
-    "@types/node": "^22.19.17",
-    "@types/react": "19.2.2",
-    "@types/react-dom": "19.2.2",
+    "@tailwindcss/postcss": "^4.2.2",
+    "@types/node": "^20.19.39",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "babel-plugin-react-compiler": "^1.0.0",
+    "tailwindcss": "^4.2.2",
     "typescript": "^6.0.2"
-  }
+  },
+  "ignoreScripts": [
+    "sharp",
+    "unrs-resolver"
+  ],
+  "trustedDependencies": [
+    "sharp",
+    "unrs-resolver"
+  ]
 }
