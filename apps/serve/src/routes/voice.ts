@@ -74,27 +74,33 @@ export const voiceRoutes = new Elysia({ prefix: "/voice" })
       };
     },
     {
-      body: VoiceNotificationRequestSchema,
+      body: VoiceNotificationRequestSchema.extend({
+        text: VoiceNotificationRequestSchema.shape.text.optional(),
+      }),
     }
   )
   .post(
     "/tts",
-    async ({ body }) => {
+    async ({ body, set }) => {
       const svc = getVoiceService();
       if (!svc) {
-        return UNAVAILABLE;
+        set.status = 503;
+        return { ...UNAVAILABLE, accepted: false };
       }
 
       const result = await svc.generateSpeech(body);
 
       if (result.status === "failed") {
+        set.status = 502;
         return {
+          accepted: false,
           error: result.error,
           timestamp: new Date().toISOString(),
         };
       }
 
       return {
+        accepted: true,
         notificationId: result.id,
         audioBase64: result.audioBase64,
         mimeType: result.mimeType,
@@ -110,10 +116,10 @@ export const voiceRoutes = new Elysia({ prefix: "/voice" })
     async ({ body }) => {
       const { audio, modelId, diarize, mimeType, filename } = body;
 
-      const audioBuffer = Buffer.from(audio, "base64").buffer.slice(
-        Buffer.from(audio, "base64").byteOffset,
-        Buffer.from(audio, "base64").byteOffset +
-          Buffer.from(audio, "base64").byteLength
+      const audioBytes = Buffer.from(audio, "base64");
+      const audioBuffer = audioBytes.buffer.slice(
+        audioBytes.byteOffset,
+        audioBytes.byteOffset + audioBytes.byteLength
       ) as ArrayBuffer;
 
       const detectedMimeType = mimeType ?? detectMimeType(audioBuffer);

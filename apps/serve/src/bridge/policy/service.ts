@@ -156,7 +156,7 @@ export class PolicyService {
       cardId,
       projectId,
       action: {
-        action: `tool.${toolName}`,
+        action: "tool.execute",
         target: toolName,
         parameters: toolArgs,
       },

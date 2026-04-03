@@ -5,7 +5,20 @@ import { Elysia, t } from "elysia";
 
 const mockAudioBuffer = Buffer.from("mock-audio-response");
 
-function generateSpeechMock(_request: VoiceNotificationRequest) {
+type VoiceGenerationRequest = Omit<VoiceNotificationRequest, "text"> & {
+  text?: string;
+};
+
+function generateSpeechMock(_request: VoiceGenerationRequest) {
+  if (_request.text === "fail") {
+    return {
+      id: "mock-notification-id",
+      status: "failed" as const,
+      error: "mock generation failed",
+      generatedAt: new Date(),
+    };
+  }
+
   return {
     id: "mock-notification-id",
     status: "generated" as const,
@@ -39,14 +52,27 @@ const testApp = new Elysia({ prefix: "/voice" })
       };
     },
     {
-      body: VoiceNotificationRequestSchema,
+      body: VoiceNotificationRequestSchema.extend({
+        text: VoiceNotificationRequestSchema.shape.text.optional(),
+      }),
     }
   )
   .post(
     "/tts",
-    ({ body }) => {
+    ({ body, set }) => {
       const result = generateSpeechMock(body);
+
+      if (result.status === "failed") {
+        set.status = 502;
+        return {
+          accepted: false,
+          error: result.error,
+          timestamp: new Date().toISOString(),
+        };
+      }
+
       return {
+        accepted: true,
         notificationId: result.id,
         audioBase64: result.audioBase64,
         mimeType: result.mimeType,
@@ -198,6 +224,22 @@ describe("voice routes integration", () => {
       expect(res.status).toBe(422);
     });
 
+    test("accepts missing text and uses generated template text", async () => {
+      const res = await fetch(
+        `http://localhost:${app.server?.port}/voice/notify`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "task_summary",
+          }),
+        }
+      );
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.accepted).toBe(true);
+    });
+
     test("accepts optional cardId and projectId", async () => {
       const res = await fetch(
         `http://localhost:${app.server?.port}/voice/notify`,
@@ -255,6 +297,24 @@ describe("voice routes integration", () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.notificationId).toBeDefined();
+    });
+
+    test("returns 502 when generation fails", async () => {
+      const res = await fetch(
+        `http://localhost:${app.server?.port}/voice/tts`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "task_summary",
+            text: "fail",
+          }),
+        }
+      );
+      expect(res.status).toBe(502);
+      const body = await res.json();
+      expect(body.accepted).toBe(false);
+      expect(body.error).toBe("mock generation failed");
     });
   });
 
