@@ -18,7 +18,7 @@ jobs:
 
     steps:
       - name: Check Out Repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Set Up Bun
         uses: oven-sh/setup-bun@v2
@@ -27,7 +27,7 @@ jobs:
 
       - name: Restore Bun Cache
         id: bun-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: ~/.bun/install/cache
           key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
@@ -36,7 +36,7 @@ jobs:
 
       - name: Restore Turbo Cache
         id: turbo-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: .turbo
           key: ${{ runner.os }}-turbo-${{ github.ref_name }}-${{ github.sha }}
@@ -55,14 +55,14 @@ jobs:
 
       - name: Save Bun Cache
         if: always() && steps.bun-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: ~/.bun/install/cache
           key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
 
       - name: Save Turbo Cache
         if: always() && steps.turbo-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: .turbo
           key: ${{ runner.os }}-turbo-${{ github.ref_name }}-${{ github.sha }}
