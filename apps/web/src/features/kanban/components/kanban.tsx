@@ -27,6 +27,7 @@ import {
   CircleCheckIcon,
   CircleDot,
   CircleIcon,
+  PlusIcon,
 } from "lucide-react";
 import {
   type ComponentProps,
@@ -36,7 +37,10 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-
+import {
+  AgentOutputCard,
+  PLACEHOLDER_RUN,
+} from "@/features/kanban/components/agent-output-card";
 import { cn } from "@/lib/utils";
 
 export interface Task {
@@ -48,6 +52,8 @@ export interface Task {
     | "warning-light"
     | "destructive-light"
     | "info-light";
+  /** Links to an OpenCode sessionId for live agent output */
+  runId?: string;
   title: string;
 }
 
@@ -405,10 +411,11 @@ const COLUMNS: Record<string, { title: string; icon: React.ReactNode }> = {
 
 interface TaskCardProps {
   asHandle?: boolean;
+  showOutput?: boolean;
   task: Task;
 }
 
-function TaskCard({ task, asHandle }: TaskCardProps) {
+function TaskCard({ task, asHandle, showOutput }: TaskCardProps) {
   const content = (
     <div className="group flex flex-col gap-3 rounded-xl border border-border/50 bg-card p-3.5 shadow-sm transition-all hover:border-border hover:shadow-md dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-white/20 dark:hover:bg-white/[0.06]">
       <span className="font-medium text-[0.85rem] text-foreground leading-snug dark:text-white/90">
@@ -420,9 +427,36 @@ function TaskCard({ task, asHandle }: TaskCardProps) {
     </div>
   );
 
+  const contentNode = asHandle ? (
+    <KanbanItemHandle>{content}</KanbanItemHandle>
+  ) : (
+    content
+  );
+
   return (
     <KanbanItem value={task.id}>
-      {asHandle ? <KanbanItemHandle>{content}</KanbanItemHandle> : content}
+      {showOutput ? (
+        // In-progress: task card + vertical connector + agent output card
+        <>
+          {contentNode}
+          {/* Connector: vertical line linking task to output */}
+          <div className="flex">
+            <div className="ml-4 flex flex-col items-center">
+              <div className="h-3 w-px bg-white/10" />
+              <div className="size-1.5 rounded-full bg-white/20" />
+              <div className="h-1.5 w-px bg-white/10" />
+            </div>
+          </div>
+          <AgentOutputCard
+            run={{
+              ...PLACEHOLDER_RUN,
+              taskTitle: task.title,
+            }}
+          />
+        </>
+      ) : (
+        contentNode
+      )}
     </KanbanItem>
   );
 }
@@ -432,30 +466,41 @@ function defaultColumns(): Columns {
     queue: [
       {
         id: `${Date.now()}-1`,
-        title: "Design landing page",
+        title:
+          "Refactor the auth middleware to use JWT RS256 and add refresh token rotation",
+        label: "Backend",
+        labelVariant: "primary-light",
+      },
+      {
+        id: `${Date.now()}-2`,
+        title:
+          "Design a dark-mode landing page with hero section and pricing table",
         label: "Design",
         labelVariant: "info-light",
       },
       {
-        id: `${Date.now()}-2`,
-        title: "Set up CI/CD pipeline",
+        id: `${Date.now()}-3`,
+        title:
+          "Set up GitHub Actions CI/CD pipeline with Turbo cache and preview deploys",
         label: "DevOps",
         labelVariant: "warning-light",
       },
     ],
     in_progress: [
       {
-        id: `${Date.now()}-3`,
-        title: "Implement auth flow",
-        label: "Backend",
+        id: `${Date.now()}-4`,
+        title:
+          "Implement real-time collaborative cursor tracking via WebSocket",
+        label: "Frontend",
         labelVariant: "primary-light",
       },
     ],
     approve: [],
     done: [
       {
-        id: `${Date.now()}-4`,
-        title: "Project kickoff",
+        id: `${Date.now()}-5`,
+        title:
+          "Project kickoff — repo structure, monorepo config, base design system",
         label: "Planning",
         labelVariant: "info-light",
       },
@@ -479,9 +524,11 @@ export function KanbanCardContent({
       <KanbanBoard className="grid auto-rows-fr grid-cols-4 gap-3">
         {Object.entries(data.columns).map(([columnId, tasks]) => {
           const col = COLUMNS[columnId];
+          const isQueue = columnId === "queue";
           return (
             <KanbanColumn key={columnId} value={columnId}>
-              <div className="flex h-full flex-col gap-3 rounded-xl border border-transparent bg-muted/30 p-3 dark:border-white/[0.02] dark:bg-black/30">
+              <div className="flex h-full flex-col gap-3 rounded-xl border border-transparent bg-muted/30 p-3 dark:border-white/2 dark:bg-black/30">
+                {/* Column header */}
                 <div className="flex items-center gap-2 px-1 py-1">
                   {col.icon}
                   <h3 className="font-medium text-[0.75rem] text-muted-foreground uppercase tracking-wider dark:text-white/50">
@@ -491,12 +538,29 @@ export function KanbanCardContent({
                     {tasks.length}
                   </div>
                 </div>
+
+                {/* Queue: create task button */}
+                {isQueue && (
+                  <button
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-white px-3 py-2.5 font-semibold text-[0.8rem] text-black shadow-[0_0_15px_rgba(255,255,255,0.1)] transition-all hover:bg-white/90 hover:shadow-[0_0_20px_rgba(255,255,255,0.2)] active:scale-[0.98]"
+                    type="button"
+                  >
+                    <PlusIcon className="size-4 shrink-0" />
+                    Create Task
+                  </button>
+                )}
+
                 <KanbanColumnContent
                   className="flex flex-col gap-2.5"
                   value={columnId}
                 >
                   {tasks.map((task) => (
-                    <TaskCard asHandle key={task.id} task={task} />
+                    <TaskCard
+                      asHandle
+                      key={task.id}
+                      showOutput={columnId === "in_progress"}
+                      task={task}
+                    />
                   ))}
                 </KanbanColumnContent>
               </div>
