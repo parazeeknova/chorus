@@ -127,6 +127,7 @@ function createKanbanCardNode(
     selectable: true,
     style: {
       width: 1280,
+      height: 720,
     },
   };
 }

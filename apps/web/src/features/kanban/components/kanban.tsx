@@ -61,8 +61,14 @@ export interface Task {
     | "warning-light"
     | "destructive-light"
     | "info-light";
+  /** Lines added by the agent run — shown in done cards */
+  linesAdded?: number;
+  /** Lines removed by the agent run — shown in done cards */
+  linesRemoved?: number;
   /** Links to an OpenCode sessionId for live agent output */
   runId?: string;
+  /** Short paragraph describing what the agent did — shown in done cards */
+  summary?: string;
   title: string;
 }
 
@@ -320,12 +326,21 @@ function KanbanBoard({ className, children }: ComponentProps<"div">) {
 
 function KanbanColumn({
   value: columnId,
+  className,
   children,
 }: {
   value: string;
+  className?: string;
   children: React.ReactNode;
 }) {
-  return <div data-column={columnId}>{children}</div>;
+  return (
+    <div
+      className={cn("flex h-full min-h-0 flex-col", className)}
+      data-column={columnId}
+    >
+      {children}
+    </div>
+  );
 }
 
 function KanbanColumnContent({
@@ -421,6 +436,7 @@ const COLUMNS: Record<string, { title: string; icon: React.ReactNode }> = {
 interface TaskCardProps {
   asHandle?: boolean;
   showApprovalControls?: boolean;
+  showDone?: boolean;
   showOutput?: boolean;
   task: Task;
 }
@@ -429,36 +445,76 @@ function TaskCard({
   task,
   asHandle,
   showOutput,
+  showDone,
   showApprovalControls,
 }: TaskCardProps) {
   const content = (
-    <div className="group flex flex-col gap-3 rounded-xl border border-border/50 bg-card p-3.5 shadow-sm transition-all hover:border-border hover:shadow-md dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-white/20 dark:hover:bg-white/[0.06]">
-      <span className="font-medium text-[0.85rem] text-foreground leading-snug dark:text-white/90">
+    <div className="group flex flex-col gap-2.5 rounded-xl border border-border/50 bg-card p-3.5 shadow-sm transition-all hover:border-border hover:shadow-md dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-white/20 dark:hover:bg-white/[0.06]">
+      {/* Title — strikethrough for done tasks */}
+      <span
+        className={cn(
+          "font-medium text-[0.85rem] leading-snug",
+          showDone
+            ? "text-white/35 line-through decoration-white/20"
+            : "text-foreground dark:text-white/90"
+        )}
+      >
         {task.title}
       </span>
-      <div className="flex items-center justify-between gap-2">
-        <Badge className="w-fit" size="sm" variant={task.labelVariant}>
-          {task.label}
-        </Badge>
-        {showApprovalControls && (
-          <div className="flex items-center gap-1.5 pt-1">
-            <button
-              className="flex size-7 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-500 transition-colors hover:bg-emerald-500/20 active:scale-95"
-              title="Approve"
-              type="button"
-            >
-              <CheckIcon className="size-4" />
-            </button>
-            <button
-              className="flex size-7 items-center justify-center rounded-md bg-rose-500/10 text-rose-500 transition-colors hover:bg-rose-500/20 active:scale-95"
-              title="Reject"
-              type="button"
-            >
-              <XIcon className="size-4" />
-            </button>
-          </div>
-        )}
-      </div>
+
+      {/* Done: summary + diff stats */}
+      {showDone && (
+        <div className="flex flex-col gap-2 border-white/5 border-t pt-2.5">
+          {task.summary && (
+            <p className="text-[0.72rem] text-white/40 leading-relaxed">
+              {task.summary}
+            </p>
+          )}
+          {(task.linesAdded !== undefined ||
+            task.linesRemoved !== undefined) && (
+            <div className="flex items-center gap-2">
+              {task.linesAdded !== undefined && task.linesAdded > 0 && (
+                <span className="flex items-center gap-0.5 font-mono text-[0.65rem] text-emerald-400/70">
+                  +{task.linesAdded}
+                </span>
+              )}
+              {task.linesAdded !== undefined &&
+                task.linesAdded > 0 &&
+                task.linesRemoved !== undefined &&
+                task.linesRemoved > 0 && (
+                  <span className="text-[0.65rem] text-white/15">·</span>
+                )}
+              {task.linesRemoved !== undefined && task.linesRemoved > 0 && (
+                <span className="flex items-center gap-0.5 font-mono text-[0.65rem] text-red-400/60">
+                  -{task.linesRemoved}
+                </span>
+              )}
+              <span className="text-[0.65rem] text-white/20">
+                lines changed
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {showApprovalControls && (
+        <div className="flex items-center justify-end gap-1.5 pt-1">
+          <button
+            className="flex size-7 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-500 transition-colors hover:bg-emerald-500/20 active:scale-95"
+            title="Approve"
+            type="button"
+          >
+            <CheckIcon className="size-4" />
+          </button>
+          <button
+            className="flex size-7 items-center justify-center rounded-md bg-rose-500/10 text-rose-500 transition-colors hover:bg-rose-500/20 active:scale-95"
+            title="Reject"
+            type="button"
+          >
+            <XIcon className="size-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 
@@ -538,6 +594,10 @@ function defaultColumns(): Columns {
           "Project kickoff — repo structure, monorepo config, base design system",
         label: "Planning",
         labelVariant: "info-light",
+        summary:
+          "Initialised Turborepo monorepo with apps/web and apps/serve, configured shared tsconfig and Tailwind design tokens, set up ESLint + Prettier pipeline.",
+        linesAdded: 312,
+        linesRemoved: 0,
       },
     ],
   };
@@ -556,7 +616,7 @@ export function KanbanCardContent({
       onValueChange={onColumnsChange}
       value={data.columns}
     >
-      <KanbanBoard className="flex min-h-0 w-full min-w-0">
+      <KanbanBoard className="flex h-full min-h-0 w-full min-w-0">
         <ResizablePanelGroup
           className="relative w-full flex-1"
           direction="horizontal"
@@ -597,7 +657,7 @@ export function KanbanCardContent({
                         )}
 
                         <KanbanColumnContent
-                          className="flex min-h-20 flex-col gap-2.5"
+                          className="nowheel custom-scrollbar flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto pr-1 pb-1"
                           value={columnId}
                         >
                           {tasks.map((task) => (
@@ -605,6 +665,7 @@ export function KanbanCardContent({
                               asHandle
                               key={task.id}
                               showApprovalControls={columnId === "approve"}
+                              showDone={columnId === "done"}
                               showOutput={columnId === "in_progress"}
                               task={task}
                             />

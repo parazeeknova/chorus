@@ -1,23 +1,26 @@
 "use client";
 
-import {
-  Handle,
-  type Node,
-  type NodeProps,
-  NodeResizeControl,
-  Position,
-} from "@xyflow/react";
+import { type Node, type NodeProps, NodeResizeControl } from "@xyflow/react";
 import {
   ArrowDownIcon,
   ArrowUpIcon,
+  ChevronDownIcon,
+  Code2Icon,
   GitBranchIcon,
+  GlobeIcon,
   GripVerticalIcon,
   MinusIcon,
+  MonitorIcon,
   PlusIcon,
   XIcon,
 } from "lucide-react";
 import { memo, useCallback } from "react";
-
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   KanbanCardContent,
   type KanbanCardData,
@@ -179,17 +182,6 @@ function KanbanCardNodeComponent({
           "active:shadow-[0_32px_100px_rgba(0,0,0,0.8)] active:ring-1 active:ring-white/15"
         )}
       >
-        <Handle
-          className="!w-3 !h-3 !bg-white/30 !border-white/20"
-          position={Position.Top}
-          type="target"
-        />
-        <Handle
-          className="!w-3 !h-3 !bg-white/30 !border-white/20"
-          position={Position.Bottom}
-          type="source"
-        />
-
         {/* Title bar */}
         <div className="flex items-center gap-3 border-white/8 border-b px-3 py-2.5">
           {/* Drag handle */}
@@ -211,7 +203,7 @@ function KanbanCardNodeComponent({
           </div>
 
           {/* Right-aligned metadata */}
-          <div className="flex shrink-0 items-center gap-2.5">
+          <div className="nodrag flex shrink-0 items-center gap-2.5">
             <GitBranch branch={gitBranch} />
 
             {/* Separator */}
@@ -223,6 +215,30 @@ function KanbanCardNodeComponent({
             <span className="h-3.5 w-px bg-white/10" />
 
             <SyncStat incoming={incomingChanges} outgoing={outgoingChanges} />
+
+            {/* Separator */}
+            <span className="h-3.5 w-px bg-white/10" />
+
+            <DropdownMenu>
+              <DropdownMenuTrigger className="flex items-center gap-1.5 rounded-md bg-white/15 px-2 py-1 font-medium text-[0.65rem] text-white transition-all hover:bg-white/25 active:scale-95">
+                <Code2Icon className="size-3" />
+                <span>Open in Editor</span>
+                <ChevronDownIcon className="size-3 text-white/50" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                className="w-[160px] border-white/10 bg-[#1e1e1e] p-1.5 text-white/90 shadow-2xl"
+              >
+                <DropdownMenuItem className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-white/80 text-xs transition-colors focus:bg-white/10 focus:text-white">
+                  <MonitorIcon className="size-3.5" />
+                  <span>Open Locally</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-white/80 text-xs transition-colors focus:bg-white/10 focus:text-white">
+                  <GlobeIcon className="size-3.5" />
+                  <span>Open Here</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {/* Close */}
             {cardData.onRemove && (
@@ -240,7 +256,7 @@ function KanbanCardNodeComponent({
           </div>
         </div>
 
-        <div className="nodrag min-h-0 min-w-0 flex-1 p-4">
+        <div className="nodrag flex min-h-0 min-w-0 flex-1 flex-col p-4">
           <KanbanCardContent
             data={cardData}
             onColumnsChange={handleColumnsChange}
