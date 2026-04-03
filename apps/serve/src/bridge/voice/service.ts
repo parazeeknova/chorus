@@ -78,10 +78,14 @@ export class VoiceService {
     const modelId = (request.modelId ??
       env.ELEVENLABS_STT_MODEL_ID) as SpeechToTextConvertRequestModelId;
 
+    const mimeType = request.mimeType ?? "audio/mpeg";
+    const filename =
+      request.filename ?? `audio.${this.extFromMimeType(mimeType)}`;
+
     try {
       const result = await this.client.speechToText.convert({
-        file: new File([request.audioBuffer], "audio.wav", {
-          type: "audio/wav",
+        file: new File([request.audioBuffer], filename, {
+          type: mimeType,
         }),
         modelId,
         diarize: request.diarize ?? false,
@@ -157,5 +161,16 @@ export class VoiceService {
       return "audio/aac";
     }
     return "audio/mpeg";
+  }
+
+  private extFromMimeType(mimeType: string): string {
+    const map: Record<string, string> = {
+      "audio/mpeg": "mp3",
+      "audio/wav": "wav",
+      "audio/ogg": "ogg",
+      "audio/flac": "flac",
+      "audio/aac": "aac",
+    };
+    return map[mimeType] ?? "mp3";
   }
 }

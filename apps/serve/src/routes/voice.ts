@@ -8,8 +8,24 @@ import {
   buildNotificationMessage,
   shouldPlayNotification,
 } from "../bridge/voice/message-builder";
+import { env } from "../config/env";
 
-const voiceService = new VoiceService();
+const UNAVAILABLE = {
+  error: "Voice service not configured. Set ELEVENLABS_API_KEY to enable.",
+  timestamp: new Date().toISOString(),
+} as const;
+
+let voiceService: VoiceService | undefined;
+
+function getVoiceService(): VoiceService | null {
+  if (!voiceService) {
+    if (!env.ELEVENLABS_API_KEY) {
+      return null;
+    }
+    voiceService = new VoiceService();
+  }
+  return voiceService;
+}
 
 const defaultSettings: VoiceSettings = {
   muteAll: false,
@@ -24,6 +40,11 @@ export const voiceRoutes = new Elysia({ prefix: "/voice" })
   .post(
     "/notify",
     async ({ body }) => {
+      const svc = getVoiceService();
+      if (!svc) {
+        return { ...UNAVAILABLE, accepted: false };
+      }
+
       if (!shouldPlayNotification(defaultSettings, body.type)) {
         return {
           accepted: false,
@@ -38,7 +59,7 @@ export const voiceRoutes = new Elysia({ prefix: "/voice" })
         body.text
       );
 
-      const result = await voiceService.generateSpeech({
+      const result = await svc.generateSpeech({
         ...body,
         text,
       });
@@ -59,7 +80,12 @@ export const voiceRoutes = new Elysia({ prefix: "/voice" })
   .post(
     "/tts",
     async ({ body }) => {
-      const result = await voiceService.generateSpeech(body);
+      const svc = getVoiceService();
+      if (!svc) {
+        return UNAVAILABLE;
+      }
+
+      const result = await svc.generateSpeech(body);
 
       if (result.status === "failed") {
         return {
@@ -82,7 +108,7 @@ export const voiceRoutes = new Elysia({ prefix: "/voice" })
   .post(
     "/stt",
     async ({ body }) => {
-      const { audio, modelId, diarize } = body;
+      const { audio, modelId, diarize, mimeType, filename } = body;
 
       const audioBuffer = Buffer.from(audio, "base64").buffer.slice(
         Buffer.from(audio, "base64").byteOffset,
@@ -90,10 +116,19 @@ export const voiceRoutes = new Elysia({ prefix: "/voice" })
           Buffer.from(audio, "base64").byteLength
       ) as ArrayBuffer;
 
-      const result = await voiceService.transcribeSpeech({
+      const detectedMimeType = mimeType ?? detectMimeType(audioBuffer);
+
+      const svc = getVoiceService();
+      if (!svc) {
+        return UNAVAILABLE;
+      }
+
+      const result = await svc.transcribeSpeech({
         audioBuffer,
         modelId,
         diarize: diarize ?? false,
+        mimeType: detectedMimeType,
+        filename,
       });
 
       return {
@@ -108,11 +143,51 @@ export const voiceRoutes = new Elysia({ prefix: "/voice" })
         audio: t.String(),
         modelId: t.Optional(t.String()),
         diarize: t.Optional(t.Boolean()),
+        mimeType: t.Optional(t.String()),
+        filename: t.Optional(t.String()),
       }),
     }
   )
   .get("/health", () => ({
-    status: "ok",
+    status: env.ELEVENLABS_API_KEY ? "ok" : "unconfigured",
     service: "voice",
     timestamp: new Date().toISOString(),
   }));
+
+function detectMimeType(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  if (bytes.length < 4) {
+    return "audio/mpeg";
+  }
+  if (
+    bytes[0] === 0x52 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x46
+  ) {
+    return "audio/wav";
+  }
+  if (
+    bytes[0] === 0x4f &&
+    bytes[1] === 0x67 &&
+    bytes[2] === 0x67 &&
+    bytes[3] === 0x53
+  ) {
+    return "audio/ogg";
+  }
+  if (
+    bytes[0] === 0x66 &&
+    bytes[1] === 0x4c &&
+    bytes[2] === 0x61 &&
+    bytes[3] === 0x43
+  ) {
+    return "audio/flac";
+  }
+  if (
+    bytes[0] === 0xff ||
+    (bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33)
+  ) {
+    return "audio/mpeg";
+  }
+  return "audio/mpeg";
+}

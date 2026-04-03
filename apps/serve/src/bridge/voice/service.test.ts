@@ -4,6 +4,8 @@ import { join } from "node:path";
 import type { VoiceNotificationRequest } from "@chorus/voice";
 import { VoiceService } from "./service";
 
+const RUN_REAL_API = process.env.RUN_REAL_API_TESTS === "true";
+
 const OUTPUT_DIR = join(process.cwd(), "tmp", "voice-test-outputs");
 const INPUT_DIR = join(process.cwd(), "tmp", "voice-test-inputs");
 
@@ -40,7 +42,7 @@ beforeAll(() => {
   ensureDir(INPUT_DIR);
 });
 
-describe("ElevenLabs Real API Tests", () => {
+describe.skipIf(!RUN_REAL_API)("ElevenLabs Real API Tests", () => {
   const voiceService = new VoiceService();
 
   describe("TTS — text to speech", () => {

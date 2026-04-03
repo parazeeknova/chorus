@@ -49,6 +49,8 @@ export const SpeechToTextRequestSchema = z.object({
   audioBuffer: z.instanceof(ArrayBuffer),
   modelId: z.string().optional(),
   diarize: z.boolean().optional(),
+  mimeType: z.string().optional(),
+  filename: z.string().optional(),
 });
 
 export type SpeechToTextRequest = z.infer<typeof SpeechToTextRequestSchema>;

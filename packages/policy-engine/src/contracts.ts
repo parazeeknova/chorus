@@ -21,7 +21,7 @@ export const PolicyDecisionSchema = z.object({
   decision: PolicyDecisionEnum,
   reasonCode: z.string(),
   humanMessage: z.string(),
-  taskScope: z.string().optional(),
+  taskScope: PolicyScopeEnum.optional(),
   requestedAction: PolicyActionSchema,
   timestamp: z.date(),
   overrideable: z.boolean().optional().default(false),

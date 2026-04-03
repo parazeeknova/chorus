@@ -1,14 +1,35 @@
 import { PolicyCheckRequestSchema } from "@chorus/policy-engine";
 import { Elysia, t } from "elysia";
 import { PolicyService } from "../bridge/policy";
+import { env } from "../config/env";
 
-const policyService = new PolicyService();
+const UNAVAILABLE = {
+  error: "Policy service not configured. Set ARMORIQ_API_KEY to enable.",
+  timestamp: new Date().toISOString(),
+} as const;
+
+let policyService: PolicyService | undefined;
+
+function getPolicyService(): PolicyService | null {
+  if (!policyService) {
+    if (!env.ARMORIQ_API_KEY) {
+      return null;
+    }
+    policyService = new PolicyService();
+  }
+  return policyService;
+}
 
 export const policyRoutes = new Elysia({ prefix: "/policy" })
   .post(
     "/check",
     async ({ body }) => {
-      const result = await policyService.checkPolicy(body);
+      const svc = getPolicyService();
+      if (!svc) {
+        return UNAVAILABLE;
+      }
+
+      const result = await svc.checkPolicy(body);
 
       return {
         decision: result.decision.decision,
@@ -27,8 +48,13 @@ export const policyRoutes = new Elysia({ prefix: "/policy" })
   .post(
     "/preflight",
     async ({ body }) => {
+      const svc = getPolicyService();
+      if (!svc) {
+        return UNAVAILABLE;
+      }
+
       const { cardId, projectId } = body;
-      const result = await policyService.preflightCheck(cardId, projectId);
+      const result = await svc.preflightCheck(cardId, projectId);
 
       return {
         decision: result.decision.decision,
@@ -49,8 +75,13 @@ export const policyRoutes = new Elysia({ prefix: "/policy" })
   .post(
     "/tool-check",
     async ({ body }) => {
+      const svc = getPolicyService();
+      if (!svc) {
+        return UNAVAILABLE;
+      }
+
       const { cardId, projectId, toolName, toolArgs } = body;
-      const result = await policyService.checkToolAction(
+      const result = await svc.checkToolAction(
         cardId,
         projectId,
         toolName,
@@ -79,8 +110,13 @@ export const policyRoutes = new Elysia({ prefix: "/policy" })
   .get(
     "/profile",
     async ({ query }) => {
+      const svc = getPolicyService();
+      if (!svc) {
+        return UNAVAILABLE;
+      }
+
       const { cardId, projectId } = query;
-      const profile = await policyService.getPolicyProfile(cardId, projectId);
+      const profile = await svc.getPolicyProfile(cardId, projectId);
 
       return {
         profileId: profile.profileId,
@@ -98,7 +134,7 @@ export const policyRoutes = new Elysia({ prefix: "/policy" })
     }
   )
   .get("/health", () => ({
-    status: "ok",
+    status: env.ARMORIQ_API_KEY ? "ok" : "unconfigured",
     service: "policy",
     timestamp: new Date().toISOString(),
   }));
