@@ -64,6 +64,17 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - use the right test type for the change: unit, integration, and e2e when appropriate
 - run the relevant tests after making changes
 
+## Git commits
+
+- git commit subjects must use this format only: `<type>[<AREA>]: <summary>`
+- valid examples: `feat[COLLAB]: add dependency-aware task wiring` and `chore[TEST]: tighten pre-push type checks`
+- use lowercase commit types like `feat`, `fix`, `chore`, `refactor`, `docs`, or `test`
+- use uppercase area tags inside brackets like `COLLAB`, `TEST`, `WEB`, `SERVE`, `CANVAS`, `AGENTS`, or another short project-relevant area
+- after the subject line, include a commit body
+- the commit body must contain at least one clear paragraph describing what changed, where it changed, and any important behavior or migration detail
+- do not use one-line commits without a body
+- keep the subject concise and put the implementation detail in the body paragraph
+
 ## Chorus-specific rules
 
 - keep task state explicit: `queue`, `in_progress`, `approve`, `done`, or other shared typed statuses

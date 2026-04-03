@@ -5,6 +5,9 @@ pre-commit:
         - "*.{js,jsx,ts,tsx,json,jsonc,css,scss,md,mdx}"
       run: bunx ultracite fix {staged_files}
       stage_fixed: true
+    version-autobump:
+      skip_empty: false
+      run: bun run version:autobump
 
 pre-push:
   jobs:
