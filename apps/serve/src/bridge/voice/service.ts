@@ -24,15 +24,14 @@ export class VoiceService {
     request: VoiceNotificationRequest
   ): Promise<VoiceNotificationResult> {
     const voiceId = request.voiceId ?? env.ELEVENLABS_DEFAULT_VOICE_ID;
-    const modelId = (request.modelId ??
-      env.ELEVENLABS_DEFAULT_MODEL_ID) as string;
+    const modelId = request.modelId ?? env.ELEVENLABS_DEFAULT_MODEL_ID;
     const outputFormat =
       env.ELEVENLABS_OUTPUT_FORMAT as TextToSpeechConvertRequestOutputFormat;
 
     try {
       const audio = await this.client.textToSpeech.convert(voiceId, {
         text: request.text,
-        modelId: modelId as never,
+        modelId,
         outputFormat,
       });
 
@@ -60,13 +59,13 @@ export class VoiceService {
     request: VoiceNotificationRequest
   ): Promise<ReadableStream<Uint8Array>> {
     const voiceId = request.voiceId ?? env.ELEVENLABS_DEFAULT_VOICE_ID;
-    const modelId = (request.modelId ??
-      env.ELEVENLABS_DEFAULT_MODEL_ID) as string;
-    const outputFormat = env.ELEVENLABS_OUTPUT_FORMAT;
+    const modelId = request.modelId ?? env.ELEVENLABS_DEFAULT_MODEL_ID;
+    const outputFormat =
+      env.ELEVENLABS_OUTPUT_FORMAT as TextToSpeechConvertRequestOutputFormat;
 
     const response = await this.client.textToSpeech.stream(voiceId, {
       text: request.text,
-      modelId: modelId as never,
+      modelId,
       outputFormat: outputFormat as never,
     });
 
