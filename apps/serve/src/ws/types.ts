@@ -1,0 +1,144 @@
+import type { NormalizedAgentEvent } from "@chorus/oc-adapter";
+import type { ServerWebSocket } from "bun";
+
+export const WS_MESSAGE_TYPE = {
+  TASK_QUEUE: "task.queue",
+  TASK_APPROVE: "task.approve",
+  TASK_REJECT: "task.reject",
+  TASK_ABORT: "task.abort",
+  TASK_REDIRECT: "task.redirect",
+  TASK_RACE: "task.race",
+  VIEWPORT_SYNC: "viewport.sync",
+  PRESENCE_PING: "presence.ping",
+} as const;
+
+export const WS_RESPONSE_TYPE = {
+  CONNECTED: "connected",
+  ERROR: "error",
+  TASK_QUEUED: "task.queued",
+  TASK_APPROVED: "task.approved",
+  TASK_REJECTED: "task.rejected",
+  TASK_ABORTED: "task.aborted",
+  TASK_REDIRECTED: "task.redirected",
+  TASK_RACE_STARTED: "task.race.started",
+  PRESENCE_PONG: "presence.pong",
+  UNKNOWN_MESSAGE: "unknown.message",
+} as const;
+
+export const SUPPORTED_MESSAGE_TYPES = [
+  WS_MESSAGE_TYPE.TASK_QUEUE,
+  WS_MESSAGE_TYPE.TASK_APPROVE,
+  WS_MESSAGE_TYPE.TASK_REJECT,
+  WS_MESSAGE_TYPE.TASK_ABORT,
+  WS_MESSAGE_TYPE.TASK_REDIRECT,
+  WS_MESSAGE_TYPE.TASK_RACE,
+  WS_MESSAGE_TYPE.VIEWPORT_SYNC,
+  WS_MESSAGE_TYPE.PRESENCE_PING,
+] as const;
+
+export interface WsSession {
+  id: string;
+  ws: ServerWebSocket<WsContext>;
+}
+
+export interface WsContext {
+  sessionId: string;
+  subscriptions: Set<string>;
+}
+
+export type WsMessage =
+  | { type: typeof WS_MESSAGE_TYPE.TASK_QUEUE; payload: QueueTaskPayload }
+  | { type: typeof WS_MESSAGE_TYPE.TASK_APPROVE; payload: ApprovePayload }
+  | { type: typeof WS_MESSAGE_TYPE.TASK_REJECT; payload: RejectPayload }
+  | { type: typeof WS_MESSAGE_TYPE.TASK_ABORT; payload: AbortPayload }
+  | { type: typeof WS_MESSAGE_TYPE.TASK_REDIRECT; payload: RedirectPayload }
+  | { type: typeof WS_MESSAGE_TYPE.TASK_RACE; payload: RacePayload }
+  | { type: typeof WS_MESSAGE_TYPE.VIEWPORT_SYNC; payload: ViewportSyncPayload }
+  | { type: typeof WS_MESSAGE_TYPE.PRESENCE_PING };
+
+export interface QueueTaskPayload {
+  agent?: string;
+  model?: {
+    providerID: string;
+    modelID: string;
+  };
+  text: string;
+}
+
+export interface ApprovePayload {
+  message?: string;
+  requestID: string;
+  sessionID: string;
+}
+
+export interface RejectPayload {
+  message?: string;
+  requestID: string;
+  sessionID: string;
+}
+
+export interface AbortPayload {
+  sessionID: string;
+}
+
+export interface RedirectPayload {
+  mode: "soft" | "hard";
+  sessionID: string;
+  text: string;
+}
+
+export interface RacePayload {
+  baseTitle?: string;
+  models: Array<{ providerID: string; modelID: string }>;
+  parentSessionID: string;
+  text: string;
+}
+
+export interface ViewportSyncPayload {
+  projectId: string;
+  viewport: { x: number; y: number; zoom: number };
+}
+
+export interface WsResponse<T = unknown> {
+  payload: T;
+  timestamp: number;
+  type: string;
+}
+
+export function broadcast(
+  clients: Set<ServerWebSocket<WsContext>>,
+  event: NormalizedAgentEvent
+): void {
+  const message = JSON.stringify({
+    type: `agent.${event.activity ?? event.type}`,
+    payload: event,
+    timestamp: Date.now(),
+  } satisfies WsResponse<NormalizedAgentEvent>);
+
+  for (const ws of clients) {
+    ws.send(message);
+  }
+}
+
+export function broadcastRaw(
+  clients: Set<ServerWebSocket<WsContext>>,
+  message: string
+): void {
+  for (const ws of clients) {
+    ws.send(message);
+  }
+}
+
+export function sendResponse<T>(
+  ws: ServerWebSocket<WsContext>,
+  type: string,
+  payload: T
+): void {
+  ws.send(
+    JSON.stringify({
+      type,
+      payload,
+      timestamp: Date.now(),
+    } satisfies WsResponse<T>)
+  );
+}

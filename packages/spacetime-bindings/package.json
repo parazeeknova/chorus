@@ -1,0 +1,16 @@
+{
+  "name": "@chorus/spacetime",
+  "version": "0.0.4",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "spacetimedb": "^2.1.0"
+  }
+}

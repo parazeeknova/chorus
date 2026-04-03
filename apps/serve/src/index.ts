@@ -1,7 +1,47 @@
 import { Elysia } from "elysia";
+import { OpenCodeBridge } from "./bridge/opencode/bridge";
+import { loadConfig } from "./config";
+import { createWsClientManager } from "./events/broadcaster";
+import { createHttpRoutes } from "./routes";
+import { policyRoutes } from "./routes/policy";
+import { voiceRoutes } from "./routes/voice";
+import { createWsHandler } from "./ws/handler";
 
-const app = new Elysia().get("/", () => "Hello Elysia").listen(2000);
+const config = loadConfig();
+const bridge = new OpenCodeBridge(
+  config.opencodeBaseUrl,
+  config.opencodeDirectory
+);
+const wsManager = createWsClientManager();
+
+bridge.subscribe((event) => {
+  wsManager.broadcast(event);
+});
+
+const app = new Elysia()
+  .get("/", () => "Hello Elysia")
+  .use(createHttpRoutes(bridge))
+  .use(voiceRoutes)
+  .use(policyRoutes)
+  .use(createWsHandler(bridge, wsManager))
+  .listen(config.port);
 
 console.log(
-  `🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`
+  `Chorus bridge running at ${app.server?.hostname}:${app.server?.port}`
 );
+console.log(`   OpenCode: ${config.opencodeBaseUrl}`);
+console.log(`   Directory: ${config.opencodeDirectory}`);
+console.log(
+  `   WebSocket: ws://${app.server?.hostname}:${app.server?.port}/ws`
+);
+
+try {
+  await bridge.start();
+} catch (error) {
+  console.error(
+    "[bridge] failed to connect to OpenCode:",
+    error instanceof Error ? error.message : error
+  );
+  console.error("[bridge] HTTP and WebSocket endpoints remain available");
+  console.error("[bridge] Restart the bridge once OpenCode is reachable");
+}
