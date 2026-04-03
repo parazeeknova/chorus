@@ -22,7 +22,12 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { cva } from "class-variance-authority";
-import { CircleCheckIcon, CircleDot, CircleIcon } from "lucide-react";
+import {
+  AlertCircle,
+  CircleCheckIcon,
+  CircleDot,
+  CircleIcon,
+} from "lucide-react";
 import {
   type ComponentProps,
   createContext,
@@ -30,6 +35,7 @@ import {
   useContext,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 
 import { cn } from "@/lib/utils";
 
@@ -272,17 +278,22 @@ export function Kanban({
         sensors={sensors}
       >
         {children}
-        <DragOverlay>
-          {activeTask ? (
-            <div className="rotate-2 scale-105 opacity-90">
-              <div className="rounded-lg border border-border/50 bg-card p-3 shadow-xl dark:border-white/10 dark:bg-[#1e1e1e] dark:shadow-2xl">
-                <span className="font-medium text-foreground text-sm dark:text-white/90">
-                  {activeTask.title}
-                </span>
-              </div>
-            </div>
-          ) : null}
-        </DragOverlay>
+        {typeof document === "undefined"
+          ? null
+          : createPortal(
+              <DragOverlay>
+                {activeTask ? (
+                  <div className="rotate-2 scale-105 opacity-90">
+                    <div className="rounded-lg border border-border/50 bg-card p-3 text-[14px] shadow-xl dark:border-white/10 dark:bg-[#1e1e1e] dark:shadow-2xl">
+                      <span className="font-medium text-foreground text-sm dark:text-white/90">
+                        {activeTask.title}
+                      </span>
+                    </div>
+                  </div>
+                ) : null}
+              </DragOverlay>,
+              document.body
+            )}
       </DndContext>
     </KanbanContext.Provider>
   );
@@ -378,17 +389,21 @@ function KanbanOverlay({ className }: ComponentProps<"div">) {
 }
 
 const COLUMNS: Record<string, { title: string; icon: React.ReactNode }> = {
-  todo: {
-    title: "To Do",
+  queue: {
+    title: "Queue",
     icon: <CircleIcon className="size-3.5" />,
   },
-  doing: {
+  in_progress: {
     title: "In Progress",
     icon: <CircleDot className="size-3.5 text-muted-foreground" />,
   },
+  approve: {
+    title: "Approve",
+    icon: <AlertCircle className="size-3.5 text-amber-500" />,
+  },
   done: {
     title: "Done",
-    icon: <CircleCheckIcon className="size-3.5" />,
+    icon: <CircleCheckIcon className="size-3.5 text-emerald-500" />,
   },
 };
 
@@ -420,7 +435,7 @@ function TaskCard({ task, asHandle }: TaskCardProps) {
 
 function defaultColumns(): Columns {
   return {
-    todo: [
+    queue: [
       {
         id: `${Date.now()}-1`,
         title: "Design landing page",
@@ -434,7 +449,7 @@ function defaultColumns(): Columns {
         labelVariant: "warning-light",
       },
     ],
-    doing: [
+    in_progress: [
       {
         id: `${Date.now()}-3`,
         title: "Implement auth flow",
@@ -442,6 +457,7 @@ function defaultColumns(): Columns {
         labelVariant: "primary-light",
       },
     ],
+    approve: [],
     done: [
       {
         id: `${Date.now()}-4`,
@@ -466,7 +482,7 @@ export function KanbanCardContent({
       onValueChange={onColumnsChange}
       value={data.columns}
     >
-      <KanbanBoard className="grid auto-rows-fr grid-cols-3 gap-3">
+      <KanbanBoard className="grid auto-rows-fr grid-cols-4 gap-3">
         {Object.entries(data.columns).map(([columnId, tasks]) => {
           const col = COLUMNS[columnId];
           return (

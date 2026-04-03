@@ -146,7 +146,7 @@ export function BackgroundCanvas() {
         id: "card-2",
         title: "Sprint 2",
         columns: {
-          todo: [
+          queue: [
             {
               id: "t1",
               title: "Research competitors",
@@ -154,7 +154,8 @@ export function BackgroundCanvas() {
               labelVariant: "info-light",
             },
           ],
-          doing: [],
+          in_progress: [],
+          approve: [],
           done: [],
         },
       }
