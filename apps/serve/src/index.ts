@@ -3,6 +3,8 @@ import { OpenCodeBridge } from "./bridge/opencode/bridge";
 import { loadConfig } from "./config";
 import { createWsClientManager } from "./events/broadcaster";
 import { createHttpRoutes } from "./routes";
+import { policyRoutes } from "./routes/policy";
+import { voiceRoutes } from "./routes/voice";
 import { createWsHandler } from "./ws/handler";
 
 const config = loadConfig();
@@ -17,7 +19,10 @@ bridge.subscribe((event) => {
 });
 
 const app = new Elysia()
+  .get("/", () => "Hello Elysia")
   .use(createHttpRoutes(bridge))
+  .use(voiceRoutes)
+  .use(policyRoutes)
   .use(createWsHandler(bridge, wsManager))
   .listen(config.port);
 

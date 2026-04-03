@@ -343,7 +343,7 @@ function KanbanColumnContent({
 
   return (
     <SortableContext items={itemIds} strategy={verticalListSortingStrategy}>
-      <div className={cn("min-h-[80px]", className)}>{children}</div>
+      <div className={cn("min-h-20", className)}>{children}</div>
     </SortableContext>
   );
 }
@@ -432,7 +432,7 @@ function TaskCard({
   showApprovalControls,
 }: TaskCardProps) {
   const content = (
-    <div className="group flex flex-col gap-3 rounded-xl border border-border/50 bg-card p-3.5 shadow-sm transition-all hover:border-border hover:shadow-md dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-white/20 dark:hover:bg-white/[0.06]">
+    <div className="group flex flex-col gap-3 rounded-xl border border-border/50 bg-card p-3.5 shadow-sm transition-all hover:border-border hover:shadow-md dark:border-white/10 dark:bg-white/3 dark:hover:border-white/20 dark:hover:bg-white/6">
       <span className="font-medium text-[0.85rem] text-foreground leading-snug dark:text-white/90">
         {task.title}
       </span>

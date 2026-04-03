@@ -180,12 +180,12 @@ function KanbanCardNodeComponent({
         )}
       >
         <Handle
-          className="!w-3 !h-3 !bg-white/30 !border-white/20"
+          className="h-3! w-3! border-white/20! bg-white/30!"
           position={Position.Top}
           type="target"
         />
         <Handle
-          className="!w-3 !h-3 !bg-white/30 !border-white/20"
+          className="h-3! w-3! border-white/20! bg-white/30!"
           position={Position.Bottom}
           type="source"
         />
