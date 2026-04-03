@@ -143,8 +143,8 @@ export function Kanban({
   const [activeTask, setActiveTask] = useState<Task | null>(null);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 2 } }),
+    useSensor(TouchSensor, { activationConstraint: { distance: 2 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
@@ -384,10 +384,6 @@ function KanbanItemHandle({
   );
 }
 
-function KanbanOverlay({ className }: ComponentProps<"div">) {
-  return <div className={cn("pointer-events-none", className)} />;
-}
-
 const COLUMNS: Record<string, { title: string; icon: React.ReactNode }> = {
   queue: {
     title: "Queue",
@@ -414,15 +410,13 @@ interface TaskCardProps {
 
 function TaskCard({ task, asHandle }: TaskCardProps) {
   const content = (
-    <div className="group rounded-lg border border-border/50 bg-card p-3 shadow-sm transition-all hover:border-border hover:shadow-md dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8">
-      <div className="flex flex-col gap-2">
-        <span className="font-medium text-[0.85rem] text-foreground leading-snug dark:text-white/90">
-          {task.title}
-        </span>
-        <Badge className="w-fit" size="sm" variant={task.labelVariant}>
-          {task.label}
-        </Badge>
-      </div>
+    <div className="group flex flex-col gap-3 rounded-xl border border-border/50 bg-card p-3.5 shadow-sm transition-all hover:border-border hover:shadow-md dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-white/20 dark:hover:bg-white/[0.06]">
+      <span className="font-medium text-[0.85rem] text-foreground leading-snug dark:text-white/90">
+        {task.title}
+      </span>
+      <Badge className="w-fit" size="sm" variant={task.labelVariant}>
+        {task.label}
+      </Badge>
     </div>
   );
 
@@ -487,22 +481,18 @@ export function KanbanCardContent({
           const col = COLUMNS[columnId];
           return (
             <KanbanColumn key={columnId} value={columnId}>
-              <div className="flex h-full flex-col gap-3 rounded-xl border border-border/40 bg-muted/30 p-3 dark:border-white/5 dark:bg-black/20">
-                <div className="flex items-center gap-1.5 px-1 py-0.5">
+              <div className="flex h-full flex-col gap-3 rounded-xl border border-transparent bg-muted/30 p-3 dark:border-white/[0.02] dark:bg-black/30">
+                <div className="flex items-center gap-2 px-1 py-1">
                   {col.icon}
-                  <h3 className="font-medium text-[0.75rem] text-muted-foreground uppercase tracking-wide">
+                  <h3 className="font-medium text-[0.75rem] text-muted-foreground uppercase tracking-wider dark:text-white/50">
                     {col.title}
                   </h3>
-                  <Badge
-                    className="ml-auto bg-background/50 dark:bg-white/10"
-                    size="sm"
-                    variant="outline"
-                  >
+                  <div className="ml-auto flex size-5 items-center justify-center rounded-full bg-background font-semibold text-[10px] dark:bg-white/10 dark:text-white/80">
                     {tasks.length}
-                  </Badge>
+                  </div>
                 </div>
                 <KanbanColumnContent
-                  className="flex flex-col gap-2"
+                  className="flex flex-col gap-2.5"
                   value={columnId}
                 >
                   {tasks.map((task) => (
@@ -514,7 +504,6 @@ export function KanbanCardContent({
           );
         })}
       </KanbanBoard>
-      <KanbanOverlay className="rounded-md border-2 border-border/40 border-dashed bg-muted/10" />
     </Kanban>
   );
 }
