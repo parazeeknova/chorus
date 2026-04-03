@@ -28,7 +28,7 @@ describe("voice contracts", () => {
       const result = VoiceNotificationRequestSchema.safeParse(input);
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.priority).toBe("normal");
+        expect(result.data.priority).toBeUndefined();
       }
     });
 
