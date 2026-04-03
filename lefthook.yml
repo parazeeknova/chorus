@@ -1,0 +1,14 @@
+pre-commit:
+  commands:
+    ultracite-staged:
+      glob:
+        - "*.{js,jsx,ts,tsx,json,jsonc,css,scss,md,mdx}"
+      run: bunx ultracite fix {staged_files}
+      stage_fixed: true
+
+pre-push:
+  jobs:
+    - name: ultracite-push
+      run: bunx ultracite fix {push_files}
+    - script: checks.sh
+      runner: bash

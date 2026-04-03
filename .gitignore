@@ -17,6 +17,7 @@ coverage
 
 # Turbo
 .turbo
+.bun
 
 # Vercel
 .vercel
