@@ -1,6 +1,12 @@
 "use client";
 
-import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
+import {
+  Handle,
+  type Node,
+  type NodeProps,
+  NodeResizeControl,
+  Position,
+} from "@xyflow/react";
 import {
   ArrowDownIcon,
   ArrowUpIcon,
@@ -131,6 +137,7 @@ function SyncStat({
 function KanbanCardNodeComponent({
   data: rawData,
   id,
+  selected,
 }: NodeProps<Node<Record<string, unknown>>>) {
   const cardData = rawData as unknown as KanbanCardNodeData;
 
@@ -151,80 +158,96 @@ function KanbanCardNodeComponent({
   );
 
   return (
-    <div
-      className={cn(
-        "dark w-[1280px] rounded-2xl border border-white/10 bg-[#111111]/95 shadow-[0_24px_80px_rgba(0,0,0,0.6)] backdrop-blur-xl transition-shadow",
-        "active:shadow-[0_32px_100px_rgba(0,0,0,0.8)] active:ring-1 active:ring-white/15"
+    <>
+      {selected && (
+        <>
+          <NodeResizeControl
+            className="-left-1.5! h-full! w-3! border-0! bg-transparent!"
+            minWidth={800}
+            position="left"
+          />
+          <NodeResizeControl
+            className="-right-1.5! h-full! w-3! border-0! bg-transparent!"
+            minWidth={800}
+            position="right"
+          />
+        </>
       )}
-    >
-      <Handle
-        className="!w-3 !h-3 !bg-white/30 !border-white/20"
-        position={Position.Top}
-        type="target"
-      />
-      <Handle
-        className="!w-3 !h-3 !bg-white/30 !border-white/20"
-        position={Position.Bottom}
-        type="source"
-      />
-
-      {/* Title bar */}
-      <div className="flex items-center gap-3 border-white/8 border-b px-3 py-2.5">
-        {/* Drag handle */}
-        <div className="flex shrink-0 cursor-grab items-center justify-center rounded-md p-1 text-white/25 hover:text-white/50 active:cursor-grabbing">
-          <GripVerticalIcon className="size-3.5" />
-        </div>
-
-        {/* Left: Task name */}
-        <h2 className="shrink-0 font-semibold text-[0.82rem] text-white/90 tracking-wide">
-          {cardData.title}
-        </h2>
-
-        {/* Separator */}
-        <span className="h-3.5 w-px shrink-0 bg-white/10" />
-
-        {/* File path */}
-        <div className="min-w-0 flex-1 truncate">
-          <FilePath path={filePath} />
-        </div>
-
-        {/* Right-aligned metadata */}
-        <div className="flex shrink-0 items-center gap-2.5">
-          <GitBranch branch={gitBranch} />
-
-          {/* Separator */}
-          <span className="h-3.5 w-px bg-white/10" />
-
-          <DiffStat added={diffAdded} removed={diffRemoved} />
-
-          {/* Separator */}
-          <span className="h-3.5 w-px bg-white/10" />
-
-          <SyncStat incoming={incomingChanges} outgoing={outgoingChanges} />
-
-          {/* Close */}
-          {cardData.onRemove && (
-            <>
-              <span className="h-3.5 w-px bg-white/10" />
-              <button
-                className="rounded-md p-1 text-white/25 transition-colors hover:bg-white/8 hover:text-white/60"
-                onClick={() => cardData.onRemove?.(id)}
-                type="button"
-              >
-                <XIcon className="size-3.5" />
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-
-      <div className="nodrag p-4">
-        <KanbanCardContent
-          data={cardData}
-          onColumnsChange={handleColumnsChange}
+      <div
+        className={cn(
+          "dark flex h-full w-full flex-col rounded-2xl border border-white/10 bg-[#111111]/95 shadow-[0_24px_80px_rgba(0,0,0,0.6)] backdrop-blur-xl transition-shadow",
+          "active:shadow-[0_32px_100px_rgba(0,0,0,0.8)] active:ring-1 active:ring-white/15"
+        )}
+      >
+        <Handle
+          className="!w-3 !h-3 !bg-white/30 !border-white/20"
+          position={Position.Top}
+          type="target"
         />
+        <Handle
+          className="!w-3 !h-3 !bg-white/30 !border-white/20"
+          position={Position.Bottom}
+          type="source"
+        />
+
+        {/* Title bar */}
+        <div className="flex items-center gap-3 border-white/8 border-b px-3 py-2.5">
+          {/* Drag handle */}
+          <div className="flex shrink-0 cursor-grab items-center justify-center rounded-md p-1 text-white/25 hover:text-white/50 active:cursor-grabbing">
+            <GripVerticalIcon className="size-3.5" />
+          </div>
+
+          {/* Left: Task name */}
+          <h2 className="shrink-0 font-semibold text-[0.82rem] text-white/90 tracking-wide">
+            {cardData.title}
+          </h2>
+
+          {/* Separator */}
+          <span className="h-3.5 w-px shrink-0 bg-white/10" />
+
+          {/* File path */}
+          <div className="min-w-0 flex-1 truncate">
+            <FilePath path={filePath} />
+          </div>
+
+          {/* Right-aligned metadata */}
+          <div className="flex shrink-0 items-center gap-2.5">
+            <GitBranch branch={gitBranch} />
+
+            {/* Separator */}
+            <span className="h-3.5 w-px bg-white/10" />
+
+            <DiffStat added={diffAdded} removed={diffRemoved} />
+
+            {/* Separator */}
+            <span className="h-3.5 w-px bg-white/10" />
+
+            <SyncStat incoming={incomingChanges} outgoing={outgoingChanges} />
+
+            {/* Close */}
+            {cardData.onRemove && (
+              <>
+                <span className="h-3.5 w-px bg-white/10" />
+                <button
+                  className="rounded-md p-1 text-white/25 transition-colors hover:bg-white/8 hover:text-white/60"
+                  onClick={() => cardData.onRemove?.(id)}
+                  type="button"
+                >
+                  <XIcon className="size-3.5" />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="nodrag min-h-0 min-w-0 flex-1 p-4">
+          <KanbanCardContent
+            data={cardData}
+            onColumnsChange={handleColumnsChange}
+          />
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 

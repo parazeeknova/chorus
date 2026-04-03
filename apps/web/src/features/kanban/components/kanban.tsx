@@ -24,19 +24,28 @@ import { CSS } from "@dnd-kit/utilities";
 import { cva } from "class-variance-authority";
 import {
   AlertCircle,
+  CheckIcon,
   CircleCheckIcon,
   CircleDot,
   CircleIcon,
   PlusIcon,
+  XIcon,
 } from "lucide-react";
 import {
   type ComponentProps,
   createContext,
+  Fragment,
   useCallback,
   useContext,
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
 import {
   AgentOutputCard,
   PLACEHOLDER_RUN,
@@ -411,19 +420,45 @@ const COLUMNS: Record<string, { title: string; icon: React.ReactNode }> = {
 
 interface TaskCardProps {
   asHandle?: boolean;
+  showApprovalControls?: boolean;
   showOutput?: boolean;
   task: Task;
 }
 
-function TaskCard({ task, asHandle, showOutput }: TaskCardProps) {
+function TaskCard({
+  task,
+  asHandle,
+  showOutput,
+  showApprovalControls,
+}: TaskCardProps) {
   const content = (
     <div className="group flex flex-col gap-3 rounded-xl border border-border/50 bg-card p-3.5 shadow-sm transition-all hover:border-border hover:shadow-md dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-white/20 dark:hover:bg-white/[0.06]">
       <span className="font-medium text-[0.85rem] text-foreground leading-snug dark:text-white/90">
         {task.title}
       </span>
-      <Badge className="w-fit" size="sm" variant={task.labelVariant}>
-        {task.label}
-      </Badge>
+      <div className="flex items-center justify-between gap-2">
+        <Badge className="w-fit" size="sm" variant={task.labelVariant}>
+          {task.label}
+        </Badge>
+        {showApprovalControls && (
+          <div className="flex items-center gap-1.5 pt-1">
+            <button
+              className="flex size-7 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-500 transition-colors hover:bg-emerald-500/20 active:scale-95"
+              title="Approve"
+              type="button"
+            >
+              <CheckIcon className="size-4" />
+            </button>
+            <button
+              className="flex size-7 items-center justify-center rounded-md bg-rose-500/10 text-rose-500 transition-colors hover:bg-rose-500/20 active:scale-95"
+              title="Reject"
+              type="button"
+            >
+              <XIcon className="size-4" />
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 
@@ -521,52 +556,69 @@ export function KanbanCardContent({
       onValueChange={onColumnsChange}
       value={data.columns}
     >
-      <KanbanBoard className="grid auto-rows-fr grid-cols-4 gap-3">
-        {Object.entries(data.columns).map(([columnId, tasks]) => {
-          const col = COLUMNS[columnId];
-          const isQueue = columnId === "queue";
-          return (
-            <KanbanColumn key={columnId} value={columnId}>
-              <div className="flex h-full flex-col gap-3 rounded-xl border border-transparent bg-muted/30 p-3 dark:border-white/2 dark:bg-black/30">
-                {/* Column header */}
-                <div className="flex items-center gap-2 px-1 py-1">
-                  {col.icon}
-                  <h3 className="font-medium text-[0.75rem] text-muted-foreground uppercase tracking-wider dark:text-white/50">
-                    {col.title}
-                  </h3>
-                  <div className="ml-auto flex size-5 items-center justify-center rounded-full bg-background font-semibold text-[10px] dark:bg-white/10 dark:text-white/80">
-                    {tasks.length}
-                  </div>
-                </div>
-
-                {/* Queue: create task button */}
-                {isQueue && (
-                  <button
-                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-white px-3 py-2.5 font-semibold text-[0.8rem] text-black shadow-[0_0_15px_rgba(255,255,255,0.1)] transition-all hover:bg-white/90 hover:shadow-[0_0_20px_rgba(255,255,255,0.2)] active:scale-[0.98]"
-                    type="button"
-                  >
-                    <PlusIcon className="size-4 shrink-0" />
-                    Create Task
-                  </button>
-                )}
-
-                <KanbanColumnContent
-                  className="flex flex-col gap-2.5"
-                  value={columnId}
+      <KanbanBoard className="flex min-h-0 w-full min-w-0">
+        <ResizablePanelGroup
+          className="relative w-full flex-1"
+          direction="horizontal"
+        >
+          {Object.entries(data.columns).map(([columnId, tasks], index, arr) => {
+            const col = COLUMNS[columnId];
+            const isQueue = columnId === "queue";
+            return (
+              <Fragment key={columnId}>
+                <ResizablePanel
+                  className="flex min-w-0 flex-col"
+                  defaultSize={25}
+                  minSize={15}
                 >
-                  {tasks.map((task) => (
-                    <TaskCard
-                      asHandle
-                      key={task.id}
-                      showOutput={columnId === "in_progress"}
-                      task={task}
-                    />
-                  ))}
-                </KanbanColumnContent>
-              </div>
-            </KanbanColumn>
-          );
-        })}
+                  <div className="flex h-full min-w-0 flex-col px-1.5">
+                    <KanbanColumn value={columnId}>
+                      <div className="flex h-full min-w-0 flex-col gap-3 rounded-xl border border-transparent bg-muted/30 p-3 dark:border-white/2 dark:bg-black/30">
+                        {/* Column header */}
+                        <div className="flex items-center gap-2 px-1 py-1">
+                          {col.icon}
+                          <h3 className="truncate font-medium text-[0.75rem] text-muted-foreground uppercase tracking-wider dark:text-white/50">
+                            {col.title}
+                          </h3>
+                          <div className="ml-auto flex size-5 shrink-0 items-center justify-center rounded-full bg-background font-semibold text-[10px] dark:bg-white/10 dark:text-white/80">
+                            {tasks.length}
+                          </div>
+                        </div>
+
+                        {/* Queue: create task button */}
+                        {isQueue && (
+                          <button
+                            className="flex w-full items-center justify-center gap-2 rounded-lg bg-white px-3 py-2.5 font-semibold text-[0.8rem] text-black shadow-[0_0_15px_rgba(255,255,255,0.1)] transition-all hover:bg-white/90 hover:shadow-[0_0_20px_rgba(255,255,255,0.2)] active:scale-[0.98]"
+                            type="button"
+                          >
+                            <PlusIcon className="size-4 shrink-0" />
+                            Create Task
+                          </button>
+                        )}
+
+                        <KanbanColumnContent
+                          className="flex min-h-20 flex-col gap-2.5"
+                          value={columnId}
+                        >
+                          {tasks.map((task) => (
+                            <TaskCard
+                              asHandle
+                              key={task.id}
+                              showApprovalControls={columnId === "approve"}
+                              showOutput={columnId === "in_progress"}
+                              task={task}
+                            />
+                          ))}
+                        </KanbanColumnContent>
+                      </div>
+                    </KanbanColumn>
+                  </div>
+                </ResizablePanel>
+                {index < arr.length - 1 && <ResizableHandle withHandle />}
+              </Fragment>
+            );
+          })}
+        </ResizablePanelGroup>
       </KanbanBoard>
     </Kanban>
   );
