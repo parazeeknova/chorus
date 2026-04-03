@@ -1,7 +1,11 @@
+import { BackgroundCanvas } from "@/features/canvas/components/background-canvas";
+
 export default function Home() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      hi
+    <main className="relative h-screen overflow-hidden bg-[#0a0a0a] text-white">
+      <div className="relative z-10 h-full w-full">
+        <BackgroundCanvas />
+      </div>
     </main>
   );
 }
