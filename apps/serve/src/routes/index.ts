@@ -134,7 +134,7 @@ export function createHttpRoutes(bridge: OpenCodeBridge) {
           };
         }
 
-        const forked = await bridge.adapter.sessions.fork({
+        const forked = await bridge.forkSession({
           sessionID: params.sessionID,
         });
 
@@ -164,16 +164,16 @@ export function createHttpRoutes(bridge: OpenCodeBridge) {
     .post(
       "/tasks/:sessionID/race",
       async ({ params, body }) => {
-        const sessions = await bridge.races.createRaceSessions(
+        const sessions = await bridge.startRace(
           params.sessionID,
           body.models,
           body.baseTitle
         );
 
-        await bridge.races.promptAll(
-          sessions.map((s) => ({
+        await bridge.promptRace(
+          sessions.map((s, i) => ({
             sessionID: s.id,
-            model: body.models[sessions.indexOf(s)] ?? body.models[0],
+            model: body.models[i] ?? body.models[0],
           })),
           body.text
         );

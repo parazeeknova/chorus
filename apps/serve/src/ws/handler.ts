@@ -2,6 +2,11 @@ import { Elysia, t } from "elysia";
 import type { OpenCodeBridge } from "../bridge/opencode/bridge";
 import type { WsClientManager } from "../events/broadcaster";
 import type { WsMessage } from "./types";
+import {
+  SUPPORTED_MESSAGE_TYPES,
+  WS_MESSAGE_TYPE,
+  WS_RESPONSE_TYPE,
+} from "./types";
 
 interface ClientData {
   sessionId: string;
@@ -13,6 +18,56 @@ const clientData = new WeakMap<object, ClientData>();
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
+
+const WS_PAYLOAD_SCHEMAS = {
+  [WS_MESSAGE_TYPE.TASK_QUEUE]: t.Object({
+    text: t.String(),
+    model: t.Optional(
+      t.Object({
+        providerID: t.String(),
+        modelID: t.String(),
+      })
+    ),
+    agent: t.Optional(t.String()),
+  }),
+  [WS_MESSAGE_TYPE.TASK_APPROVE]: t.Object({
+    requestID: t.String(),
+    sessionID: t.String(),
+    message: t.Optional(t.String()),
+  }),
+  [WS_MESSAGE_TYPE.TASK_REJECT]: t.Object({
+    requestID: t.String(),
+    sessionID: t.String(),
+    message: t.Optional(t.String()),
+  }),
+  [WS_MESSAGE_TYPE.TASK_ABORT]: t.Object({
+    sessionID: t.String(),
+  }),
+  [WS_MESSAGE_TYPE.TASK_REDIRECT]: t.Object({
+    sessionID: t.String(),
+    text: t.String(),
+    mode: t.Union([t.Literal("soft"), t.Literal("hard")]),
+  }),
+  [WS_MESSAGE_TYPE.TASK_RACE]: t.Object({
+    parentSessionID: t.String(),
+    models: t.Array(
+      t.Object({
+        providerID: t.String(),
+        modelID: t.String(),
+      })
+    ),
+    text: t.String(),
+    baseTitle: t.Optional(t.String()),
+  }),
+  [WS_MESSAGE_TYPE.VIEWPORT_SYNC]: t.Object({
+    projectId: t.String(),
+    viewport: t.Object({
+      x: t.Number(),
+      y: t.Number(),
+      zoom: t.Number(),
+    }),
+  }),
+} as const;
 
 export function createWsHandler(
   bridge: OpenCodeBridge,
@@ -35,7 +90,7 @@ export function createWsHandler(
       console.log(`[ws] client connected: ${sessionId}`);
       ws.send(
         JSON.stringify({
-          type: "connected",
+          type: WS_RESPONSE_TYPE.CONNECTED,
           payload: { sessionId },
           timestamp: Date.now(),
         })
@@ -52,7 +107,7 @@ export function createWsHandler(
         console.error("[ws] handler error:", error);
         ws.send(
           JSON.stringify({
-            type: "error",
+            type: WS_RESPONSE_TYPE.ERROR,
             payload: {
               message: error instanceof Error ? error.message : "unknown error",
             },
@@ -93,10 +148,21 @@ async function handleMessage(
 
   const msg = message as WsMessage;
 
+  const validate = <T extends keyof typeof WS_PAYLOAD_SCHEMAS>(
+    type: T,
+    raw: unknown
+  ) => {
+    const schema = WS_PAYLOAD_SCHEMAS[type];
+    if (!schema) {
+      throw new Error(`No validation schema for message type: ${type}`);
+    }
+    return schema.Parse(raw);
+  };
+
   switch (msg.type) {
-    case "task.queue": {
-      const payload = (msg as Extract<WsMessage, { type: "task.queue" }>)
-        .payload;
+    case WS_MESSAGE_TYPE.TASK_QUEUE: {
+      const payload = validate(WS_MESSAGE_TYPE.TASK_QUEUE, msg.payload);
+
       const session = await bridge.createSession({
         title: payload.text.slice(0, 80),
       });
@@ -109,7 +175,7 @@ async function handleMessage(
       });
 
       wsSend({
-        type: "task.queued",
+        type: WS_RESPONSE_TYPE.TASK_QUEUED,
         payload: {
           sessionID: session.id,
           accepted: true,
@@ -119,9 +185,9 @@ async function handleMessage(
       break;
     }
 
-    case "task.approve": {
-      const payload = (msg as Extract<WsMessage, { type: "task.approve" }>)
-        .payload;
+    case WS_MESSAGE_TYPE.TASK_APPROVE: {
+      const payload = validate(WS_MESSAGE_TYPE.TASK_APPROVE, msg.payload);
+
       const result = await bridge.replyPermission({
         requestID: payload.requestID,
         sessionID: payload.sessionID,
@@ -130,7 +196,7 @@ async function handleMessage(
       });
 
       wsSend({
-        type: "task.approved",
+        type: WS_RESPONSE_TYPE.TASK_APPROVED,
         payload: {
           requestID: payload.requestID,
           accepted: result,
@@ -140,9 +206,9 @@ async function handleMessage(
       break;
     }
 
-    case "task.reject": {
-      const payload = (msg as Extract<WsMessage, { type: "task.reject" }>)
-        .payload;
+    case WS_MESSAGE_TYPE.TASK_REJECT: {
+      const payload = validate(WS_MESSAGE_TYPE.TASK_REJECT, msg.payload);
+
       const result = await bridge.replyPermission({
         requestID: payload.requestID,
         sessionID: payload.sessionID,
@@ -151,7 +217,7 @@ async function handleMessage(
       });
 
       wsSend({
-        type: "task.rejected",
+        type: WS_RESPONSE_TYPE.TASK_REJECTED,
         payload: {
           requestID: payload.requestID,
           accepted: result,
@@ -161,13 +227,13 @@ async function handleMessage(
       break;
     }
 
-    case "task.abort": {
-      const payload = (msg as Extract<WsMessage, { type: "task.abort" }>)
-        .payload;
+    case WS_MESSAGE_TYPE.TASK_ABORT: {
+      const payload = validate(WS_MESSAGE_TYPE.TASK_ABORT, msg.payload);
+
       const result = await bridge.abortSession(payload.sessionID);
 
       wsSend({
-        type: "task.aborted",
+        type: WS_RESPONSE_TYPE.TASK_ABORTED,
         payload: {
           sessionID: payload.sessionID,
           accepted: result,
@@ -177,57 +243,56 @@ async function handleMessage(
       break;
     }
 
-    case "task.redirect": {
-      const payload = (msg as Extract<WsMessage, { type: "task.redirect" }>)
-        .payload;
+    case WS_MESSAGE_TYPE.TASK_REDIRECT: {
+      const payload = validate(WS_MESSAGE_TYPE.TASK_REDIRECT, msg.payload);
 
       if (payload.mode === "soft") {
         await bridge.promptSession({
           sessionID: payload.sessionID,
           text: `Redirect instruction: ${payload.text}`,
         });
-      } else {
-        const forked = await bridge.adapter.sessions.fork({
-          sessionID: payload.sessionID,
-        });
-
-        await bridge.promptSession({
-          sessionID: forked.id,
-          text: payload.text,
-        });
 
         wsSend({
-          type: "task.redirected",
+          type: WS_RESPONSE_TYPE.TASK_REDIRECTED,
           payload: {
-            originalSessionID: payload.sessionID,
-            newSessionID: forked.id,
+            sessionID: payload.sessionID,
+            mode: payload.mode,
           },
           timestamp: Date.now(),
         });
         break;
       }
 
+      const forked = await bridge.forkSession({
+        sessionID: payload.sessionID,
+      });
+
+      await bridge.promptSession({
+        sessionID: forked.id,
+        text: payload.text,
+      });
+
       wsSend({
-        type: "task.redirected",
+        type: WS_RESPONSE_TYPE.TASK_REDIRECTED,
         payload: {
-          sessionID: payload.sessionID,
-          mode: payload.mode,
+          originalSessionID: payload.sessionID,
+          newSessionID: forked.id,
         },
         timestamp: Date.now(),
       });
       break;
     }
 
-    case "task.race": {
-      const payload = (msg as Extract<WsMessage, { type: "task.race" }>)
-        .payload;
-      const sessions = await bridge.races.createRaceSessions(
+    case WS_MESSAGE_TYPE.TASK_RACE: {
+      const payload = validate(WS_MESSAGE_TYPE.TASK_RACE, msg.payload);
+
+      const sessions = await bridge.startRace(
         payload.parentSessionID,
         payload.models,
         payload.baseTitle
       );
 
-      await bridge.races.promptAll(
+      await bridge.promptRace(
         sessions.map((s, i) => ({
           sessionID: s.id,
           model: payload.models[i] ?? payload.models[0],
@@ -236,7 +301,7 @@ async function handleMessage(
       );
 
       wsSend({
-        type: "task.race.started",
+        type: WS_RESPONSE_TYPE.TASK_RACE_STARTED,
         payload: {
           raceSessions: sessions.map((s) => s.id),
         },
@@ -245,18 +310,22 @@ async function handleMessage(
       break;
     }
 
-    case "viewport.sync": {
-      manager.broadcast({
-        type: "viewport.sync",
-        payload: msg.payload,
+    case WS_MESSAGE_TYPE.VIEWPORT_SYNC: {
+      const payload = validate(WS_MESSAGE_TYPE.VIEWPORT_SYNC, msg.payload);
+
+      const rawMessage = JSON.stringify({
+        type: WS_MESSAGE_TYPE.VIEWPORT_SYNC,
+        payload,
         timestamp: Date.now(),
-      } as Parameters<typeof manager.broadcast>[0]);
+      });
+
+      manager.broadcastRaw(rawMessage);
       break;
     }
 
-    case "presence.ping": {
+    case WS_MESSAGE_TYPE.PRESENCE_PING: {
       wsSend({
-        type: "presence.pong",
+        type: WS_RESPONSE_TYPE.PRESENCE_PONG,
         payload: {
           timestamp: Date.now(),
           clientCount: manager.clients.size,
@@ -269,19 +338,10 @@ async function handleMessage(
     default: {
       const rawType = (message as { type: string }).type;
       wsSend({
-        type: "unknown.message",
+        type: WS_RESPONSE_TYPE.UNKNOWN_MESSAGE,
         payload: {
           receivedType: rawType,
-          supportedTypes: [
-            "task.queue",
-            "task.approve",
-            "task.reject",
-            "task.abort",
-            "task.redirect",
-            "task.race",
-            "viewport.sync",
-            "presence.ping",
-          ],
+          supportedTypes: [...SUPPORTED_MESSAGE_TYPES],
         },
         timestamp: Date.now(),
       });

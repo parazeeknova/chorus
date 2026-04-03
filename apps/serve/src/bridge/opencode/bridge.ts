@@ -3,6 +3,7 @@ import type {
   NormalizedAgentEvent,
   PermissionHandlerInput,
   SessionCreateInput,
+  SessionForkInput,
   SessionPromptInput,
 } from "@chorus/oc-adapter";
 import { OpenCodeAdapter } from "@chorus/oc-adapter";
@@ -41,6 +42,10 @@ export class OpenCodeBridge {
   }
 
   async start(): Promise<void> {
+    if (this.#eventHandle !== null) {
+      return;
+    }
+
     const handle = await this.adapter.events.subscribe((event) => {
       const normalized = this.adapter.normalize(event);
       this.#trackSession(normalized);
@@ -51,8 +56,16 @@ export class OpenCodeBridge {
   }
 
   #trackSession(event: NormalizedAgentEvent): void {
-    if (event.sessionID) {
-      this.#activeSessions.set(event.sessionID, event.type);
+    if (!event.sessionID) {
+      return;
+    }
+
+    const activity = event.activity ?? event.type;
+
+    if (activity === "idle") {
+      this.#activeSessions.delete(event.sessionID);
+    } else {
+      this.#activeSessions.set(event.sessionID, activity);
     }
   }
 
@@ -84,6 +97,32 @@ export class OpenCodeBridge {
 
   replyPermission(input: PermissionHandlerInput) {
     return this.adapter.permissions.reply(input);
+  }
+
+  forkSession(input: SessionForkInput) {
+    return this.adapter.sessions.fork(input);
+  }
+
+  startRace(
+    parentSessionID: string,
+    models: Array<{ providerID: string; modelID: string }>,
+    baseTitle?: string
+  ) {
+    return this.adapter.races.createRaceSessions(
+      parentSessionID,
+      models,
+      baseTitle
+    );
+  }
+
+  promptRace(
+    sessions: Array<{
+      sessionID: string;
+      model: { providerID: string; modelID: string };
+    }>,
+    text: string
+  ) {
+    return this.adapter.races.promptAll(sessions, text);
   }
 
   get races() {

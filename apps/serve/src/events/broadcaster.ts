@@ -4,6 +4,7 @@ import type { WsContext } from "../ws/types";
 
 export interface WsClientManager {
   broadcast: (event: NormalizedAgentEvent) => void;
+  broadcastRaw: (message: string) => void;
   clients: Set<ServerWebSocket<WsContext>>;
 }
 
@@ -22,5 +23,11 @@ export function createWsClientManager(): WsClientManager {
     }
   }
 
-  return { clients, broadcast };
+  function broadcastRaw(message: string): void {
+    for (const ws of clients) {
+      ws.send(message);
+    }
+  }
+
+  return { clients, broadcast, broadcastRaw };
 }
