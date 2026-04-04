@@ -58,6 +58,7 @@ export interface WorkspaceContextValue {
   selectBoard: (boardId: string) => void;
   selectedBoard?: WorkspaceBoard;
   selectedBoardId: string | null;
+  sessionCommand: (command: "undo" | "redo") => Promise<boolean>;
   updateBoardColumns: (boardId: string, columns: Columns) => void;
   updateBoardPosition: (
     boardId: string,

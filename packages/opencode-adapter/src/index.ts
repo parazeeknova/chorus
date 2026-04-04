@@ -52,6 +52,7 @@ export type {
   SessionForkInput,
   SessionPromptAsyncInput,
   SessionPromptInput,
+  SessionRevertInput,
 } from "./features/session/session-manager";
 export type { TuiLookupInput } from "./features/tui/tui-manager";
 

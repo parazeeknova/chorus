@@ -1,9 +1,17 @@
 import { queueBoardPromptInputSchema } from "@chorus/contracts";
+import { createLogger } from "@chorus/logger";
 import { Elysia, t } from "elysia";
 import type { OpenCodeBridge } from "../bridge/opencode/bridge";
 import type { WsClientManager } from "../events/broadcaster";
 import type { BoardTaskService } from "../tasks/board-task-service";
 import { createWorkspaceMessage } from "./workspace";
+
+const logger = createLogger(
+  {
+    env: process.env.NODE_ENV === "production" ? "production" : "development",
+  },
+  "ROUTES"
+);
 
 export function createHttpRoutes(
   bridge: OpenCodeBridge,
@@ -194,6 +202,50 @@ export function createHttpRoutes(
           ),
           text: t.String(),
           baseTitle: t.Optional(t.String()),
+        }),
+      }
+    )
+
+    .post(
+      "/sessions/:sessionID/revert",
+      async ({ params }) => {
+        try {
+          logger.debug("Reverting session", { sessionID: params.sessionID });
+          await bridge.revertSession(params.sessionID);
+          logger.info("Session reverted", { sessionID: params.sessionID });
+          return { success: true, timestamp: Date.now() };
+        } catch (error) {
+          logger.error("Failed to revert session", error, {
+            sessionID: params.sessionID,
+          });
+          throw error;
+        }
+      },
+      {
+        params: t.Object({
+          sessionID: t.String(),
+        }),
+      }
+    )
+
+    .post(
+      "/sessions/:sessionID/unrevert",
+      async ({ params }) => {
+        try {
+          logger.debug("Unreverting session", { sessionID: params.sessionID });
+          await bridge.unrevertSession(params.sessionID);
+          logger.info("Session unreverted", { sessionID: params.sessionID });
+          return { success: true, timestamp: Date.now() };
+        } catch (error) {
+          logger.error("Failed to unrevert session", error, {
+            sessionID: params.sessionID,
+          });
+          throw error;
+        }
+      },
+      {
+        params: t.Object({
+          sessionID: t.String(),
         }),
       }
     );

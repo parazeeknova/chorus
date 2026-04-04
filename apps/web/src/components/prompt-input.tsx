@@ -6,7 +6,8 @@ import {
   opencodeModelCatalogSchema,
 } from "@chorus/contracts";
 import { ArrowUp, Mic, MoreHorizontal, XIcon } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CommandPalette } from "@/components/command-palette";
 import {
   createModelKey,
   DEFAULT_MODEL_KEY,
@@ -22,6 +23,10 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useWorkspace } from "@/features/workspace/workspace-context";
+import {
+  type AutocompleteItem,
+  useAutocomplete,
+} from "@/hooks/use-autocomplete";
 import { useVoiceRecording } from "@/hooks/use-voice-recording";
 import { cn } from "@/lib/utils";
 import { fetchVoiceConfig, type GroqVoice } from "@/lib/voice-api";
@@ -47,15 +52,26 @@ export function PromptInput() {
   >();
   const [selectedVoice, setSelectedVoice] = useState("hannah");
   const [voices, setVoices] = useState<GroqVoice[]>([]);
+  const [textareaRect, setTextareaRect] = useState<{
+    top: number;
+    left: number;
+    width: number;
+  } | null>(null);
+
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
   const {
     boards,
     dismissComposerHint,
     isQueueingPrompt,
     preferences,
     queuePrompt,
-    selectedBoard,
     selectBoard,
+    sessionCommand,
+    selectedBoard,
   } = useWorkspace();
+
+  const autocomplete = useAutocomplete(selectedBoard?.repo.directory);
 
   useEffect(() => {
     fetchVoiceConfig()
@@ -183,9 +199,68 @@ export function PromptInput() {
     setPrompt(e.target.value);
     e.target.style.height = "auto";
     e.target.style.height = `${e.target.scrollHeight}px`;
+
+    const cursorPos = e.target.selectionStart;
+    autocomplete.checkTrigger(e.target.value, cursorPos);
+
+    if (autocomplete.isOpen) {
+      const rect = e.target.getBoundingClientRect();
+      setTextareaRect({
+        top: rect.top,
+        left: rect.left,
+        width: rect.width,
+      });
+    }
   };
 
+  const handleSelectAutocomplete = useCallback(
+    async (item: AutocompleteItem) => {
+      if (item.id.startsWith("builtin:")) {
+        const command = item.id.replace("builtin:", "") as "undo" | "redo";
+        const success = await sessionCommand(command);
+        if (success) {
+          autocomplete.close();
+          setTextareaRect(null);
+          setPrompt("");
+        }
+        return;
+      }
+
+      if (!(textareaRef.current && autocomplete.state)) {
+        return;
+      }
+
+      const textarea = textareaRef.current;
+      const { triggerIndex, cursorPosition } = autocomplete.state;
+
+      const before = prompt.slice(0, triggerIndex);
+      const after = prompt.slice(cursorPosition);
+      const insertText =
+        item.type === "file" ? `@${item.id} ` : `${item.label} `;
+
+      const newPrompt = before + insertText + after;
+      setPrompt(newPrompt);
+
+      autocomplete.close();
+      setTextareaRect(null);
+
+      requestAnimationFrame(() => {
+        textarea.focus();
+        const newPos = triggerIndex + insertText.length;
+        textarea.setSelectionRange(newPos, newPos);
+      });
+    },
+    [prompt, autocomplete, sessionCommand]
+  );
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (autocomplete.isOpen && e.key === "Escape") {
+      e.preventDefault();
+      autocomplete.close();
+      setTextareaRect(null);
+      return;
+    }
+
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e).catch((error) => {
@@ -225,6 +300,7 @@ export function PromptInput() {
                 onChange={handleInput}
                 onKeyDown={handleKeyDown}
                 placeholder="Ask Chorus to build something..."
+                ref={textareaRef}
                 rows={1}
                 value={prompt}
               />
@@ -345,6 +421,16 @@ export function PromptInput() {
             </div>
           </div>
         </form>
+        <CommandPalette
+          anchorRect={textareaRect}
+          isLoading={autocomplete.isLoading}
+          items={autocomplete.items}
+          onClose={() => {
+            autocomplete.close();
+            setTextareaRect(null);
+          }}
+          onSelect={handleSelectAutocomplete}
+        />
       </div>
     </div>
   );
