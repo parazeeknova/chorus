@@ -137,7 +137,8 @@ export function PromptInput() {
 
   if (availableModels.length === 0) {
     defaultModelTitle = "No OpenCode models available";
-    defaultModelDescription = "Use Settings -> OpenCode to connect a provider";
+    defaultModelDescription =
+      "Use Settings -> OpenCode to enable a global provider";
   } else if (defaultModelSummary) {
     defaultModelTitle = `Auto · ${defaultModelSummary.name}`;
   }

@@ -1,6 +1,13 @@
 "use client";
 
 import {
+  type OpencodeCredentialSummary,
+  type OpencodeProviderStatus,
+  opencodeConfiguredProviderCatalogSchema,
+  opencodeCredentialCatalogSchema,
+  opencodeProviderCatalogSchema,
+} from "@chorus/contracts";
+import {
   BellIcon,
   CheckCircle2Icon,
   CpuIcon,
@@ -32,6 +39,55 @@ import { cn } from "@/lib/utils";
 const menuItems = ["Edit", "View", "Window", "Help"];
 const islandChrome =
   "pointer-events-auto relative rounded-[1.35rem] border border-white/10 bg-zinc-950/68 shadow-[0_18px_50px_rgba(0,0,0,0.42)] backdrop-blur-2xl";
+
+function buildProvidersUrl(
+  refreshToken: string,
+  directory: string | null
+): string {
+  if (!directory) {
+    return `/api/providers?refresh=${refreshToken}`;
+  }
+
+  return `/api/providers?refresh=${refreshToken}&directory=${encodeURIComponent(directory)}`;
+}
+
+async function fetchProviderStatus(url: string) {
+  const response = await fetch(url, {
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  return opencodeProviderCatalogSchema.parse(await response.json()).providers;
+}
+
+async function fetchStoredCredentials() {
+  const response = await fetch("/api/opencode/auth-credentials", {
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  return opencodeCredentialCatalogSchema.parse(await response.json())
+    .credentials;
+}
+
+async function fetchConfiguredProviders() {
+  const response = await fetch("/api/opencode/configured-providers", {
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  return opencodeConfiguredProviderCatalogSchema.parse(await response.json())
+    .providerIDs;
+}
 
 // ─── Notification types ────────────────────────────────────────────────────────
 type NotifType = "review" | "question" | "done" | "warning";
@@ -235,6 +291,17 @@ function NotificationPane({ onClose }: { onClose: () => void }) {
 export function AppHeader() {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [providerStatus, setProviderStatus] = useState<
+    OpencodeProviderStatus[]
+  >([]);
+  const [storedCredentials, setStoredCredentials] = useState<
+    OpencodeCredentialSummary[]
+  >([]);
+  const [configuredProviderIDs, setConfiguredProviderIDs] = useState<string[]>(
+    []
+  );
+  const [providerStatusRefreshTick, setProviderStatusRefreshTick] = useState(0);
+  const [authLoginNotice, setAuthLoginNotice] = useState<string | null>(null);
   const notifRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -262,6 +329,55 @@ export function AppHeader() {
   }, [notifOpen]);
 
   const unreadCount = INITIAL_NOTIFICATIONS.filter((n) => !n.read).length;
+  const selectedDirectory = selectedBoard?.repo.directory ?? null;
+  const connectedProviderCount = providerStatus.filter(
+    (provider) => provider.connected
+  ).length;
+
+  useEffect(() => {
+    let isCancelled = false;
+    const refreshToken = providerStatusRefreshTick.toString(36);
+
+    async function loadProviderStatus() {
+      try {
+        const [providers, credentials, configuredProviders] = await Promise.all(
+          [
+            fetchProviderStatus(
+              buildProvidersUrl(refreshToken, selectedDirectory)
+            ),
+            fetchStoredCredentials(),
+            fetchConfiguredProviders(),
+          ]
+        );
+
+        if (isCancelled) {
+          return;
+        }
+
+        if (providers) {
+          setProviderStatus(providers);
+        }
+
+        if (credentials) {
+          setStoredCredentials(credentials);
+        }
+
+        if (configuredProviders) {
+          setConfiguredProviderIDs(configuredProviders);
+        }
+      } catch (error) {
+        console.error("Failed to load provider status", error);
+      }
+    }
+
+    loadProviderStatus().catch((error) => {
+      console.error("Failed to load provider status", error);
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [providerStatusRefreshTick, selectedDirectory]);
 
   async function openOpencodeModels() {
     if (!selectedBoard) {
@@ -283,12 +399,12 @@ export function AppHeader() {
     }
   }
 
-  async function openOpencodeConnect() {
+  async function openOpencodeAuthLogin() {
     if (!selectedBoard) {
       return;
     }
 
-    const response = await fetch("/api/opencode/connect", {
+    const response = await fetch("/api/opencode/auth-login", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -299,8 +415,44 @@ export function AppHeader() {
     });
 
     if (!response.ok) {
-      throw new Error("Failed to run OpenCode /connect");
+      throw new Error("Failed to launch opencode auth login");
     }
+
+    setAuthLoginNotice(
+      "Auth login completed. If no provider appears yet, enable one of the stored global credentials below for Chorus."
+    );
+    setProviderStatusRefreshTick((tick) => tick + 1);
+  }
+
+  async function configureCredentialProvider(providerID: string) {
+    const response = await fetch("/api/opencode/configure-provider", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        directory: selectedDirectory ?? undefined,
+        providerID,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to configure OpenCode provider");
+    }
+
+    const payload = (await response.json()) as {
+      configured: boolean;
+      providerIDs?: string[];
+    };
+
+    if (payload.providerIDs) {
+      setConfiguredProviderIDs(payload.providerIDs);
+    }
+
+    setAuthLoginNotice(
+      `Configured ${providerID} globally for Chorus and reloaded the current board instance.`
+    );
+    setProviderStatusRefreshTick((tick) => tick + 1);
   }
 
   return (
@@ -511,6 +663,102 @@ export function AppHeader() {
                   <DropdownMenuLabel className="text-white/40">
                     OpenCode
                   </DropdownMenuLabel>
+                  {selectedBoard && connectedProviderCount === 0 && (
+                    <div className="mb-1 rounded-xl border border-amber-400/12 bg-amber-400/[0.08] px-3 py-2 text-[11px] text-amber-100/80">
+                      No providers are currently loaded for Chorus. Auth is
+                      global, so if login succeeded you can enable one of the
+                      stored credentials below and Chorus will reload the
+                      current board instance.
+                    </div>
+                  )}
+                  {authLoginNotice && (
+                    <div className="mb-1 rounded-xl border border-cyan-400/12 bg-cyan-400/[0.07] px-3 py-2 text-[11px] text-cyan-100/80">
+                      {authLoginNotice}
+                    </div>
+                  )}
+                  <div className="mb-1 flex max-h-52 flex-col gap-1 overflow-y-auto px-1.5 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    {providerStatus.length === 0 ? (
+                      <div className="rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2 text-[11px] text-white/45">
+                        No providers are currently loaded.
+                      </div>
+                    ) : (
+                      providerStatus.map((provider) => (
+                        <div
+                          className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2"
+                          key={provider.id}
+                        >
+                          <span
+                            className={cn(
+                              "size-2 shrink-0 rounded-full",
+                              provider.connected
+                                ? "bg-emerald-400"
+                                : "bg-white/20"
+                            )}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="truncate font-medium text-[12px] text-white/88">
+                                {provider.name}
+                              </span>
+                              <span className="rounded-md bg-white/[0.06] px-1.5 py-0.5 text-[10px] text-white/35 uppercase tracking-[0.16em]">
+                                {provider.connected ? "Connected" : "Offline"}
+                              </span>
+                            </div>
+                            <div className="truncate text-[11px] text-white/40">
+                              {provider.modelCount} models
+                              {provider.supportsOauth ? " · OAuth" : ""}
+                              {provider.supportsApi ? " · API key" : ""}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  {storedCredentials.length > 0 && (
+                    <div className="mb-1 flex max-h-44 flex-col gap-1 overflow-y-auto px-1.5 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      <div className="px-1.5 pt-1 text-[10px] text-white/35 uppercase tracking-[0.18em]">
+                        Stored Credentials
+                      </div>
+                      {storedCredentials.map((credential) => (
+                        <button
+                          className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2 text-left transition hover:bg-white/[0.06] disabled:cursor-default disabled:opacity-70"
+                          disabled={configuredProviderIDs.includes(
+                            credential.id
+                          )}
+                          key={credential.id}
+                          onClick={() => {
+                            configureCredentialProvider(credential.id).catch(
+                              (error) => {
+                                console.error(
+                                  "Failed to configure stored credential",
+                                  error
+                                );
+                              }
+                            );
+                          }}
+                          type="button"
+                        >
+                          <span className="size-2 shrink-0 rounded-full bg-cyan-400" />
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate font-medium text-[12px] text-white/88">
+                              {credential.id}
+                            </div>
+                            <div className="truncate text-[11px] text-white/40">
+                              {credential.type}
+                              {configuredProviderIDs.includes(credential.id)
+                                ? " · enabled globally"
+                                : ""}
+                            </div>
+                          </div>
+                          <span className="rounded-md bg-white/[0.06] px-1.5 py-0.5 text-[10px] text-white/45 uppercase tracking-[0.16em]">
+                            {configuredProviderIDs.includes(credential.id)
+                              ? "Enabled"
+                              : "Enable"}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <DropdownMenuItem
                     className="cursor-pointer rounded-lg px-3 py-2 text-sm text-white/85 focus:bg-white/10 focus:text-white data-disabled:pointer-events-none data-disabled:opacity-40"
                     disabled={!selectedBoard}
@@ -534,18 +782,32 @@ export function AppHeader() {
                     className="cursor-pointer rounded-lg px-3 py-2 text-sm text-white/85 focus:bg-white/10 focus:text-white data-disabled:pointer-events-none data-disabled:opacity-40"
                     disabled={!selectedBoard}
                     onClick={() => {
-                      openOpencodeConnect().catch((error) => {
-                        console.error("Failed to run OpenCode connect", error);
+                      openOpencodeAuthLogin().catch((error) => {
+                        console.error("Failed to launch auth login", error);
                       });
                     }}
                   >
                     <PlugZapIcon className="size-4" />
                     <div className="flex min-w-0 flex-col">
-                      <span>Run /connect</span>
+                      <span>Launch auth login</span>
                       <span className="truncate text-[11px] text-white/40">
                         {selectedBoard
-                          ? "Connect providers for the selected board"
+                          ? "Run `opencode auth login`, then Chorus reloads the OpenCode instance for this board"
                           : "Select a board first"}
+                      </span>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="cursor-pointer rounded-lg px-3 py-2 text-sm text-white/85 focus:bg-white/10 focus:text-white"
+                    onClick={() => {
+                      setProviderStatusRefreshTick((tick) => tick + 1);
+                    }}
+                  >
+                    <CheckCircle2Icon className="size-4" />
+                    <div className="flex min-w-0 flex-col">
+                      <span>Refresh provider status</span>
+                      <span className="truncate text-[11px] text-white/40">
+                        Recheck connected providers and available models
                       </span>
                     </div>
                   </DropdownMenuItem>

@@ -1,6 +1,8 @@
 import type { OpencodeClient } from "@opencode-ai/sdk/v2";
 import { createOpencodeClient as createSDKClient } from "@opencode-ai/sdk/v2";
+import { ConfigManager } from "./features/config/config-manager";
 import { EventStream, normalizeEvent } from "./features/events/event-stream";
+import { InstanceManager } from "./features/instance/instance-manager";
 import { PermissionHandler } from "./features/permissions/permission-handler";
 import { ProjectManager } from "./features/projects/project-manager";
 import { ProviderManager } from "./features/providers/provider-manager";
@@ -37,6 +39,11 @@ export type {
 export type {
   OpencodeModelCatalog,
   OpencodeModelSummary,
+  OpencodeProviderAuthCatalog,
+  OpencodeProviderAuthMethod,
+  OpencodeProviderCatalog,
+  OpencodeProviderOauthAuthorization,
+  OpencodeProviderStatus,
 } from "./features/providers/provider-manager";
 export type { RaceConfig, RaceResult } from "./features/race/race-manager";
 export type {
@@ -62,8 +69,10 @@ export function createClient(
 
 export class OpenCodeAdapter {
   readonly client: OpencodeClient;
+  readonly config: ConfigManager;
   readonly sessions: SessionManager;
   readonly events: EventStream;
+  readonly instances: InstanceManager;
   readonly permissions: PermissionHandler;
   readonly projects: ProjectManager;
   readonly providers: ProviderManager;
@@ -72,8 +81,10 @@ export class OpenCodeAdapter {
 
   constructor(client: OpencodeClient) {
     this.client = client;
+    this.config = new ConfigManager(client);
     this.sessions = new SessionManager(client);
     this.events = new EventStream(client);
+    this.instances = new InstanceManager(client);
     this.permissions = new PermissionHandler(client);
     this.projects = new ProjectManager(client);
     this.providers = new ProviderManager(client);
