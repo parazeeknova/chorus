@@ -765,7 +765,7 @@ function AutoAcceptToggle({
             "absolute size-2.5 rounded-full shadow-sm transition-all duration-200",
             autoAccept
               ? "left-[calc(100%-2px)] -translate-x-full bg-emerald-400"
-              : "left-[2px] bg-white/35"
+              : "left-0.5 bg-white/35"
           )}
         />
       </span>

@@ -1,11 +1,14 @@
 import { queueBoardPromptInputSchema } from "@chorus/contracts";
 import { Elysia, t } from "elysia";
 import type { OpenCodeBridge } from "../bridge/opencode/bridge";
+import type { WsClientManager } from "../events/broadcaster";
 import type { BoardTaskService } from "../tasks/board-task-service";
+import { createWorkspaceMessage } from "./workspace";
 
 export function createHttpRoutes(
   bridge: OpenCodeBridge,
-  boardTasks: BoardTaskService
+  boardTasks: BoardTaskService,
+  wsManager: WsClientManager
 ) {
   return new Elysia()
     .get("/health", () => ({
@@ -27,7 +30,12 @@ export function createHttpRoutes(
           };
         }
 
-        return boardTasks.queuePrompt(parsed.data);
+        return boardTasks.queuePrompt(parsed.data).then((result) => {
+          wsManager.broadcastRaw(
+            createWorkspaceMessage(boardTasks.getWorkspaceSnapshot())
+          );
+          return result;
+        });
       },
       {
         body: t.Any(),

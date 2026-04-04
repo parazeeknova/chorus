@@ -18,7 +18,7 @@
     },
     "apps/serve": {
       "name": "@chorus/serve",
-      "version": "0.0.10",
+      "version": "0.0.11",
       "dependencies": {
         "@armoriq/sdk": "^0.2.10",
         "@chorus/logger": "workspace:*",
@@ -37,9 +37,10 @@
     },
     "apps/web": {
       "name": "@chorus/web",
-      "version": "0.0.17",
+      "version": "0.0.19",
       "dependencies": {
         "@base-ui/react": "^1.3.0",
+        "@chorus/monaco": "workspace:*",
         "@dnd-kit/core": "^6.3.1",
         "@dnd-kit/sortable": "^10.0.0",
         "@dnd-kit/utilities": "^3.2.2",
@@ -83,7 +84,7 @@
     },
     "packages/contracts": {
       "name": "@chorus/contracts",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "dependencies": {
         "zod": "^4.3.6",
       },
@@ -94,7 +95,7 @@
     },
     "packages/logger": {
       "name": "@chorus/logger",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "dependencies": {
         "posthog-node": "^5.28.11",
       },
@@ -105,7 +106,7 @@
     },
     "packages/monaco": {
       "name": "@chorus/monaco",
-      "version": "0.0.1",
+      "version": "0.0.3",
       "dependencies": {
         "@chorus/contracts": "workspace:*",
         "@chorus/oc-adapter": "workspace:*",
@@ -132,7 +133,7 @@
     },
     "packages/opencode-adapter": {
       "name": "@chorus/oc-adapter",
-      "version": "0.0.4",
+      "version": "0.0.5",
       "dependencies": {
         "@opencode-ai/sdk": "^1.3.13",
       },

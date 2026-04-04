@@ -2,6 +2,7 @@ import { queueBoardPromptInputSchema } from "@chorus/contracts";
 import { Elysia, t } from "elysia";
 import type { OpenCodeBridge } from "../bridge/opencode/bridge";
 import type { WsClientManager } from "../events/broadcaster";
+import { createWorkspaceMessage } from "../routes/workspace";
 import type { BoardTaskService } from "../tasks/board-task-service";
 import type { WsMessage } from "./types";
 import {
@@ -168,6 +169,9 @@ async function handleMessage(
         payload: response,
         timestamp: response.timestamp,
       });
+      manager.broadcastRaw(
+        createWorkspaceMessage(boardTasks.getWorkspaceSnapshot())
+      );
       break;
     }
 

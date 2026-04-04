@@ -1,3 +1,4 @@
+import path from "node:path";
 import { createLogger } from "@chorus/logger";
 import { Elysia } from "elysia";
 import { OpenCodeBridge } from "./bridge/opencode/bridge";
@@ -9,7 +10,9 @@ import { createHttpRoutes } from "./routes";
 import { policyRoutes } from "./routes/policy";
 import { createProjectRoutes } from "./routes/projects";
 import { voiceRoutes } from "./routes/voice";
+import { createWorkspaceRoutes } from "./routes/workspace";
 import { BoardTaskService } from "./tasks/board-task-service";
+import { WorkspaceStore } from "./workspace/store";
 import { createWsHandler } from "./ws/handler";
 
 const config = loadConfig();
@@ -25,7 +28,11 @@ const bridge = new OpenCodeBridge(
   config.opencodeDirectory
 );
 const wsManager = createWsClientManager();
-const boardTasks = new BoardTaskService(bridge);
+const workspaceStore = new WorkspaceStore(
+  path.join(process.cwd(), ".chorus", "workspace.json")
+);
+await workspaceStore.load();
+const boardTasks = new BoardTaskService(bridge, workspaceStore);
 const projectService = new ProjectService(
   config.opencodeBaseUrl,
   config.opencodeDirectory,
@@ -35,6 +42,27 @@ const projectService = new ProjectService(
 bridge.subscribe((event) => {
   wsManager.broadcast(event);
   logger.debug("bridge-event", { event: JSON.stringify(event) });
+  workspaceStore
+    .applyAgentEvent(event)
+    .then((snapshot) => {
+      if (!snapshot) {
+        return;
+      }
+
+      wsManager.broadcastRaw(
+        JSON.stringify({
+          type: "workspace.updated",
+          payload: snapshot,
+          timestamp: Date.now(),
+        })
+      );
+    })
+    .catch((error) => {
+      logger.error(
+        "workspace-projection-failed",
+        error instanceof Error ? error : undefined
+      );
+    });
 });
 
 const app = new Elysia()
@@ -48,8 +76,9 @@ const app = new Elysia()
     );
   })
   .get("/", () => "Hello Elysia")
-  .use(createHttpRoutes(bridge, boardTasks))
+  .use(createHttpRoutes(bridge, boardTasks, wsManager))
   .use(createProjectRoutes(projectService))
+  .use(createWorkspaceRoutes(workspaceStore, wsManager))
   .use(voiceRoutes)
   .use(policyRoutes)
   .use(createWsHandler(bridge, wsManager, boardTasks))

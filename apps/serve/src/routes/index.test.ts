@@ -1,5 +1,6 @@
 import { describe, expect, mock, test } from "bun:test";
 import { Elysia } from "elysia";
+import { createWsClientManager } from "../events/broadcaster";
 import { createHttpRoutes } from "./index";
 
 function makeMockBridge() {
@@ -41,6 +42,15 @@ function makeMockBridge() {
 
 function makeMockBoardTasks() {
   return {
+    getWorkspaceSnapshot: mock(() => ({
+      boards: [],
+      preferences: {
+        composerHintDismissed: false,
+      },
+      previousWorkspaces: [],
+      revision: 1,
+      selectedBoardId: null,
+    })),
     queuePrompt: mock(async (input: unknown) => ({
       boardId: (input as { boardId: string }).boardId,
       sessionId: "sess-123",
@@ -55,8 +65,9 @@ describe("HTTP routes", () => {
   function makeApp() {
     const bridge = makeMockBridge();
     const boardTasks = makeMockBoardTasks();
+    const wsManager = createWsClientManager();
     const app = new Elysia().use(
-      createHttpRoutes(bridge as never, boardTasks as never)
+      createHttpRoutes(bridge as never, boardTasks as never, wsManager)
     );
     return { app, bridge, boardTasks };
   }

@@ -1,4 +1,7 @@
 import { describe, expect, mock, test } from "bun:test";
+import { rm } from "node:fs/promises";
+import { join } from "node:path";
+import { WorkspaceStore } from "../workspace/store";
 import { BoardTaskService } from "./board-task-service";
 
 function makeMockBridge() {
@@ -11,7 +14,35 @@ function makeMockBridge() {
 describe("BoardTaskService", () => {
   test("creates a session for the first prompt", async () => {
     const bridge = makeMockBridge();
-    const service = new BoardTaskService(bridge as never);
+    const path = join("/tmp", `chorus-board-task-${Date.now()}-create.json`);
+    const workspaceStore = new WorkspaceStore(path);
+    await workspaceStore.load();
+    await workspaceStore.replaceSnapshot({
+      boards: [
+        {
+          boardId: "board-1",
+          columns: {
+            queue: [],
+            in_progress: [],
+            approve: [],
+            done: [],
+          },
+          position: { x: 0, y: 0 },
+          repo: {
+            directory: "/tmp/repo",
+            worktree: "/tmp/repo",
+            sandboxes: [],
+          },
+          session: { state: "uninitialized" },
+          title: "Repo Board",
+        },
+      ],
+      preferences: {
+        composerHintDismissed: false,
+      },
+      selectedBoardId: "board-1",
+    });
+    const service = new BoardTaskService(bridge as never, workspaceStore);
 
     const result = await service.queuePrompt({
       boardId: "board-1",
@@ -33,17 +64,44 @@ describe("BoardTaskService", () => {
       model: undefined,
       agent: undefined,
     });
+
+    await rm(path, { force: true });
   });
 
-  test("reuses the stored session for later prompts", async () => {
+  test("reuses the persisted session for later prompts", async () => {
     const bridge = makeMockBridge();
-    const service = new BoardTaskService(bridge as never);
-
-    await service.queuePrompt({
-      boardId: "board-1",
-      directory: "/tmp/repo",
-      text: "first prompt",
+    const path = join("/tmp", `chorus-board-task-${Date.now()}-reuse.json`);
+    const workspaceStore = new WorkspaceStore(path);
+    await workspaceStore.load();
+    await workspaceStore.replaceSnapshot({
+      boards: [
+        {
+          boardId: "board-1",
+          columns: {
+            queue: [],
+            in_progress: [],
+            approve: [],
+            done: [],
+          },
+          position: { x: 0, y: 0 },
+          repo: {
+            directory: "/tmp/repo",
+            worktree: "/tmp/repo",
+            sandboxes: [],
+          },
+          session: {
+            sessionId: "sess-123",
+            state: "active",
+          },
+          title: "Repo Board",
+        },
+      ],
+      preferences: {
+        composerHintDismissed: false,
+      },
+      selectedBoardId: "board-1",
     });
+    const service = new BoardTaskService(bridge as never, workspaceStore);
 
     const result = await service.queuePrompt({
       boardId: "board-1",
@@ -52,7 +110,7 @@ describe("BoardTaskService", () => {
     });
 
     expect(result.createdSession).toBe(false);
-    expect(bridge.createSession).toHaveBeenCalledTimes(1);
+    expect(bridge.createSession).toHaveBeenCalledTimes(0);
     expect(bridge.promptSession).toHaveBeenLastCalledWith({
       sessionID: "sess-123",
       directory: "/tmp/repo",
@@ -60,5 +118,7 @@ describe("BoardTaskService", () => {
       model: undefined,
       agent: undefined,
     });
+
+    await rm(path, { force: true });
   });
 });

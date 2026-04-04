@@ -1,5 +1,8 @@
 import type {
   BoardSeed,
+  WorkspaceBoard as ContractWorkspaceBoard,
+  WorkspaceHistoryEntry as ContractWorkspaceHistoryEntry,
+  WorkspacePreferences as ContractWorkspacePreferences,
   ProjectListResponse,
   QueueBoardPromptResponse,
   RepoProject,
@@ -16,31 +19,9 @@ export type BoardSessionState =
   | "active"
   | "error";
 
-export interface WorkspaceBoardSession {
-  currentTaskId?: string;
-  errorMessage?: string;
-  sessionId?: string;
-  state: BoardSessionState;
-}
-
-export interface WorkspaceBoard {
-  boardId: string;
-  columns: Columns;
-  position: {
-    x: number;
-    y: number;
-  };
-  repo: BoardSeed["repo"];
-  session: WorkspaceBoardSession;
-  title: string;
-}
-
-export interface WorkspaceHistoryEntry {
-  id: string;
-  lastOpenedAt: number;
-  repo: WorkspaceBoard["repo"];
-  title: string;
-}
+export type WorkspaceBoard = ContractWorkspaceBoard;
+export type WorkspaceHistoryEntry = ContractWorkspaceHistoryEntry;
+export type WorkspacePreferences = ContractWorkspacePreferences;
 
 export interface PromptSubmissionResult extends QueueBoardPromptResponse {
   task: Task;
@@ -57,10 +38,12 @@ export interface WorkspaceContextValue {
   clearSelection: () => void;
   createBoardFromHistory: (entry: WorkspaceHistoryEntry) => void;
   createBoardFromProject: (project: RepoProject) => void;
+  dismissComposerHint: () => void;
   isOpeningFolder: boolean;
   isQueueingPrompt: boolean;
   loadProjects: () => Promise<void>;
   openFolder: () => Promise<void>;
+  preferences: WorkspacePreferences;
   previousWorkspaces: WorkspaceHistoryEntry[];
   queuePrompt: (input: {
     agent?: string;
@@ -71,6 +54,7 @@ export interface WorkspaceContextValue {
     text: string;
   }) => Promise<PromptSubmissionResult | null>;
   recentProjects: WorkspaceProject[];
+  removeBoard: (boardId: string) => void;
   selectBoard: (boardId: string) => void;
   selectedBoard?: WorkspaceBoard;
   selectedBoardId: string | null;

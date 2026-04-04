@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUp, Mic, MoreHorizontal } from "lucide-react";
+import { ArrowUp, Mic, MoreHorizontal, XIcon } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,8 +34,15 @@ export function PromptInput() {
   const [prompt, setPrompt] = useState("");
   const [selectedModel, setSelectedModel] =
     useState<keyof typeof MODEL_OPTIONS>("default");
-  const { boards, isQueueingPrompt, queuePrompt, selectedBoard, selectBoard } =
-    useWorkspace();
+  const {
+    boards,
+    dismissComposerHint,
+    isQueueingPrompt,
+    preferences,
+    queuePrompt,
+    selectedBoard,
+    selectBoard,
+  } = useWorkspace();
 
   const isBusy =
     isQueueingPrompt || selectedBoard?.session.state === "starting";
@@ -102,12 +109,24 @@ export function PromptInput() {
   return (
     <div className="fixed right-0 bottom-8 left-0 z-40 flex justify-center px-4">
       <div className="w-full max-w-3xl">
-        <div className="mb-2 rounded-lg border border-white/10 bg-black/45 px-3 py-2 text-[11px] text-white/70 leading-4 shadow-lg backdrop-blur-md">
-          Boards persist locally across refresh.{" "}
-          {selectedBoard
-            ? `${selectedBoard.title} is selected. ${sessionMessage}`
-            : "Open or select a board, then send the first prompt to start its OpenCode session."}
-        </div>
+        {!preferences.composerHintDismissed && (
+          <div className="mb-2 flex items-start justify-between gap-3 rounded-lg border border-white/10 bg-black/45 px-3 py-2 text-[11px] text-white/70 leading-4 shadow-lg backdrop-blur-md">
+            <span>
+              Boards persist across browsers on this machine.{" "}
+              {selectedBoard
+                ? `${selectedBoard.title} is selected. ${sessionMessage}`
+                : "Open or select a board, then send the first prompt to start its OpenCode session."}
+            </span>
+            <button
+              aria-label="Dismiss composer hint"
+              className="rounded-md p-0.5 text-white/35 transition-colors hover:bg-white/8 hover:text-white/70"
+              onClick={dismissComposerHint}
+              type="button"
+            >
+              <XIcon className="size-3.5" />
+            </button>
+          </div>
+        )}
         <form className="relative" onSubmit={handleSubmit}>
           <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#0f0f0f]/90 p-2 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.8)] backdrop-blur-2xl transition-colors focus-within:border-white/20 focus-within:bg-[#161616]/95">
             <div className="flex flex-col gap-2 px-3 py-2">

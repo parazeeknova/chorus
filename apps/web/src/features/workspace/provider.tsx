@@ -4,26 +4,23 @@ import {
   boardSeedSchema,
   projectListResponseSchema,
   queueBoardPromptResponseSchema,
+  type WorkspaceMutation,
+  type WorkspaceSnapshot,
+  workspaceSnapshotSchema,
 } from "@chorus/contracts";
-import type { NormalizedAgentEvent } from "@chorus/oc-adapter";
-import { useEffect, useEffectEvent, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import {
-  loadWorkspaceHistory,
-  loadWorkspaceSnapshot,
-  persistWorkspaceSnapshot,
-} from "./db";
-import {
-  applyAgentEventToBoard,
   attachPromptTask,
   attachSessionToBoard,
-  createBoardFromHistoryEntry,
-  createBoardFromProject,
-  createBoardFromSeed,
   createPromptTask,
   updateBoardColumns as nextBoardColumns,
   updateBoardPosition as nextBoardPosition,
 } from "./state";
-import type { AgentEventEnvelope, WorkspaceContextValue } from "./types";
+import type {
+  AgentEventEnvelope,
+  WorkspaceBoard,
+  WorkspaceContextValue,
+} from "./types";
 import { WorkspaceContext } from "./workspace-context";
 
 function getChorusWsUrl() {
@@ -34,12 +31,32 @@ function getModelLabel(model?: { modelID: string; providerID: string }) {
   return model ? `${model.providerID}/${model.modelID}` : "OpenCode default";
 }
 
+function createWorkspaceMutation<T extends WorkspaceMutation["type"]>(
+  clientId: string,
+  baseRevision: number,
+  type: T,
+  payload: Extract<WorkspaceMutation, { type: T }>["payload"]
+): WorkspaceMutation {
+  return {
+    baseRevision,
+    clientId,
+    mutationId: crypto.randomUUID(),
+    type,
+    payload,
+  } as Extract<WorkspaceMutation, { type: T }>;
+}
+
 export function ChorusWorkspaceProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const [boards, setBoards] = useState<WorkspaceContextValue["boards"]>([]);
+  const [preferences, setPreferences] = useState<
+    WorkspaceContextValue["preferences"]
+  >({
+    composerHintDismissed: false,
+  });
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
   const [recentProjects, setRecentProjects] = useState<
     WorkspaceContextValue["recentProjects"]
@@ -49,11 +66,75 @@ export function ChorusWorkspaceProvider({
   >([]);
   const [isOpeningFolder, setIsOpeningFolder] = useState(false);
   const [isQueueingPrompt, setIsQueueingPrompt] = useState(false);
-  const [isHydrated, setIsHydrated] = useState(false);
+  const clientIdRef = useRef(crypto.randomUUID());
+  const revisionRef = useRef(0);
 
   const selectedBoard = boards.find(
     (board) => board.boardId === selectedBoardId
   );
+
+  const applySnapshot = useEffectEvent((snapshot: WorkspaceSnapshot) => {
+    if (snapshot.revision < revisionRef.current) {
+      return;
+    }
+
+    revisionRef.current = snapshot.revision;
+    setBoards(snapshot.boards);
+    setPreferences(snapshot.preferences);
+    setSelectedBoardId(snapshot.selectedBoardId);
+    setPreviousWorkspaces(snapshot.previousWorkspaces);
+  });
+
+  const mutateWorkspace = useEffectEvent(
+    async (mutation: WorkspaceMutation) => {
+      const response = await fetch("/api/workspace", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(mutation),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to mutate workspace");
+      }
+
+      const snapshot = workspaceSnapshotSchema.parse(await response.json());
+      applySnapshot(snapshot);
+      return snapshot;
+    }
+  );
+
+  const removeBoardById = useEffectEvent((boardId: string) => {
+    setBoards((currentBoards) => {
+      const remainingBoards = currentBoards.filter(
+        (board) => board.boardId !== boardId
+      );
+
+      setSelectedBoardId((currentSelectedBoardId) => {
+        if (currentSelectedBoardId !== boardId) {
+          return currentSelectedBoardId;
+        }
+
+        return remainingBoards[0]?.boardId ?? null;
+      });
+
+      return remainingBoards;
+    });
+
+    mutateWorkspace(
+      createWorkspaceMutation(
+        clientIdRef.current,
+        revisionRef.current,
+        "board.remove",
+        {
+          boardId,
+        }
+      )
+    ).catch((error) => {
+      console.error("Failed to remove board", error);
+    });
+  });
 
   const loadProjects = useEffectEvent(async () => {
     const response = await fetch("/api/projects", {
@@ -77,37 +158,35 @@ export function ChorusWorkspaceProvider({
 
     async function hydrateWorkspace() {
       try {
-        const [snapshot, history] = await Promise.all([
-          loadWorkspaceSnapshot(),
-          loadWorkspaceHistory(),
+        const [projectsResponse, workspaceResponse] = await Promise.all([
+          fetch("/api/projects", {
+            cache: "no-store",
+          }),
+          fetch("/api/workspace", {
+            cache: "no-store",
+          }),
         ]);
 
         if (isCancelled) {
           return;
         }
 
-        setPreviousWorkspaces(history);
+        if (projectsResponse.ok) {
+          const projectsPayload = projectListResponseSchema.parse(
+            await projectsResponse.json()
+          );
+          setRecentProjects(projectsPayload.projects);
+        }
 
-        if (snapshot) {
-          setBoards(snapshot.boards);
-          setSelectedBoardId(() => {
-            const selected = snapshot.selectedBoardId;
-            if (
-              selected &&
-              snapshot.boards.some((board) => board.boardId === selected)
-            ) {
-              return selected;
-            }
+        if (workspaceResponse.ok) {
+          const snapshot = workspaceSnapshotSchema.parse(
+            await workspaceResponse.json()
+          );
 
-            return snapshot.boards[0]?.boardId ?? null;
-          });
+          applySnapshot(snapshot);
         }
       } catch (error) {
         console.error("Failed to hydrate workspace", error);
-      } finally {
-        if (!isCancelled) {
-          setIsHydrated(true);
-        }
       }
     }
 
@@ -121,52 +200,16 @@ export function ChorusWorkspaceProvider({
   }, []);
 
   useEffect(() => {
-    if (!isHydrated) {
-      return;
-    }
-
-    const persistTimeout = window.setTimeout(() => {
-      persistWorkspaceSnapshot({
-        boards,
-        selectedBoardId,
-      })
-        .then(loadWorkspaceHistory)
-        .then(setPreviousWorkspaces)
-        .catch((error) => {
-          console.error("Failed to persist workspace", error);
-        });
-    }, 200);
-
-    return () => {
-      window.clearTimeout(persistTimeout);
-    };
-  }, [boards, isHydrated, selectedBoardId]);
-
-  const handleAgentEvent = useEffectEvent((event: NormalizedAgentEvent) => {
-    if (!event.sessionID) {
-      return;
-    }
-
-    setBoards((currentBoards) =>
-      currentBoards.map((board) =>
-        board.session.sessionId === event.sessionID
-          ? applyAgentEventToBoard(board, event)
-          : board
-      )
-    );
-  });
-
-  useEffect(() => {
     const socket = new WebSocket(getChorusWsUrl());
 
     socket.onmessage = (message) => {
       try {
         const parsed = JSON.parse(message.data) as AgentEventEnvelope;
-        if (!parsed.type.startsWith("agent.")) {
+        if (parsed.type === "workspace.updated") {
+          const snapshot = workspaceSnapshotSchema.parse(parsed.payload);
+          applySnapshot(snapshot);
           return;
         }
-
-        handleAgentEvent(parsed.payload);
       } catch (error) {
         console.error("Failed to parse Chorus event", error);
       }
@@ -195,12 +238,16 @@ export function ChorusWorkspaceProvider({
       }
 
       const seed = boardSeedSchema.parse(payload);
-
-      setBoards((currentBoards) => {
-        const board = createBoardFromSeed(seed, currentBoards.length);
-        setSelectedBoardId(board.boardId);
-        return [...currentBoards, board];
-      });
+      await mutateWorkspace(
+        createWorkspaceMutation(
+          clientIdRef.current,
+          revisionRef.current,
+          "board.create",
+          {
+            seed,
+          }
+        )
+      );
 
       loadProjects();
     } finally {
@@ -210,20 +257,45 @@ export function ChorusWorkspaceProvider({
 
   const createBoardFromRecentProject = useEffectEvent(
     (project: WorkspaceContextValue["recentProjects"][number]) => {
-      setBoards((currentBoards) => {
-        const board = createBoardFromProject(project, currentBoards.length);
-        setSelectedBoardId(board.boardId);
-        return [...currentBoards, board];
+      mutateWorkspace(
+        createWorkspaceMutation(
+          clientIdRef.current,
+          revisionRef.current,
+          "board.create",
+          {
+            seed: {
+              title:
+                project.projectName ??
+                project.directory.split("/").filter(Boolean).at(-1) ??
+                project.directory,
+              repo: {
+                ...project,
+              },
+            },
+          }
+        )
+      ).catch((error) => {
+        console.error("Failed to create board from project", error);
       });
     }
   );
 
   const createBoardFromHistory = useEffectEvent(
     (entry: WorkspaceContextValue["previousWorkspaces"][number]) => {
-      setBoards((currentBoards) => {
-        const board = createBoardFromHistoryEntry(entry, currentBoards.length);
-        setSelectedBoardId(board.boardId);
-        return [...currentBoards, board];
+      mutateWorkspace(
+        createWorkspaceMutation(
+          clientIdRef.current,
+          revisionRef.current,
+          "board.create",
+          {
+            seed: {
+              title: entry.title,
+              repo: entry.repo,
+            },
+          }
+        )
+      ).catch((error) => {
+        console.error("Failed to create board from history", error);
       });
     }
   );
@@ -246,27 +318,53 @@ export function ChorusWorkspaceProvider({
         modelLabel: getModelLabel(input.model),
         prompt: input.text,
       });
+      const preparedSessionState =
+        selectedBoard.session.sessionId === undefined ? "starting" : "active";
+      const preparedBoard: WorkspaceBoard = {
+        ...attachPromptTask(selectedBoard, task),
+        session: {
+          ...attachPromptTask(selectedBoard, task).session,
+          state: preparedSessionState,
+        },
+      };
 
       setBoards((currentBoards) =>
         currentBoards.map((board) =>
-          board.boardId === selectedBoard.boardId
-            ? {
-                ...attachPromptTask(board, task),
-                session: {
-                  ...attachPromptTask(board, task).session,
-                  state:
-                    board.session.sessionId === undefined
-                      ? "starting"
-                      : "active",
-                },
-              }
-            : board
+          board.boardId === selectedBoard.boardId ? preparedBoard : board
         )
       );
 
       setIsQueueingPrompt(true);
 
       try {
+        await mutateWorkspace(
+          createWorkspaceMutation(
+            clientIdRef.current,
+            revisionRef.current,
+            "board.columns.replace",
+            {
+              boardId: selectedBoard.boardId,
+              columns: preparedBoard.columns,
+            }
+          )
+        );
+        await mutateWorkspace(
+          createWorkspaceMutation(
+            clientIdRef.current,
+            revisionRef.current,
+            "board.session.patch",
+            {
+              boardId: selectedBoard.boardId,
+              session: {
+                currentTaskId: preparedBoard.session.currentTaskId,
+                errorMessage: undefined,
+                sessionId: selectedBoard.session.sessionId,
+                state: preparedSessionState,
+              },
+            }
+          )
+        );
+
         const response = await fetch("/api/tasks", {
           method: "POST",
           headers: {
@@ -334,26 +432,95 @@ export function ChorusWorkspaceProvider({
     selectedBoard,
     recentProjects,
     previousWorkspaces,
+    preferences,
     isOpeningFolder,
     isQueueingPrompt,
     loadProjects,
     openFolder,
     createBoardFromProject: createBoardFromRecentProject,
     createBoardFromHistory,
-    selectBoard: setSelectedBoardId,
-    clearSelection: () => setSelectedBoardId(null),
-    updateBoardColumns: (boardId, columns) =>
+    dismissComposerHint: () =>
+      mutateWorkspace(
+        createWorkspaceMutation(
+          clientIdRef.current,
+          revisionRef.current,
+          "preference.dismiss_composer_hint",
+          {}
+        )
+      ).catch((error) => {
+        console.error("Failed to dismiss composer hint", error);
+      }),
+    removeBoard: removeBoardById,
+    selectBoard: (boardId) => {
+      setSelectedBoardId(boardId);
+      mutateWorkspace(
+        createWorkspaceMutation(
+          clientIdRef.current,
+          revisionRef.current,
+          "board.select",
+          {
+            boardId,
+          }
+        )
+      ).catch((error) => {
+        console.error("Failed to select board", error);
+      });
+    },
+    clearSelection: () => {
+      setSelectedBoardId(null);
+      mutateWorkspace(
+        createWorkspaceMutation(
+          clientIdRef.current,
+          revisionRef.current,
+          "board.select",
+          {
+            boardId: null,
+          }
+        )
+      ).catch((error) => {
+        console.error("Failed to clear selection", error);
+      });
+    },
+    updateBoardColumns: (boardId, columns) => {
       setBoards((currentBoards) =>
         currentBoards.map((board) =>
           board.boardId === boardId ? nextBoardColumns(board, columns) : board
         )
-      ),
-    updateBoardPosition: (boardId, position) =>
+      );
+      mutateWorkspace(
+        createWorkspaceMutation(
+          clientIdRef.current,
+          revisionRef.current,
+          "board.columns.replace",
+          {
+            boardId,
+            columns,
+          }
+        )
+      ).catch((error) => {
+        console.error("Failed to update board columns", error);
+      });
+    },
+    updateBoardPosition: (boardId, position) => {
       setBoards((currentBoards) =>
         currentBoards.map((board) =>
           board.boardId === boardId ? nextBoardPosition(board, position) : board
         )
-      ),
+      );
+      mutateWorkspace(
+        createWorkspaceMutation(
+          clientIdRef.current,
+          revisionRef.current,
+          "board.move",
+          {
+            boardId,
+            position,
+          }
+        )
+      ).catch((error) => {
+        console.error("Failed to update board position", error);
+      });
+    },
     queuePrompt,
   };
 

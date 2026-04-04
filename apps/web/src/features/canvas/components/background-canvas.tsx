@@ -311,6 +311,7 @@ function KeyboardHelpPanel({ onClose }: { onClose: () => void }) {
 function createKanbanCardNode(
   board: WorkspaceBoard,
   selected: boolean,
+  onRemove: (id: string) => void,
   onUpdateColumns: (id: string, columns: Columns) => void
 ): Node<KanbanCardNodeData> {
   return {
@@ -326,6 +327,7 @@ function createKanbanCardNode(
       projectName: board.repo.projectName,
       sessionId: board.session.sessionId,
       sessionState: board.session.state,
+      onRemove,
       onUpdateColumns,
     },
     selected,
@@ -342,6 +344,7 @@ function reconcileNodes(
   currentNodes: Node<KanbanCardNodeData>[],
   boards: WorkspaceBoard[],
   selectedBoardId: string | null,
+  onRemove: (id: string) => void,
   onUpdateColumns: (id: string, columns: Columns) => void
 ): Node<KanbanCardNodeData>[] {
   const currentNodesById = new Map(currentNodes.map((node) => [node.id, node]));
@@ -350,6 +353,7 @@ function reconcileNodes(
     const nextNode = createKanbanCardNode(
       board,
       board.boardId === selectedBoardId,
+      onRemove,
       onUpdateColumns
     );
     const currentNode = currentNodesById.get(board.boardId);
@@ -375,6 +379,7 @@ export function BackgroundCanvas() {
   const {
     boards,
     clearSelection,
+    removeBoard,
     selectedBoardId,
     selectBoard,
     updateBoardColumns,
@@ -394,6 +399,21 @@ export function BackgroundCanvas() {
       updateBoardColumns(id, columns);
     },
     [updateBoardColumns]
+  );
+
+  const handleRemoveBoard = useCallback(
+    (boardId: string) => {
+      removeBoard(boardId);
+      setNodes((currentNodes) =>
+        currentNodes.filter((node) => node.id !== boardId)
+      );
+      setEdges((currentEdges) =>
+        currentEdges.filter(
+          (edge) => edge.source !== boardId && edge.target !== boardId
+        )
+      );
+    },
+    [removeBoard]
   );
 
   /**
@@ -428,9 +448,15 @@ export function BackgroundCanvas() {
 
   useEffect(() => {
     setNodes((currentNodes) =>
-      reconcileNodes(currentNodes, boards, selectedBoardId, handleUpdateColumns)
+      reconcileNodes(
+        currentNodes,
+        boards,
+        selectedBoardId,
+        handleRemoveBoard,
+        handleUpdateColumns
+      )
     );
-  }, [boards, handleUpdateColumns, selectedBoardId]);
+  }, [boards, handleRemoveBoard, handleUpdateColumns, selectedBoardId]);
 
   return (
     <div className="h-full w-full">
@@ -503,7 +529,7 @@ export function BackgroundCanvas() {
             <button
               aria-label="Keyboard shortcuts"
               className={[
-                "flex size-[44px] items-center justify-center rounded-xl border transition-all duration-150",
+                "flex size-11 items-center justify-center rounded-xl border transition-all duration-150",
                 "shadow-[0_4px_20px_rgba(0,0,0,0.5)] backdrop-blur-xl",
                 showHelp
                   ? "border-white/20 bg-white/15 text-white/80"

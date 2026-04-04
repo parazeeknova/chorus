@@ -1,5 +1,6 @@
 "use client";
 
+import { BorderlessFileView, DiffFloatingWindow } from "@chorus/monaco";
 import { type Node, type NodeProps, NodeResizeControl } from "@xyflow/react";
 import {
   ChevronDownIcon,
@@ -12,7 +13,7 @@ import {
   TriangleAlertIcon,
   XIcon,
 } from "lucide-react";
-import { memo, useCallback } from "react";
+import { memo, useCallback, useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -119,12 +120,45 @@ function SessionStatus({
   );
 }
 
+function inferLanguage(path?: string): string {
+  if (!path) {
+    return "plaintext";
+  }
+  const ext = path.split(".").pop()?.toLowerCase();
+  const langMap: Record<string, string> = {
+    ts: "typescript",
+    tsx: "typescript",
+    js: "javascript",
+    jsx: "javascript",
+    py: "python",
+    rs: "rust",
+    go: "go",
+    rb: "ruby",
+    java: "java",
+    css: "css",
+    scss: "scss",
+    html: "html",
+    json: "json",
+    yaml: "yaml",
+    yml: "yaml",
+    md: "markdown",
+    sh: "shell",
+    bash: "shell",
+    toml: "toml",
+    xml: "xml",
+    sql: "sql",
+  };
+  return ext ? (langMap[ext] ?? "plaintext") : "plaintext";
+}
+
 function KanbanCardNodeComponent({
   data: rawData,
   id,
   selected,
 }: NodeProps<Node<Record<string, unknown>>>) {
   const cardData = rawData as unknown as KanbanCardNodeData;
+  const [editorMode, setEditorMode] = useState<"kanban" | "file" | null>(null);
+  const [diffVisible, setDiffVisible] = useState(false);
 
   const filePath = cardData.filePath ?? cardData.projectName ?? cardData.title;
 
@@ -134,6 +168,22 @@ function KanbanCardNodeComponent({
     },
     [cardData, id]
   );
+
+  const handleOpenHere = useCallback(() => {
+    setEditorMode("file");
+  }, []);
+
+  const handleOpenLocally = useCallback(() => {
+    setEditorMode("kanban");
+  }, []);
+
+  const handleCloseEditor = useCallback(() => {
+    setEditorMode(null);
+  }, []);
+
+  const handleToggleDiff = useCallback(() => {
+    setDiffVisible((prev) => !prev);
+  }, []);
 
   return (
     <>
@@ -157,33 +207,26 @@ function KanbanCardNodeComponent({
           "active:shadow-[0_32px_100px_rgba(0,0,0,0.8)] active:ring-1 active:ring-white/15"
         )}
       >
-        {/* Title bar */}
         <div className="flex items-center gap-3 border-white/8 border-b px-3 py-2.5">
-          {/* Drag handle */}
           <div className="flex shrink-0 cursor-grab items-center justify-center rounded-md p-1 text-white/25 hover:text-white/50 active:cursor-grabbing">
             <GripVerticalIcon className="size-3.5" />
           </div>
 
-          {/* Left: Task name */}
           <h2 className="shrink-0 font-semibold text-[0.82rem] text-white/90 tracking-wide">
             {cardData.title}
           </h2>
 
-          {/* Separator */}
           <span className="h-3.5 w-px shrink-0 bg-white/10" />
 
-          {/* File path */}
           <div className="min-w-0 flex-1 truncate">
             <FilePath path={filePath} />
           </div>
 
-          {/* Right-aligned metadata */}
           <div className="nodrag flex shrink-0 items-center gap-2.5">
             {cardData.gitBranch ? (
               <GitBranch branch={cardData.gitBranch} />
             ) : null}
 
-            {/* Separator */}
             <span className="h-3.5 w-px bg-white/10" />
 
             <SessionStatus
@@ -191,7 +234,6 @@ function KanbanCardNodeComponent({
               state={cardData.sessionState}
             />
 
-            {/* Separator */}
             <span className="h-3.5 w-px bg-white/10" />
 
             <DropdownMenu>
@@ -204,18 +246,40 @@ function KanbanCardNodeComponent({
                 align="end"
                 className="w-40 border-white/10 bg-[#1e1e1e] p-1.5 text-white/90 shadow-2xl"
               >
-                <DropdownMenuItem className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-white/80 text-xs transition-colors focus:bg-white/10 focus:text-white">
+                <DropdownMenuItem
+                  className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-white/80 text-xs transition-colors focus:bg-white/10 focus:text-white"
+                  onClick={handleOpenLocally}
+                >
                   <MonitorIcon className="size-3.5" />
                   <span>Open Locally</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-white/80 text-xs transition-colors focus:bg-white/10 focus:text-white">
+                <DropdownMenuItem
+                  className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-white/80 text-xs transition-colors focus:bg-white/10 focus:text-white"
+                  onClick={handleOpenHere}
+                >
                   <GlobeIcon className="size-3.5" />
                   <span>Open Here</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-white/80 text-xs transition-colors focus:bg-white/10 focus:text-white"
+                  onClick={handleToggleDiff}
+                >
+                  <Code2Icon className="size-3.5" />
+                  <span>View Diffs</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Close */}
+            {editorMode !== null && (
+              <button
+                className="rounded-md bg-white/10 px-2 py-1 font-medium text-[0.65rem] text-white transition-all hover:bg-white/20 active:scale-95"
+                onClick={handleCloseEditor}
+                type="button"
+              >
+                Back to Kanban
+              </button>
+            )}
+
             {cardData.onRemove && (
               <>
                 <span className="h-3.5 w-px bg-white/10" />
@@ -231,17 +295,35 @@ function KanbanCardNodeComponent({
           </div>
         </div>
 
-        <div className="nodrag flex min-h-0 min-w-0 flex-1 flex-col p-4">
-          <KanbanCardContent
-            data={{
-              id: cardData.boardId,
-              title: cardData.title,
-              columns: cardData.columns,
-            }}
-            onColumnsChange={handleColumnsChange}
-          />
+        <div className="nodrag flex min-h-0 min-w-0 flex-1 flex-col">
+          {editorMode === "file" && filePath ? (
+            <BorderlessFileView
+              filePath={filePath}
+              language={inferLanguage(filePath)}
+              value={`// File: ${filePath}\n// Connect to LSP to see live content`}
+            />
+          ) : (
+            <div className="min-h-0 min-w-0 flex-1 p-4">
+              <KanbanCardContent
+                data={{
+                  id: cardData.boardId,
+                  title: cardData.title,
+                  columns: cardData.columns,
+                }}
+                onColumnsChange={handleColumnsChange}
+              />
+            </div>
+          )}
         </div>
       </div>
+
+      <DiffFloatingWindow
+        language={inferLanguage(filePath)}
+        modified={`// Modified version of ${filePath}`}
+        onClose={() => setDiffVisible(false)}
+        original={`// Original version of ${filePath}`}
+        visible={diffVisible}
+      />
     </>
   );
 }
