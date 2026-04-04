@@ -1,9 +1,13 @@
 import MonacoEditor from "@monaco-editor/react";
 import type * as monaco from "monaco-editor";
-import { LanguageClientWrapper } from "monaco-languageclient/lcwrapper";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChorusMonacoProps } from "../types";
 import { DiffFloatingWindow } from "./diff-floating-window";
+
+interface LspClientWrapper {
+  dispose(): void;
+  start(): Promise<void>;
+}
 
 const CHORUS_THEME: monaco.editor.IStandaloneThemeData = {
   base: "vs-dark",
@@ -43,7 +47,7 @@ export function ChorusMonaco({
 }: ChorusMonacoProps) {
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<typeof monaco | null>(null);
-  const lcWrapperRef = useRef<LanguageClientWrapper | null>(null);
+  const lcWrapperRef = useRef<LspClientWrapper | null>(null);
   const [lspError, setLspError] = useState<string | null>(null);
   const lspConfigRef = useRef(lspConfig);
   lspConfigRef.current = lspConfig;
@@ -55,6 +59,9 @@ export function ChorusMonaco({
     }
 
     try {
+      const { LanguageClientWrapper } = await import(
+        "monaco-languageclient/lcwrapper"
+      );
       const lcWrapper = new LanguageClientWrapper({
         languageId: config.languageId,
         connection: {
