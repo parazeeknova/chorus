@@ -18,6 +18,7 @@ import {
 } from "@xyflow/react";
 import { KeyboardIcon, XIcon } from "lucide-react";
 import { useCallback, useEffect, useEffectEvent, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   type Columns,
   defaultColumns,
@@ -357,6 +358,11 @@ export function BackgroundCanvas() {
   ]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [showHelp, setShowHelp] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const handleRemoveCard = useCallback((id: string) => {
     setNodes((nds) => nds.filter((n) => n.id !== id));
@@ -451,29 +457,6 @@ export function BackgroundCanvas() {
           onToggleHelp={handleToggleHelp}
         />
 
-        {/* Bottom-right action cluster: keyboard help + zoom controls */}
-        <div className="pointer-events-none absolute right-4 bottom-4 z-10 flex flex-col items-end gap-2">
-          {/* Keyboard shortcuts panel (above the icon button) */}
-          {showHelp && <KeyboardHelpPanel onClose={() => setShowHelp(false)} />}
-
-          {/* Keyboard icon button */}
-          <button
-            aria-label="Keyboard shortcuts"
-            className={[
-              "pointer-events-auto flex size-9 items-center justify-center rounded-xl border transition-all",
-              "shadow-[0_4px_20px_rgba(0,0,0,0.4)] backdrop-blur-xl",
-              showHelp
-                ? "border-white/20 bg-white/15 text-white/80 shadow-[0_0_16px_rgba(255,255,255,0.08)]"
-                : "border-white/10 bg-[#020617]/80 text-white/35 hover:border-white/18 hover:bg-white/10 hover:text-white/60",
-            ].join(" ")}
-            onClick={handleToggleHelp}
-            title="Keyboard shortcuts (?)"
-            type="button"
-          >
-            <KeyboardIcon className="size-4" />
-          </button>
-        </div>
-
         <Controls
           className="background-flow__controls"
           orientation="vertical"
@@ -493,6 +476,33 @@ export function BackgroundCanvas() {
           variant={BackgroundVariant.Dots}
         />
       </ReactFlow>
+
+      {/* Keyboard help panel + icon button — portalled to document.body to
+          escape the z-10 stacking context imposed by the page layout wrapper. */}
+      {isMounted &&
+        createPortal(
+          <div className="fixed right-4 bottom-4 z-9999 flex flex-col items-end gap-2">
+            {showHelp && (
+              <KeyboardHelpPanel onClose={() => setShowHelp(false)} />
+            )}
+            <button
+              aria-label="Keyboard shortcuts"
+              className={[
+                "flex size-9 items-center justify-center rounded-xl border transition-all duration-150",
+                "shadow-[0_4px_20px_rgba(0,0,0,0.5)] backdrop-blur-xl",
+                showHelp
+                  ? "border-white/20 bg-white/15 text-white/80"
+                  : "border-white/10 bg-[#020617]/80 text-white/35 hover:border-white/15 hover:bg-white/10 hover:text-white/60",
+              ].join(" ")}
+              onClick={handleToggleHelp}
+              title="Keyboard shortcuts (?)"
+              type="button"
+            >
+              <KeyboardIcon className="size-4" />
+            </button>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
