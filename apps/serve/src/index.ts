@@ -16,6 +16,7 @@ import { createProjectRoutes } from "./routes/projects";
 import { voiceRoutes } from "./routes/voice";
 import { createWorkspaceRoutes } from "./routes/workspace";
 import { BoardTaskService } from "./tasks/board-task-service";
+import { serveWebFrontend } from "./web-frontend";
 import { WorkspaceStore } from "./workspace/store";
 import { createWsHandler } from "./ws/handler";
 
@@ -166,7 +167,13 @@ const app = new Elysia()
       error instanceof Error ? error : undefined
     );
   })
-  .get("/", () => "Hello Elysia")
+  // Web frontend routes
+  .get("/", () => serveWebFrontend("/"))
+  .get("/*", ({ request }) => {
+    const url = new URL(request.url);
+    return serveWebFrontend(url.pathname);
+  })
+  // API routes
   .use(createHttpRoutes(bridge, boardTasks, wsManager))
   .use(createProjectRoutes(projectService))
   .use(createWorkspaceRoutes(workspaceStore, wsManager))

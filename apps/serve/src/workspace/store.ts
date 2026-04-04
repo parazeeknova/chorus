@@ -50,6 +50,7 @@ function createBoardFromSeed(seed: BoardSeed, index: number): WorkspaceBoard {
       approve: [],
       done: [],
     },
+    modelSelection: null,
     session: {
       state: "uninitialized",
     },
@@ -63,6 +64,7 @@ export class WorkspaceStore {
     boards: [],
     preferences: {
       composerHintDismissed: false,
+      recentlyUsedModels: [],
       speechVoiceId: null,
     },
     previousWorkspaces: [],
@@ -83,6 +85,7 @@ export class WorkspaceStore {
         boards: [],
         preferences: {
           composerHintDismissed: false,
+          recentlyUsedModels: [],
           speechVoiceId: null,
         },
         previousWorkspaces: [],
@@ -249,6 +252,43 @@ export class WorkspaceStore {
           preferences: {
             ...snapshot.preferences,
             speechVoiceId: mutation.payload.voiceId,
+          },
+          selectedBoardId: snapshot.selectedBoardId,
+        });
+        break;
+      }
+
+      case "board.model.set": {
+        nextSnapshot = await this.replaceSnapshot({
+          boards: snapshot.boards.map((board) =>
+            board.boardId === mutation.payload.boardId
+              ? {
+                  ...board,
+                  modelSelection: mutation.payload.model,
+                }
+              : board
+          ),
+          preferences: snapshot.preferences,
+          selectedBoardId: snapshot.selectedBoardId,
+        });
+        break;
+      }
+
+      case "preference.recently_used_models.add": {
+        const existing = snapshot.preferences.recentlyUsedModels;
+        const filtered = existing.filter(
+          (m) =>
+            !(
+              m.providerID === mutation.payload.model.providerID &&
+              m.modelID === mutation.payload.model.modelID
+            )
+        );
+        const updated = [mutation.payload.model, ...filtered].slice(0, 5);
+        nextSnapshot = await this.replaceSnapshot({
+          boards: snapshot.boards,
+          preferences: {
+            ...snapshot.preferences,
+            recentlyUsedModels: updated,
           },
           selectedBoardId: snapshot.selectedBoardId,
         });
