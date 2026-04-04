@@ -45,6 +45,8 @@ interface ModelPickerProps {
   defaultModel?: ModelSelection;
   loading?: boolean;
   onValueChange: (value: string) => void;
+  previousModelSelection?: ModelSelection | null;
+  recentlyUsedModels?: ModelSelection[];
   value: string;
 }
 
@@ -59,6 +61,8 @@ export function ModelPicker({
   defaultModel,
   loading = false,
   onValueChange,
+  previousModelSelection,
+  recentlyUsedModels = [],
   value,
 }: ModelPickerProps) {
   const [open, setOpen] = useState(false);
@@ -237,6 +241,8 @@ export function ModelPicker({
                       onValueChange(nextValue);
                       setOpen(false);
                     }}
+                    previousModelSelection={previousModelSelection}
+                    recentModels={recentlyUsedModels}
                     searchQuery={deferredSearchQuery}
                     value={value}
                   />
@@ -254,12 +260,16 @@ function PickerBody({
   activeGroup,
   loading,
   onSelect,
+  previousModelSelection,
+  recentModels,
   searchQuery,
   value,
 }: {
   activeGroup: ProviderGroup | null;
   loading: boolean;
   onSelect: (value: string) => void;
+  previousModelSelection?: ModelSelection | null;
+  recentModels: ModelSelection[];
   searchQuery: string;
   value: string;
 }) {
@@ -273,6 +283,16 @@ function PickerBody({
 
   return (
     <>
+      {recentModels.length > 0 && !searchQuery ? (
+        <RecentlyUsedSection
+          availableModels={activeGroup.models}
+          onSelect={onSelect}
+          previousModelSelection={previousModelSelection}
+          recentModels={recentModels}
+          value={value}
+        />
+      ) : null}
+
       <div className="mt-3 flex items-center gap-2 px-1">
         <span className="truncate text-[10px] text-white/35 uppercase tracking-[0.22em]">
           {activeGroup.providerName}
@@ -492,6 +512,72 @@ function ModelOptionCard({
         </div>
       </span>
     </button>
+  );
+}
+
+function RecentlyUsedSection({
+  availableModels,
+  onSelect,
+  previousModelSelection,
+  recentModels,
+  value,
+}: {
+  availableModels: OpencodeModelSummary[];
+  onSelect: (value: string) => void;
+  previousModelSelection?: ModelSelection | null;
+  recentModels: ModelSelection[];
+  value: string;
+}) {
+  const recentModelsWithDetails = recentModels
+    .map((selection) => {
+      const model = availableModels.find(
+        (m) =>
+          m.providerID === selection.providerID &&
+          m.modelID === selection.modelID
+      );
+      return model ? { model, selection } : null;
+    })
+    .filter(Boolean) as {
+    model: OpencodeModelSummary;
+    selection: ModelSelection;
+  }[];
+
+  if (recentModelsWithDetails.length === 0) {
+    return null;
+  }
+
+  const isPreviousModelSaved =
+    previousModelSelection &&
+    recentModels.some(
+      (m) =>
+        m.providerID === previousModelSelection.providerID &&
+        m.modelID === previousModelSelection.modelID
+    );
+
+  return (
+    <div>
+      <div className="mb-2 flex items-center gap-2 px-1">
+        <span className="truncate text-[10px] text-white/35 uppercase tracking-[0.22em]">
+          Recently Used
+        </span>
+        {isPreviousModelSaved && (
+          <span className="rounded-xs border border-white/8 bg-white/[0.03] px-1.5 py-0.5 text-[9px] text-white/42 uppercase tracking-[0.18em]">
+            Board saved
+          </span>
+        )}
+        <span className="h-px flex-1 bg-white/8" />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        {recentModelsWithDetails.map(({ model }) => (
+          <ModelOptionCard
+            key={createModelKey(model)}
+            model={model}
+            onSelect={onSelect}
+            selected={value === createModelKey(model)}
+          />
+        ))}
+      </div>
+    </div>
   );
 }
 

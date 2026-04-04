@@ -68,18 +68,12 @@ jobs:
           key: ${{ runner.os }}-turbo-${{ github.ref_name }}-${{ github.sha }}
 
   build-desktop:
-    name: Build Electrobun Desktop App
+    name: Build Electron Desktop App
     needs: lint-and-types
     if: startsWith(github.ref, 'refs/tags/v')
     strategy:
       matrix:
-        include:
-          - os: macos-latest
-            artifact-pattern: "*.dmg"
-          - os: windows-latest
-            artifact-pattern: "*.exe"
-          - os: ubuntu-latest
-            artifact-pattern: "*.AppImage"
+        os: [macos-latest, windows-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
 
@@ -95,22 +89,27 @@ jobs:
       - name: Install Dependencies
         run: bun ci
 
-      - name: Build Electrobun Desktop App
+      - name: Build Electron Desktop App
         run: bun run --cwd apps/desktop build
-        # Electrobun builds for the current platform by default
-        # Cross-compilation can be done with: bunx electrobun build --targets macos-arm64,win-x64,linux-x64
+
+      - name: Package Electron App
+        run: bun run --cwd apps/desktop package
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.os }}
           path: |
-            apps/desktop/dist/${{ matrix.artifact-pattern }}
-            apps/desktop/dist/*.zip
+            apps/desktop/release/*.dmg
+            apps/desktop/release/*.exe
+            apps/desktop/release/*.AppImage
+            apps/desktop/release/*.deb
           if-no-files-found: warn
 
   release:
-    name: Create Electrobun Release
+    name: Create Electron Release
     needs: build-desktop
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
@@ -127,14 +126,12 @@ jobs:
         with:
           path: release-artifacts
 
-      - name: Create Electrobun Release
+      - name: Create Electron Release
         uses: softprops/action-gh-release@v2
         with:
           files: release-artifacts/**/*
           generate_release_notes: true
           draft: false
           prerelease: false
-          # Release name will be the tag name (e.g., v0.0.1)
-          # Body will be auto-generated from commits
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

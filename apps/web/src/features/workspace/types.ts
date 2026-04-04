@@ -3,6 +3,7 @@ import type {
   WorkspaceBoard as ContractWorkspaceBoard,
   WorkspaceHistoryEntry as ContractWorkspaceHistoryEntry,
   WorkspacePreferences as ContractWorkspacePreferences,
+  ModelSelection,
   ProjectListResponse,
   QueueBoardPromptResponse,
   RepoProject,
@@ -34,6 +35,7 @@ export interface AgentEventEnvelope {
 }
 
 export interface WorkspaceContextValue {
+  addRecentModel: (model: ModelSelection) => void;
   boards: WorkspaceBoard[];
   clearSelection: () => void;
   createBoardFromHistory: (entry: WorkspaceHistoryEntry) => void;
@@ -59,6 +61,7 @@ export interface WorkspaceContextValue {
   selectedBoard?: WorkspaceBoard;
   selectedBoardId: string | null;
   sessionCommand: (command: "undo" | "redo") => Promise<boolean>;
+  setBoardModel: (boardId: string, model: ModelSelection | null) => void;
   setSpeechVoiceId: (voiceId: string | null) => void;
   updateBoardColumns: (boardId: string, columns: Columns) => void;
   updateBoardPosition: (

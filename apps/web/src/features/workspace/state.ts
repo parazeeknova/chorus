@@ -44,35 +44,44 @@ function makeLabelVariant(columnId: keyof Columns): Task["labelVariant"] {
   }
 }
 
-function buildStep(event: NormalizedAgentEvent): AgentStep | null {
-  const id = `${event.type}-${event.timestamp}-${Math.random()
+function makeStepId(event: NormalizedAgentEvent): string {
+  if (event.partID) {
+    return `part-${event.partID}`;
+  }
+  return `${event.type}-${event.timestamp}-${Math.random()
     .toString(36)
     .slice(2, 8)}`;
+}
 
+function makeToolStep(event: NormalizedAgentEvent): AgentStep {
+  const step: AgentStep = {
+    id: makeStepId(event),
+    kind: "tool_call",
+    status: event.activity === "error" ? "error" : "done",
+    summary: `${event.toolName}${event.toolState ? ` · ${event.toolState}` : ""}`,
+    content: event.text,
+  };
+
+  if (event.fileDiff) {
+    step.kind = "file_edit";
+    step.filePath = event.fileDiff.filePath;
+    step.originalContent = event.fileDiff.before;
+    step.modifiedContent = event.fileDiff.after;
+    step.linesAdded = event.fileDiff.additions;
+    step.linesRemoved = event.fileDiff.deletions;
+  }
+
+  return step;
+}
+
+function buildStep(event: NormalizedAgentEvent): AgentStep | null {
   if (event.toolName) {
-    const step: AgentStep = {
-      id,
-      kind: "tool_call",
-      status: event.activity === "error" ? "error" : "done",
-      summary: `${event.toolName}${event.toolState ? ` · ${event.toolState}` : ""}`,
-      content: event.text,
-    };
-
-    if (event.fileDiff) {
-      step.kind = "file_edit";
-      step.filePath = event.fileDiff.filePath;
-      step.originalContent = event.fileDiff.before;
-      step.modifiedContent = event.fileDiff.after;
-      step.linesAdded = event.fileDiff.additions;
-      step.linesRemoved = event.fileDiff.deletions;
-    }
-
-    return step;
+    return makeToolStep(event);
   }
 
   if (event.activity === "thinking") {
     return {
-      id,
+      id: makeStepId(event),
       kind: "thinking",
       status: "running",
       summary: event.text?.slice(0, 72) ?? "Thinking",
@@ -82,7 +91,7 @@ function buildStep(event: NormalizedAgentEvent): AgentStep | null {
 
   if (event.activity === "writing") {
     return {
-      id,
+      id: makeStepId(event),
       kind: "response",
       status: "running",
       summary: event.text?.slice(0, 72) ?? "Streaming response",
@@ -92,7 +101,7 @@ function buildStep(event: NormalizedAgentEvent): AgentStep | null {
 
   if (event.activity === "waiting_for_approval") {
     return {
-      id,
+      id: makeStepId(event),
       kind: "response",
       status: "running",
       summary: "Awaiting approval",
@@ -102,7 +111,7 @@ function buildStep(event: NormalizedAgentEvent): AgentStep | null {
 
   if (event.activity === "error") {
     return {
-      id,
+      id: makeStepId(event),
       kind: "response",
       status: "error",
       summary: event.error ?? "Session error",
@@ -179,7 +188,6 @@ function moveTask(
 }
 
 function appendRunStep(task: Task, event: NormalizedAgentEvent): Task {
-  const step = buildStep(event);
   const previousRun = task.run ?? {
     elapsed: "0m 00s",
     model: "OpenCode",
@@ -190,6 +198,40 @@ function appendRunStep(task: Task, event: NormalizedAgentEvent): Task {
   };
 
   const startedAt = previousRun.startedAt ?? event.timestamp;
+
+  if (event.delta && event.partID) {
+    const deltaStepId = `part-${event.partID}`;
+    const existingStepIdx = previousRun.steps.findIndex(
+      (s) => s.id === deltaStepId
+    );
+
+    if (existingStepIdx !== -1) {
+      const existing = previousRun.steps[existingStepIdx];
+      const updatedContent = (existing.content ?? "") + event.delta;
+      const updatedStep: AgentStep = {
+        ...existing,
+        content: updatedContent,
+        summary: updatedContent.slice(0, 72),
+      };
+      const steps = previousRun.steps.map((s, i) =>
+        i === existingStepIdx ? updatedStep : s
+      );
+      return {
+        ...task,
+        run: {
+          ...previousRun,
+          elapsed: formatElapsed(startedAt),
+          startedAt,
+          sessionId: event.sessionID ?? previousRun.sessionId,
+          steps,
+        },
+        runId: event.sessionID ?? task.runId,
+      };
+    }
+  }
+
+  const step = buildStep(event);
+
   const steps =
     step === null
       ? previousRun.steps
@@ -225,6 +267,7 @@ export function createBoardFromSeed(
       y: BOARD_Y_START + index * BOARD_Y_OFFSET,
     },
     columns: createEmptyColumns(),
+    modelSelection: null,
     session: {
       state: "uninitialized",
     },

@@ -53,7 +53,7 @@ export class EventStream {
       onEvent,
       abort
     ).catch(() => {
-      // handled internally
+      // stream errors are handled internally by the subscription
     });
 
     return {
@@ -112,8 +112,12 @@ export interface FileDiffInfo {
 
 export interface NormalizedAgentEvent {
   activity?: NormalizedActivity;
+  delta?: string;
   error?: string;
   fileDiff?: FileDiffInfo;
+  messageID?: string;
+  partID?: string;
+  partType?: "text" | "reasoning" | "tool";
   permissionID?: string;
   sessionID?: string;
   text?: string;
@@ -201,16 +205,42 @@ function extractFileDiff(
   return undefined;
 }
 
+const assistantMessageRoles = new Map<string, Set<string>>();
+
+function isAssistantMessage(sessionID: string, messageID: string): boolean {
+  const sessionRoles = assistantMessageRoles.get(sessionID);
+  return sessionRoles?.has(messageID) ?? false;
+}
+
+function recordAssistantMessage(sessionID: string, messageID: string) {
+  let sessionRoles = assistantMessageRoles.get(sessionID);
+  if (!sessionRoles) {
+    sessionRoles = new Set();
+    assistantMessageRoles.set(sessionID, sessionRoles);
+  }
+  sessionRoles.add(messageID);
+}
+
 function normalizeMessagePartUpdated(
   base: NormalizedAgentEvent,
   raw: Extract<OCEvent, { type: "message.part.updated" }>
 ): NormalizedAgentEvent {
   const part = raw.properties.part;
+  const sessionID = raw.properties.sessionID;
+  const messageID = part.messageID;
+
+  if (!isAssistantMessage(sessionID, messageID)) {
+    return { ...base, sessionID };
+  }
+
   if (part.type === "text") {
     return {
       ...base,
-      sessionID: raw.properties.sessionID,
+      sessionID,
       activity: "writing",
+      messageID,
+      partID: part.id,
+      partType: "text",
       text: part.text,
     };
   }
@@ -219,8 +249,11 @@ function normalizeMessagePartUpdated(
     const fileDiff = extractFileDiff(part.tool, state);
     return {
       ...base,
-      sessionID: raw.properties.sessionID,
+      sessionID,
       activity: state.status === "running" ? "thinking" : "writing",
+      messageID,
+      partID: part.id,
+      partType: "tool",
       toolName: part.tool,
       toolState: state.status,
       fileDiff,
@@ -229,12 +262,36 @@ function normalizeMessagePartUpdated(
   if (part.type === "reasoning") {
     return {
       ...base,
-      sessionID: raw.properties.sessionID,
+      sessionID,
       activity: "thinking",
+      messageID,
+      partID: part.id,
+      partType: "reasoning",
       text: part.text,
     };
   }
-  return { ...base, sessionID: raw.properties.sessionID };
+  return { ...base, sessionID };
+}
+
+function normalizeMessagePartDelta(
+  base: NormalizedAgentEvent,
+  raw: Extract<OCEvent, { type: "message.part.delta" }>
+): NormalizedAgentEvent {
+  const props = raw.properties;
+  const sessionID = props.sessionID;
+  const messageID = props.messageID;
+
+  if (!isAssistantMessage(sessionID, messageID)) {
+    return { ...base, sessionID };
+  }
+
+  return {
+    ...base,
+    sessionID,
+    messageID,
+    partID: props.partID,
+    delta: props.delta,
+  };
 }
 
 function normalizeSessionStatus(
@@ -261,15 +318,23 @@ function normalizeMessageUpdated(
   raw: Extract<OCEvent, { type: "message.updated" }>
 ): NormalizedAgentEvent {
   const info = raw.properties.info;
+  const sessionID = raw.properties.sessionID;
+  const messageID = info.id;
+
+  if (info.role === "assistant") {
+    recordAssistantMessage(sessionID, messageID);
+  }
+
   if (info.role === "assistant" && "error" in info && info.error) {
     return {
       ...base,
-      sessionID: raw.properties.sessionID,
+      sessionID,
+      messageID,
       activity: "error",
       error: String(info.error.data?.message ?? ""),
     };
   }
-  return { ...base, sessionID: raw.properties.sessionID };
+  return { ...base, sessionID, messageID };
 }
 
 export function normalizeEvent(raw: OCEvent): NormalizedAgentEvent {
@@ -281,6 +346,8 @@ export function normalizeEvent(raw: OCEvent): NormalizedAgentEvent {
   switch (raw.type) {
     case "message.part.updated":
       return normalizeMessagePartUpdated(base, raw);
+    case "message.part.delta":
+      return normalizeMessagePartDelta(base, raw);
     case "session.status":
       return normalizeSessionStatus(base, raw);
     case "session.idle":

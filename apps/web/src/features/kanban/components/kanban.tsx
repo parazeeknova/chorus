@@ -60,6 +60,7 @@ import {
   PLACEHOLDER_RUN,
 } from "@/features/kanban/components/agent-output-card";
 import { cn } from "@/lib/utils";
+import { type GroupedStep, groupSteps } from "../utils/group-steps";
 
 export interface ChangedFile {
   added: number;
@@ -568,6 +569,35 @@ function DoneStepRow({ step }: { step: AgentStep }) {
   );
 }
 
+function DoneGroupedStepRow({ group }: { group: GroupedStep }) {
+  switch (group.kind) {
+    case "thinking":
+    case "response":
+      return (
+        <div className="flex items-start gap-1.5">
+          <span className="mt-0.5 font-mono text-[0.62rem] text-white/30">
+            {group.kind === "thinking" ? "💭" : "💬"}
+          </span>
+          <span className="min-w-0 flex-1 font-mono text-[0.68rem] text-white/50 leading-relaxed">
+            {group.summary}
+          </span>
+          {group.sourceSteps.length > 1 && (
+            <span className="rounded-xs bg-white/5 px-1 py-0.5 font-mono text-[0.55rem] text-white/25">
+              ×{group.sourceSteps.length}
+            </span>
+          )}
+        </div>
+      );
+    case "file_edit":
+      return <DoneStepRow step={group.step} />;
+    case "tool_call":
+    case "command":
+      return <DoneStepRow step={group.step} />;
+    default:
+      return null;
+  }
+}
+
 function TaskCard({
   task,
   asHandle,
@@ -594,8 +624,15 @@ function TaskCard({
         <div className="flex flex-col gap-2.5 border-white/5 border-t pt-2.5">
           {task.run && task.run.steps.length > 0 && (
             <div className="flex flex-col gap-1.5">
-              {task.run.steps.map((step) => (
-                <DoneStepRow key={step.id} step={step} />
+              {groupSteps(task.run.steps).map((group) => (
+                <DoneGroupedStepRow
+                  group={group}
+                  key={
+                    group.kind === "thinking" || group.kind === "response"
+                      ? group.id
+                      : group.step.id
+                  }
+                />
               ))}
             </div>
           )}

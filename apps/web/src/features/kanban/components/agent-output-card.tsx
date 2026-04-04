@@ -17,6 +17,7 @@ import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
+import { type GroupedStep, groupSteps } from "../utils/group-steps";
 
 export type AgentStepKind =
   | "thinking"
@@ -163,10 +164,15 @@ function inferLanguage(filePath?: string): string {
   return ext ? (langMap[ext] ?? "plaintext") : "plaintext";
 }
 
-function ThinkingBlock({ step }: { step: AgentStep }) {
-  const isRunning = step.status === "running";
+function GroupedThinkingBlock({
+  group,
+}: {
+  group: NonNullable<Extract<GroupedStep, { kind: "thinking" }>>;
+}) {
+  const isRunning = group.status === "running";
   const [expanded, setExpanded] = useState(false);
-  const hasContent = step.content && step.content.length > 0;
+  const hasContent = group.content && group.content.length > 0;
+  const stepCount = group.sourceSteps.length;
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -182,8 +188,14 @@ function ThinkingBlock({ step }: { step: AgentStep }) {
           Thinking
         </span>
 
+        {stepCount > 1 && (
+          <span className="rounded-xs bg-violet-500/10 px-1.5 py-0.5 font-mono text-[0.6rem] text-violet-300/70">
+            {stepCount}
+          </span>
+        )}
+
         <span className="min-w-0 flex-1 truncate font-mono text-[0.72rem] text-white/60">
-          {step.summary}
+          {group.summary}
         </span>
 
         {hasContent && (
@@ -205,7 +217,7 @@ function ThinkingBlock({ step }: { step: AgentStep }) {
         <div className="ml-5 rounded-xs border border-violet-500/10 bg-violet-500/[0.03] px-3 py-2.5">
           <div className="text-[0.72rem] text-violet-300/60 leading-relaxed">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {step.content}
+              {group.content}
             </ReactMarkdown>
           </div>
         </div>
@@ -214,15 +226,27 @@ function ThinkingBlock({ step }: { step: AgentStep }) {
   );
 }
 
-function ResponseBlock({ step }: { step: AgentStep }) {
-  const isRunning = step.status === "running";
+function GroupedResponseBlock({
+  group,
+}: {
+  group: {
+    kind: "response";
+    id: string;
+    status: AgentStep["status"];
+    summary: string;
+    content: string;
+    sourceSteps: AgentStep[];
+  };
+}) {
+  const isRunning = group.status === "running";
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
-  const hasContent = step.content && step.content.length > 0;
+  const hasContent = group.content && group.content.length > 0;
+  const stepCount = group.sourceSteps.length;
 
   function handleCopy() {
-    if (step.content) {
-      navigator.clipboard.writeText(step.content);
+    if (group.content) {
+      navigator.clipboard.writeText(group.content);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
@@ -242,8 +266,14 @@ function ResponseBlock({ step }: { step: AgentStep }) {
           Response
         </span>
 
+        {stepCount > 1 && (
+          <span className="rounded-xs bg-sky-500/10 px-1.5 py-0.5 font-mono text-[0.6rem] text-sky-300/70">
+            {stepCount}
+          </span>
+        )}
+
         <span className="min-w-0 flex-1 truncate font-mono text-[0.72rem] text-white/60">
-          {step.summary}
+          {group.summary}
         </span>
 
         {hasContent && (
@@ -279,7 +309,7 @@ function ResponseBlock({ step }: { step: AgentStep }) {
         <div className="ml-5 rounded-xs border border-sky-500/10 bg-sky-500/[0.03] px-3 py-2.5">
           <div className="text-[0.72rem] text-sky-300/70 leading-relaxed">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {step.content}
+              {group.content}
             </ReactMarkdown>
           </div>
         </div>
@@ -294,7 +324,9 @@ function ChangesBlock({ step }: { step: AgentStep }) {
   const [showDiff, setShowDiff] = useState(false);
   const hasOriginal = step.originalContent && step.originalContent.length > 0;
   const hasModified = step.modifiedContent && step.modifiedContent.length > 0;
-  const canShowDiff = hasOriginal && hasModified;
+  const hasActualChanges =
+    (step.linesAdded ?? 0) > 0 || (step.linesRemoved ?? 0) > 0;
+  const canShowDiff = hasOriginal && hasModified && hasActualChanges;
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -410,17 +442,17 @@ function ToolCallRow({ step }: { step: AgentStep }) {
   );
 }
 
-function StepRow({ step }: { step: AgentStep }) {
-  switch (step.kind) {
+function GroupedStepRow({ group }: { group: GroupedStep }) {
+  switch (group.kind) {
     case "thinking":
-      return <ThinkingBlock step={step} />;
+      return <GroupedThinkingBlock group={group} />;
     case "response":
-      return <ResponseBlock step={step} />;
+      return <GroupedResponseBlock group={group} />;
     case "file_edit":
-      return <ChangesBlock step={step} />;
+      return <ChangesBlock step={group.step} />;
     case "tool_call":
     case "command":
-      return <ToolCallRow step={step} />;
+      return <ToolCallRow step={group.step} />;
     default:
       return null;
   }
@@ -439,6 +471,7 @@ export function AgentOutputCard({
 }: AgentOutputCardProps) {
   const doneCount = run.steps.filter((s) => s.status === "done").length;
   const isLive = run.steps.some((s) => s.status === "running");
+  const groupedSteps = groupSteps(run.steps);
 
   return (
     <div
@@ -470,9 +503,13 @@ export function AgentOutputCard({
       </div>
 
       <div className="flex flex-col gap-3 px-3 py-3">
-        {run.steps.map((step) => (
-          <StepRow key={step.id} step={step} />
-        ))}
+        {groupedSteps.map((group) => {
+          const stepId =
+            group.kind === "thinking" || group.kind === "response"
+              ? group.id
+              : group.step.id;
+          return <GroupedStepRow group={group} key={stepId} />;
+        })}
       </div>
 
       <div className="flex items-center gap-3 border-white/5 border-t px-3 py-2">

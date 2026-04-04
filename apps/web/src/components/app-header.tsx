@@ -113,7 +113,6 @@ async function fetchConfiguredProviders() {
     .providerIDs;
 }
 
-// ─── Notification types ────────────────────────────────────────────────────────
 type NotifType = "review" | "question" | "done" | "warning";
 
 interface Notification {

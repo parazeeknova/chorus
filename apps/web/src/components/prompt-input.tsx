@@ -67,6 +67,8 @@ export function PromptInput() {
     selectBoard,
     sessionCommand,
     selectedBoard,
+    setBoardModel,
+    addRecentModel,
   } = useWorkspace();
 
   const autocomplete = useAutocomplete(selectedBoard?.repo.directory);
@@ -144,6 +146,27 @@ export function PromptInput() {
     };
   }, [selectedDirectory]);
 
+  useEffect(() => {
+    if (!selectedBoard || availableModels.length === 0) {
+      return;
+    }
+
+    const boardModel = selectedBoard.modelSelection;
+    if (boardModel) {
+      const modelKey = `${boardModel.providerID}/${boardModel.modelID}`;
+      const modelExists = availableModels.some(
+        (m) => `${m.providerID}/${m.modelID}` === modelKey
+      );
+      if (modelExists && modelKey !== selectedModelKey) {
+        setSelectedModelKey(modelKey);
+      } else if (!modelExists && selectedModelKey !== DEFAULT_MODEL_KEY) {
+        setSelectedModelKey(DEFAULT_MODEL_KEY);
+      }
+    } else if (selectedModelKey !== DEFAULT_MODEL_KEY) {
+      setSelectedModelKey(DEFAULT_MODEL_KEY);
+    }
+  }, [selectedBoard, availableModels, selectedModelKey]);
+
   const selectedModel = useMemo(() => {
     if (selectedModelKey === DEFAULT_MODEL_KEY) {
       return undefined;
@@ -159,6 +182,18 @@ export function PromptInput() {
       modelID,
     } satisfies ModelSelection;
   }, [selectedModelKey]);
+
+  const handleModelValueChange = (value: string) => {
+    setSelectedModelKey(value);
+    if (value !== DEFAULT_MODEL_KEY && selectedBoard) {
+      const [providerID, modelID] = value.split("/");
+      if (providerID && modelID) {
+        const model = { providerID, modelID };
+        setBoardModel(selectedBoard.boardId, model);
+        addRecentModel(model);
+      }
+    }
+  };
 
   const handleVoiceButtonClick = async () => {
     if (isRecording) {
@@ -301,7 +336,9 @@ export function PromptInput() {
                     className={composerSelectTriggerClass}
                     defaultModel={defaultModel}
                     loading={isLoadingModels}
-                    onValueChange={setSelectedModelKey}
+                    onValueChange={handleModelValueChange}
+                    previousModelSelection={selectedBoard?.modelSelection}
+                    recentlyUsedModels={preferences.recentlyUsedModels}
                     value={selectedModelKey}
                   />
                 </div>

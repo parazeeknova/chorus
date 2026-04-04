@@ -1,97 +1,36 @@
-# Chorus Desktop
+# Chorus Desktop (Electron)
 
-Electrobun-based desktop application that bundles the Chorus web frontend and serve backend into a single self-contained native app.
-
-## Quick Start
-
-Run everything at once from repo root:
-```bash
-bun run dev
-```
-
-This starts:
-- Next.js dev server (port 3000)
-- Chorus serve backend (port 2000) 
-- Electrobun desktop app with native window
-
-The desktop app proxies web requests to Next.js automatically.
-
-## Architecture
-
-- **Web Frontend**: Next.js app proxied from localhost:3000
-- **Serve Backend**: Elysia server in Bun main process (port 2000)
-- **Desktop Shell**: Electrobun native window with system webview
+Chorus desktop application using Electron.
 
 ## Development
 
-Prerequisites: bun v1.3.11+
-
 ```bash
-# Install dependencies from repo root
-bun install
-
-# Run everything (from repo root)
+# From repo root - starts serve, web, and desktop
 bun run dev
 
-# Or run just the desktop app (Next.js must be running separately)
+# Or just the desktop (serve must be running)
 cd apps/desktop && bun run dev
 ```
 
-## Production Build
+The desktop app loads http://localhost:2000 in a native window.
+
+## Build
 
 ```bash
 cd apps/desktop
 bun run build
+bun run package
 ```
 
-Creates platform-specific bundles in `dist/`:
-- macOS: `.dmg`
-- Windows: `.exe`
-- Linux: `.AppImage`
+Creates platform-specific packages in `release/`.
 
-## Auto-Updater
+## Architecture
 
-Configured in `electrobun.config.ts`:
-```typescript
-release: {
-  baseUrl: "https://github.com/parazeeknova/chorus/releases/download"
-}
-```
+- **Main Process**: Electron main process (`src/main/`)
+- **Preload**: Secure bridge between main and renderer (`src/preload/`)
+- **Renderer**: Loads web UI from localhost:2000 (Chorus serve)
 
-Uses bsdiff for ~14KB update patches.
+## Requirements
 
-## Releasing
-
-```bash
-# Update version in apps/desktop/package.json
-git add apps/desktop/package.json
-git commit -m "chore[DESKTOP]: bump version to 0.0.4"
-git tag v0.0.4
-git push origin main
-git push origin v0.0.4
-```
-
-GitHub Actions builds and releases automatically.
-
-## Features
-
-✅ Full Chorus backend integration (apps/serve)  
-✅ Web frontend proxy to Next.js dev server  
-✅ Auto-updater support  
-✅ Cross-platform (macOS, Windows, Linux)  
-✅ ~12MB bundle size (vs ~200MB Electron)  
-✅ ~14KB update patches with bsdiff  
-
-## Configuration
-
-Environment variables:
-- `CHORUS_SERVE_PORT` - Backend port (default: 2000)
-- `NODE_ENV=production` - Serve static files instead of proxy
-
-## Status
-
-🚀 **Fully functional!** The desktop app successfully:
-- Starts Elysia backend with OpenCode bridge
-- Creates native desktop window
-- Proxies web UI from Next.js dev server
-- Handles graceful shutdown
+- Chorus serve must be running on port 2000
+- Web frontend served by the backend

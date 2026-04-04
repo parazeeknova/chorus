@@ -233,6 +233,7 @@ export const workspaceBoardSessionSchema = z.object({
 export const workspaceBoardSchema = z.object({
   boardId: z.string().min(1),
   columns: columnsSchema,
+  modelSelection: modelSelectionSchema.nullable(),
   position: z.object({
     x: z.number(),
     y: z.number(),
@@ -251,6 +252,7 @@ export const workspaceHistoryEntrySchema = z.object({
 
 export const workspacePreferencesSchema = z.object({
   composerHintDismissed: z.boolean(),
+  recentlyUsedModels: modelSelectionSchema.array().default([]),
   speechVoiceId: z.string().min(1).nullable().optional().default(null),
 });
 
@@ -312,6 +314,19 @@ export const workspaceMutationSchema = z.discriminatedUnion("type", [
     payload: z.object({
       boardId: z.string().min(1),
       session: workspaceBoardSessionSchema.partial(),
+    }),
+  }),
+  workspaceMutationBaseSchema.extend({
+    type: z.literal("board.model.set"),
+    payload: z.object({
+      boardId: z.string().min(1),
+      model: modelSelectionSchema.nullable(),
+    }),
+  }),
+  workspaceMutationBaseSchema.extend({
+    type: z.literal("preference.recently_used_models.add"),
+    payload: z.object({
+      model: modelSelectionSchema,
     }),
   }),
   workspaceMutationBaseSchema.extend({
