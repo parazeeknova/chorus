@@ -297,10 +297,58 @@ export function PromptInput() {
           </div>
         )}
         <form className="relative" onSubmit={handleSubmit}>
-          <div className="overflow-hidden rounded-sm border border-white/10 bg-[#0f0f0f]/90 p-2 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.8)] backdrop-blur-2xl transition-colors focus-within:border-white/20 focus-within:bg-[#161616]/95">
+          <div className="overflow-hidden rounded-sm border border-white/10 bg-[#0f0f0f]/90 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.8)] backdrop-blur-2xl transition-colors focus-within:border-white/20 focus-within:bg-[#161616]/95">
+            {/* Mobile-only: board selector pinned to top edge of the card */}
+            <div className="border-white/8 border-b px-3 py-1.5 sm:hidden">
+              <Select
+                onValueChange={(value) => value && selectBoard(value)}
+                value={selectedBoard?.boardId ?? null}
+              >
+                <SelectTrigger
+                  className={cn(
+                    composerSelectTriggerClass,
+                    "w-full border-0 bg-transparent px-0 text-white/58 shadow-none focus:ring-0"
+                  )}
+                  size="sm"
+                >
+                  <span className="min-w-0 flex-1 truncate text-left">
+                    {selectedBoard
+                      ? getBoardRepoName(selectedBoard)
+                      : "Select a board"}
+                  </span>
+                </SelectTrigger>
+                <SelectContent
+                  align="start"
+                  className={cn(
+                    "w-[min(20rem,calc(100vw-2rem))] min-w-0",
+                    composerSelectContentClass
+                  )}
+                >
+                  {boards.map((board) => (
+                    <SelectItem
+                      className={composerSelectItemClass}
+                      key={board.boardId}
+                      value={board.boardId}
+                    >
+                      <span className="flex min-w-0 flex-col">
+                        <span className="truncate">
+                          {getBoardRepoName(board)}
+                        </span>
+                        <span className="truncate text-[11px] text-white/40">
+                          {board.repo.branch ?? board.repo.directory}
+                        </span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Main content area */}
             <div className="flex flex-col gap-2 px-3 py-2">
               <Textarea
                 className="max-h-40 min-h-8 w-full resize-none overflow-y-auto rounded-none border-0 bg-transparent p-0 font-medium text-[15px] text-white/90 shadow-none placeholder:text-white/40 focus-visible:ring-0 focus-visible:ring-offset-0 dark:bg-transparent"
+                id="chorus-prompt-input"
                 onChange={handleInput}
                 onKeyDown={handleKeyDown}
                 placeholder="Ask Chorus to build something..."
@@ -308,8 +356,10 @@ export function PromptInput() {
                 rows={1}
                 value={prompt}
               />
+              {/* Bottom toolbar — single row always */}
               <div className="flex items-center justify-between opacity-80 transition-opacity focus-within:opacity-100">
-                <div className="flex items-center gap-2">
+                {/* Left: model picker */}
+                <div className="flex min-w-0 items-center gap-2">
                   <ModelPicker
                     availableModels={availableModels}
                     className={composerSelectTriggerClass}
@@ -319,46 +369,50 @@ export function PromptInput() {
                     value={selectedModelKey}
                   />
                 </div>
+                {/* Right: board (desktop only) + action buttons */}
                 <div className="flex items-center gap-2">
-                  <Select
-                    onValueChange={(value) => value && selectBoard(value)}
-                    value={selectedBoard?.boardId ?? null}
-                  >
-                    <SelectTrigger
-                      className={cn(
-                        composerSelectTriggerClass,
-                        "bg-transparent text-white/58"
-                      )}
-                      size="sm"
+                  {/* Board selector: desktop only — hidden on mobile */}
+                  <div className="hidden sm:block">
+                    <Select
+                      onValueChange={(value) => value && selectBoard(value)}
+                      value={selectedBoard?.boardId ?? null}
                     >
-                      <span className="min-w-0 flex-1 truncate text-left">
-                        {selectedBoard
-                          ? getBoardRepoName(selectedBoard)
-                          : "Select a board"}
-                      </span>
-                    </SelectTrigger>
-                    <SelectContent
-                      align="end"
-                      className={cn("min-w-64", composerSelectContentClass)}
-                    >
-                      {boards.map((board) => (
-                        <SelectItem
-                          className={composerSelectItemClass}
-                          key={board.boardId}
-                          value={board.boardId}
-                        >
-                          <span className="flex min-w-0 flex-col">
-                            <span className="truncate">
-                              {getBoardRepoName(board)}
+                      <SelectTrigger
+                        className={cn(
+                          composerSelectTriggerClass,
+                          "max-w-40 bg-transparent text-white/58"
+                        )}
+                        size="sm"
+                      >
+                        <span className="min-w-0 flex-1 truncate text-left">
+                          {selectedBoard
+                            ? getBoardRepoName(selectedBoard)
+                            : "Select a board"}
+                        </span>
+                      </SelectTrigger>
+                      <SelectContent
+                        align="end"
+                        className={cn("min-w-64", composerSelectContentClass)}
+                      >
+                        {boards.map((board) => (
+                          <SelectItem
+                            className={composerSelectItemClass}
+                            key={board.boardId}
+                            value={board.boardId}
+                          >
+                            <span className="flex min-w-0 flex-col">
+                              <span className="truncate">
+                                {getBoardRepoName(board)}
+                              </span>
+                              <span className="truncate text-[11px] text-white/40">
+                                {board.repo.branch ?? board.repo.directory}
+                              </span>
                             </span>
-                            <span className="truncate text-[11px] text-white/40">
-                              {board.repo.branch ?? board.repo.directory}
-                            </span>
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <Button
                     className={`h-7 w-7 rounded-xs hover:text-white/90 dark:hover:text-white/90 ${
                       isRecording
