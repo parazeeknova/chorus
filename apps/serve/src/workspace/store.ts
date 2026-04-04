@@ -50,6 +50,7 @@ function createBoardFromSeed(seed: BoardSeed, index: number): WorkspaceBoard {
       approve: [],
       done: [],
     },
+    reviewMode: "auto",
     session: {
       state: "uninitialized",
     },
@@ -255,6 +256,53 @@ export class WorkspaceStore {
         break;
       }
 
+      case "board.review_mode.set": {
+        nextSnapshot = await this.replaceSnapshot({
+          boards: snapshot.boards.map((board) =>
+            board.boardId === mutation.payload.boardId
+              ? {
+                  ...board,
+                  reviewMode: mutation.payload.reviewMode,
+                }
+              : board
+          ),
+          preferences: snapshot.preferences,
+          selectedBoardId: snapshot.selectedBoardId,
+        });
+        break;
+      }
+
+      case "board.task.plan.update": {
+        nextSnapshot = await this.replaceSnapshot({
+          boards: snapshot.boards.map((board) => {
+            if (board.boardId !== mutation.payload.boardId) {
+              return board;
+            }
+            const updatedColumns = Object.fromEntries(
+              Object.entries(board.columns).map(([colId, tasks]) => [
+                colId,
+                tasks.map((task) =>
+                  task.id === mutation.payload.taskId
+                    ? {
+                        ...task,
+                        plan: mutation.payload.plan,
+                        questions: mutation.payload.questions ?? task.questions,
+                      }
+                    : task
+                ),
+              ])
+            );
+            return {
+              ...board,
+              columns: updatedColumns,
+            };
+          }),
+          preferences: snapshot.preferences,
+          selectedBoardId: snapshot.selectedBoardId,
+        });
+        break;
+      }
+
       default: {
         throw new Error(
           `Unsupported workspace mutation type: ${String(mutation)}`
@@ -295,6 +343,26 @@ export class WorkspaceStore {
               },
             };
           })()
+        : board
+    );
+
+    return await this.replaceSnapshot({
+      boards,
+      preferences: this.#snapshot.preferences,
+      selectedBoardId: this.#snapshot.selectedBoardId,
+    });
+  }
+
+  async updateBoardReviewMode(
+    boardId: string,
+    reviewMode: "manual" | "auto"
+  ): Promise<WorkspaceSnapshot> {
+    const boards = this.#snapshot.boards.map((board) =>
+      board.boardId === boardId
+        ? {
+            ...board,
+            reviewMode,
+          }
         : board
     );
 

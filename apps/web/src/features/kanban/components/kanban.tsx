@@ -82,6 +82,10 @@ export interface Task {
   linesAdded?: number;
   /** Lines removed by the agent run — shown in done cards */
   linesRemoved?: number;
+  /** AI-generated plan for the task — shown in review cards for MANUAL mode */
+  plan?: string;
+  /** Questions from AI that need user input — shown in review cards for MANUAL mode */
+  questions?: string[];
   /** Live or recorded run state shown in the in-progress card */
   run?: AgentRunContext;
   /** Links to an OpenCode sessionId for live agent output */
@@ -98,6 +102,7 @@ export type Columns = Record<string, Task[]>;
 export interface KanbanCardData {
   columns: Columns;
   id: string;
+  reviewMode?: "manual" | "auto";
   title: string;
 }
 
@@ -540,6 +545,11 @@ function ChangedFileRow({ file }: { file: ChangedFile }) {
 interface TaskCardProps {
   asHandle?: boolean;
   draggable?: boolean;
+  onApprove?: (taskId: string, plan: string, answers: string[]) => void;
+  onPlanChange?: (taskId: string, plan: string) => void;
+  onQuestionsAnswered?: (taskId: string, answers: string[]) => void;
+  onReject?: (taskId: string) => void;
+  reviewMode?: "manual" | "auto";
   showApprovalControls?: boolean;
   showDone?: boolean;
   showOutput?: boolean;
@@ -568,6 +578,7 @@ function DoneStepRow({ step }: { step: AgentStep }) {
   );
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: TaskCard renders multiple conditional sections for different task states (queue, in_progress, review, done)
 function TaskCard({
   task,
   asHandle,
@@ -576,7 +587,47 @@ function TaskCard({
   showDone,
   showApprovalControls,
   showPlay,
+  reviewMode = "auto",
+  onApprove,
+  onReject,
+  onPlanChange,
+  onQuestionsAnswered,
 }: TaskCardProps) {
+  const [editedPlan, setEditedPlan] = useState(task.plan ?? "");
+  const [questionAnswers, setQuestionAnswers] = useState<string[]>(
+    task.questions?.map(() => "") ?? []
+  );
+
+  useEffect(() => {
+    setEditedPlan(task.plan ?? "");
+  }, [task.plan]);
+
+  useEffect(() => {
+    setQuestionAnswers(task.questions?.map(() => "") ?? []);
+  }, [task.questions]);
+
+  const isManualReview = showApprovalControls && reviewMode === "manual";
+
+  const handleApproveClick = () => {
+    if (isManualReview && onApprove) {
+      if (editedPlan !== task.plan && onPlanChange) {
+        onPlanChange(task.id, editedPlan);
+      }
+      onApprove(task.id, editedPlan, questionAnswers);
+    } else if (onApprove) {
+      onApprove(task.id, "", []);
+    }
+  };
+
+  const handleQuestionChange = (qIndex: number, value: string) => {
+    const newAnswers = [...questionAnswers];
+    newAnswers[qIndex] = value;
+    setQuestionAnswers(newAnswers);
+    if (onQuestionsAnswered) {
+      onQuestionsAnswered(task.id, newAnswers);
+    }
+  };
+
   const content = (
     <div
       className={cn(
@@ -589,12 +640,75 @@ function TaskCard({
         {task.title}
       </span>
 
-      {/* Done: summary + diff stats + run output */}
+      {isManualReview && (
+        <div className="flex flex-col gap-3 border-white/5 border-t pt-2.5">
+          {/* Plan Section - always editable textarea */}
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-[0.7rem] text-amber-400 uppercase tracking-wider">
+                Plan
+              </span>
+            </div>
+            <textarea
+              className="min-h-[120px] w-full resize-y rounded-xs border border-white/10 bg-white/5 p-2.5 font-mono text-[0.72rem] text-white/70 leading-relaxed placeholder:text-white/20 focus:border-amber-400/40 focus:outline-none"
+              onChange={(e) => setEditedPlan(e.target.value)}
+              placeholder="AI will generate a plan here. You can edit it directly..."
+              value={editedPlan}
+            />
+          </div>
+
+          {/* Questions Section */}
+          {task.questions && task.questions.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <span className="font-medium text-[0.7rem] text-amber-400 uppercase tracking-wider">
+                Questions
+              </span>
+              {task.questions.map((question, qIndex) => (
+                <div className="flex flex-col gap-1" key={question}>
+                  <p className="text-[0.7rem] text-white/60 leading-relaxed">
+                    {question}
+                  </p>
+                  <input
+                    className="w-full rounded-xs border border-white/10 bg-white/5 px-2.5 py-1.5 font-mono text-[0.7rem] text-white/70 leading-relaxed placeholder:text-white/20 focus:border-amber-400/40 focus:outline-none"
+                    onChange={(e) =>
+                      handleQuestionChange(qIndex, e.target.value)
+                    }
+                    placeholder="Your answer..."
+                    type="text"
+                    value={questionAnswers[qIndex] ?? ""}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Empty state when no plan yet */}
+          {!task.plan && (
+            <div className="flex flex-col items-center gap-2 py-4 text-center">
+              <span className="text-[0.72rem] text-white/30">
+                Waiting for AI to generate a plan...
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {showApprovalControls &&
+        reviewMode === "auto" &&
+        task.changedFiles &&
+        task.changedFiles.length > 0 && (
+          <div className="flex flex-col gap-1 border-white/5 border-t pt-2.5">
+            {task.changedFiles.map((f) => (
+              <ChangedFileRow file={f} key={f.path} />
+            ))}
+          </div>
+        )}
+
       {showDone && (
         <div className="flex flex-col gap-2.5 border-white/5 border-t pt-2.5">
           {task.run && task.run.steps.length > 0 && (
             <div className="flex flex-col gap-1.5">
-              {task.run.steps.map((step) => (
+              {task.run.steps.map((step: AgentStep) => (
                 <DoneStepRow key={step.id} step={step} />
               ))}
             </div>
@@ -653,6 +767,7 @@ function TaskCard({
       )}
 
       {showApprovalControls &&
+        reviewMode === "auto" &&
         task.changedFiles &&
         task.changedFiles.length > 0 && (
           <div className="flex flex-col gap-1 border-white/5 border-t pt-2.5">
@@ -671,7 +786,8 @@ function TaskCard({
               "transition-all duration-150 hover:border-emerald-500/30 hover:bg-emerald-500/20",
               "active:scale-[0.97]"
             )}
-            title="Approve"
+            onClick={handleApproveClick}
+            title={isManualReview ? "Finalize & Implement" : "Approve"}
             type="button"
           >
             <CheckIcon className="size-3.5" />
@@ -683,6 +799,7 @@ function TaskCard({
               "transition-all duration-150 hover:border-rose-500/30 hover:bg-rose-500/20",
               "active:scale-[0.97]"
             )}
+            onClick={() => onReject?.(task.id)}
             title="Reject"
             type="button"
           >
@@ -721,10 +838,8 @@ function TaskCard({
   return (
     <KanbanItem disabled={!draggable} value={task.id}>
       {showOutput ? (
-        // In-progress: task card + vertical connector + agent output card
         <>
           {contentNode}
-          {/* Connector: vertical line linking task to output */}
           <div className="flex">
             <div className="ml-5 flex flex-col items-center">
               <div className="h-2 w-px bg-linear-to-b from-white/5 to-white/15" />
@@ -823,41 +938,45 @@ function defaultColumns(boardId = "board"): Columns {
   };
 }
 
-function AutoAcceptToggle({
-  autoAccept,
+function ReviewModeToggle({
+  reviewMode,
   onToggle,
 }: {
-  autoAccept: boolean;
-  onToggle: () => void;
+  reviewMode: "manual" | "auto";
+  onToggle: (mode: "manual" | "auto") => void;
 }) {
   return (
     <button
       className="flex items-center gap-1.5 rounded-xs px-1.5 py-0.5 transition-colors hover:bg-white/5"
-      onClick={onToggle}
-      title={autoAccept ? "Switch to manual review" : "Switch to auto-accept"}
+      onClick={() => onToggle(reviewMode === "manual" ? "auto" : "manual")}
+      title={
+        reviewMode === "manual"
+          ? "Switch to auto-accept"
+          : "Switch to manual review"
+      }
       type="button"
     >
       <span
         className={cn(
           "font-medium text-[0.6rem] uppercase tracking-wider transition-colors",
-          autoAccept ? "text-emerald-400" : "text-white/25"
+          reviewMode === "manual" ? "text-amber-400" : "text-white/25"
         )}
       >
-        {autoAccept ? "Auto" : "Manual"}
+        {reviewMode === "manual" ? "Manual" : "Auto"}
       </span>
       <span
         className={cn(
           "relative inline-flex h-3.5 w-6 shrink-0 items-center rounded-full transition-all duration-200",
-          autoAccept
-            ? "bg-emerald-500/35 shadow-[0_0_8px_rgba(52,211,153,0.25)]"
+          reviewMode === "manual"
+            ? "bg-amber-500/35 shadow-[0_0_8px_rgba(251,191,36,0.25)]"
             : "bg-white/10"
         )}
       >
         <span
           className={cn(
             "absolute size-2.5 rounded-full shadow-sm transition-all duration-200",
-            autoAccept
-              ? "left-[calc(100%-2px)] -translate-x-full bg-emerald-400"
+            reviewMode === "manual"
+              ? "left-[calc(100%-2px)] -translate-x-full bg-amber-400"
               : "left-0.5 bg-white/35"
           )}
         />
@@ -869,13 +988,13 @@ function AutoAcceptToggle({
 function ColumnHeader({
   columnId,
   tasks,
-  autoAccept,
-  onAutoAcceptChange,
+  reviewMode,
+  onReviewModeChange,
 }: {
   columnId: string;
   tasks: Task[];
-  autoAccept: boolean;
-  onAutoAcceptChange: (value: boolean) => void;
+  reviewMode: "manual" | "auto";
+  onReviewModeChange: (mode: "manual" | "auto") => void;
 }) {
   const col = COLUMNS[columnId];
   const isReview = columnId === "approve";
@@ -890,9 +1009,9 @@ function ColumnHeader({
         {tasks.length}
       </div>
       {isReview && (
-        <AutoAcceptToggle
-          autoAccept={autoAccept}
-          onToggle={() => onAutoAcceptChange(!autoAccept)}
+        <ReviewModeToggle
+          onToggle={onReviewModeChange}
+          reviewMode={reviewMode}
         />
       )}
     </div>
@@ -902,18 +1021,31 @@ function ColumnHeader({
 function TaskList({
   columnId,
   tasks,
-  autoAccept,
+  reviewMode,
+  onApprove,
+  onReject,
+  onPlanChange,
+  onQuestionsAnswered,
 }: {
   columnId: string;
   tasks: Task[];
-  autoAccept: boolean;
+  reviewMode: "manual" | "auto";
+  onApprove?: (taskId: string, plan: string, answers: string[]) => void;
+  onReject?: (taskId: string) => void;
+  onPlanChange?: (taskId: string, plan: string) => void;
+  onQuestionsAnswered?: (taskId: string, answers: string[]) => void;
 }) {
   return tasks.map((task) => (
     <TaskCard
       asHandle
       draggable={columnId === "queue"}
       key={task.id}
-      showApprovalControls={columnId === "approve" && !autoAccept}
+      onApprove={onApprove}
+      onPlanChange={onPlanChange}
+      onQuestionsAnswered={onQuestionsAnswered}
+      onReject={onReject}
+      reviewMode={columnId === "approve" ? reviewMode : "auto"}
+      showApprovalControls={columnId === "approve"}
       showDone={columnId === "done"}
       showOutput={columnId === "in_progress"}
       showPlay={columnId === "queue"}
@@ -925,13 +1057,21 @@ function TaskList({
 function KanbanColumnRenderer({
   columnId,
   tasks,
-  autoAccept,
-  onAutoAcceptChange,
+  reviewMode,
+  onReviewModeChange,
+  onApprove,
+  onReject,
+  onPlanChange,
+  onQuestionsAnswered,
 }: {
   columnId: string;
   tasks: Task[];
-  autoAccept: boolean;
-  onAutoAcceptChange: (value: boolean) => void;
+  reviewMode: "manual" | "auto";
+  onReviewModeChange: (mode: "manual" | "auto") => void;
+  onApprove?: (taskId: string, plan: string, answers: string[]) => void;
+  onReject?: (taskId: string) => void;
+  onPlanChange?: (taskId: string, plan: string) => void;
+  onQuestionsAnswered?: (taskId: string, answers: string[]) => void;
 }) {
   const col = COLUMNS[columnId];
   const isQueue = columnId === "queue";
@@ -953,9 +1093,9 @@ function KanbanColumnRenderer({
               )}
             />
             <ColumnHeader
-              autoAccept={autoAccept}
               columnId={columnId}
-              onAutoAcceptChange={onAutoAcceptChange}
+              onReviewModeChange={onReviewModeChange}
+              reviewMode={reviewMode}
               tasks={tasks}
             />
 
@@ -988,8 +1128,12 @@ function KanbanColumnRenderer({
                 />
               ) : (
                 <TaskList
-                  autoAccept={autoAccept}
                   columnId={columnId}
+                  onApprove={onApprove}
+                  onPlanChange={onPlanChange}
+                  onQuestionsAnswered={onQuestionsAnswered}
+                  onReject={onReject}
+                  reviewMode={reviewMode}
                   tasks={tasks}
                 />
               )}
@@ -1004,11 +1148,28 @@ function KanbanColumnRenderer({
 export function KanbanCardContent({
   data,
   onColumnsChange,
+  onReviewModeChange,
+  onApprove,
+  onReject,
+  onPlanChange,
+  onQuestionsAnswered,
 }: {
   data: KanbanCardData;
   onColumnsChange: (columns: Columns) => void;
+  onReviewModeChange?: (mode: "manual" | "auto") => void;
+  onApprove?: (taskId: string, plan: string, answers: string[]) => void;
+  onReject?: (taskId: string) => void;
+  onPlanChange?: (taskId: string, plan: string) => void;
+  onQuestionsAnswered?: (taskId: string, answers: string[]) => void;
 }) {
-  const [autoAccept, setAutoAccept] = useState(false);
+  const [reviewMode, setReviewMode] = useState<"manual" | "auto">(
+    data.reviewMode ?? "auto"
+  );
+
+  const handleReviewModeChange = (mode: "manual" | "auto") => {
+    setReviewMode(mode);
+    onReviewModeChange?.(mode);
+  };
 
   return (
     <Kanban
@@ -1025,9 +1186,13 @@ export function KanbanCardContent({
           {Object.entries(data.columns).map(([columnId, tasks], index, arr) => (
             <Fragment key={columnId}>
               <KanbanColumnRenderer
-                autoAccept={autoAccept}
                 columnId={columnId}
-                onAutoAcceptChange={setAutoAccept}
+                onApprove={onApprove}
+                onPlanChange={onPlanChange}
+                onQuestionsAnswered={onQuestionsAnswered}
+                onReject={onReject}
+                onReviewModeChange={handleReviewModeChange}
+                reviewMode={reviewMode}
                 tasks={tasks}
               />
               {index < arr.length - 1 && <ResizableHandle withHandle />}

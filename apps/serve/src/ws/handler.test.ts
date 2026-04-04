@@ -76,6 +76,7 @@ describe("WS message type definitions", () => {
         text: "build something",
         model: { providerID: "anthropic", modelID: "claude" },
         agent: "build",
+        reviewMode: "auto",
       },
     };
 

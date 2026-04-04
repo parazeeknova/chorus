@@ -194,7 +194,21 @@ export const agentRunContextSchema = z.object({
   taskTitle: z.string().min(1),
 });
 
+export const reviewModeSchema = z.union([
+  z.literal("manual"),
+  z.literal("auto"),
+]);
+
 export const taskSchema = z.object({
+  changedFiles: z
+    .array(
+      z.object({
+        added: z.number(),
+        path: z.string(),
+        removed: z.number(),
+      })
+    )
+    .optional(),
   id: z.string().min(1),
   label: z.string().min(1),
   labelVariant: z.union([
@@ -206,9 +220,12 @@ export const taskSchema = z.object({
   ]),
   linesAdded: z.number().optional(),
   linesRemoved: z.number().optional(),
+  plan: z.string().optional(),
+  questions: z.array(z.string()).optional(),
   run: agentRunContextSchema.optional(),
   runId: z.string().min(1).optional(),
   summary: z.string().optional(),
+  taggedFiles: z.array(z.string()).optional(),
   title: z.string().min(1),
 });
 
@@ -236,6 +253,7 @@ export const workspaceBoardSchema = z.object({
     y: z.number(),
   }),
   repo: repoContextSchema,
+  reviewMode: reviewModeSchema.optional().default("auto"),
   session: workspaceBoardSessionSchema,
   title: z.string().min(1),
 });
@@ -328,6 +346,22 @@ export const workspaceMutationSchema = z.discriminatedUnion("type", [
       voice: z.string().min(1),
     }),
   }),
+  workspaceMutationBaseSchema.extend({
+    type: z.literal("board.review_mode.set"),
+    payload: z.object({
+      boardId: z.string().min(1),
+      reviewMode: reviewModeSchema,
+    }),
+  }),
+  workspaceMutationBaseSchema.extend({
+    type: z.literal("board.task.plan.update"),
+    payload: z.object({
+      boardId: z.string().min(1),
+      taskId: z.string().min(1),
+      plan: z.string(),
+      questions: z.array(z.string()).optional(),
+    }),
+  }),
 ]);
 
 export const promptFilePartSchema = z.object({
@@ -353,6 +387,7 @@ export const queueBoardPromptInputSchema = z.object({
   agent: z.string().min(1).optional(),
   model: modelSelectionSchema.optional(),
   parts: z.array(promptPartSchema).optional(),
+  reviewMode: reviewModeSchema.optional().default("auto"),
 });
 
 export const queueBoardPromptResponseSchema = z.object({
