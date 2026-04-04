@@ -23,7 +23,7 @@
     },
     "apps/desktop": {
       "name": "@chorus/desktop",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "dependencies": {
         "electron-log": "^5.4.3",
         "electron-updater": "^6.8.3",
