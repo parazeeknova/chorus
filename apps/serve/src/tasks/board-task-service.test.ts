@@ -29,6 +29,7 @@ describe("BoardTaskService", () => {
             approve: [],
             done: [],
           },
+          modelSelection: null,
           position: { x: 0, y: 0 },
           repo: {
             directory: "/tmp/repo",
@@ -41,7 +42,9 @@ describe("BoardTaskService", () => {
         },
       ],
       preferences: {
+        boardViewMode: "relaxed",
         composerHintDismissed: false,
+        recentlyUsedModels: [],
         speechVoiceId: null,
       },
       selectedBoardId: "board-1",
@@ -88,6 +91,7 @@ describe("BoardTaskService", () => {
             approve: [],
             done: [],
           },
+          modelSelection: null,
           position: { x: 0, y: 0 },
           repo: {
             directory: "/tmp/repo",
@@ -103,7 +107,9 @@ describe("BoardTaskService", () => {
         },
       ],
       preferences: {
+        boardViewMode: "relaxed",
         composerHintDismissed: false,
+        recentlyUsedModels: [],
         speechVoiceId: null,
       },
       selectedBoardId: "board-1",

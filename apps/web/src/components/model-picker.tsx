@@ -45,6 +45,8 @@ interface ModelPickerProps {
   defaultModel?: ModelSelection;
   loading?: boolean;
   onValueChange: (value: string) => void;
+  previousModelSelection?: ModelSelection | null;
+  recentlyUsedModels?: ModelSelection[];
   value: string;
 }
 
@@ -59,6 +61,8 @@ export function ModelPicker({
   defaultModel,
   loading = false,
   onValueChange,
+  previousModelSelection,
+  recentlyUsedModels = [],
   value,
 }: ModelPickerProps) {
   const [open, setOpen] = useState(false);
@@ -171,9 +175,6 @@ export function ModelPicker({
             <span className="block truncate text-left text-[11px] text-white/86">
               {triggerCopy.label}
             </span>
-            <span className="block truncate text-left text-[10px] text-white/42">
-              {triggerCopy.meta}
-            </span>
           </span>
         </span>
         <ChevronDownIcon className="size-4 shrink-0 text-white/45" />
@@ -185,7 +186,7 @@ export function ModelPicker({
           side="top"
           sideOffset={10}
         >
-          <Popover.Popup className="h-[min(28rem,calc(100vh-7rem))] w-[34rem] max-w-[calc(100vw-2rem)] origin-(--transform-origin) overflow-hidden rounded-xs border border-white/10 bg-[#141414]/98 text-white shadow-[0_20px_54px_rgba(0,0,0,0.52)] ring-1 ring-white/8 backdrop-blur-xl transition-[opacity,transform] duration-100 data-[ending-style]:scale-95 data-[starting-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0">
+          <Popover.Popup className="h-[min(28rem,calc(100vh-14rem))] w-[34rem] max-w-[calc(100vw-2rem)] origin-(--transform-origin) overflow-hidden rounded-xs border border-white/10 bg-[#141414]/98 text-white shadow-[0_20px_54px_rgba(0,0,0,0.52)] ring-1 ring-white/8 backdrop-blur-xl transition-[opacity,transform] duration-100 data-[ending-style]:scale-95 data-[starting-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 sm:h-[min(28rem,calc(100vh-7rem))]">
             <div className="grid h-full min-h-0 grid-cols-[4.5rem_minmax(0,1fr)]">
               <ProviderTabs
                 activeProviderID={activeGroup?.providerID}
@@ -193,18 +194,19 @@ export function ModelPicker({
                 onSelect={setActiveProviderID}
               />
               <div className="flex min-h-0 flex-col bg-[#161616]">
-                <div className="border-white/6 border-b px-3 py-2.5">
-                  <div className="flex items-start justify-between gap-3">
+                <div className="border-white/6 border-b px-3 py-2">
+                  {/* Desktop: description + search side by side. Mobile: search only, full width */}
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                     <div className="min-w-0">
                       <div className="text-[10px] text-white/35 uppercase tracking-[0.22em]">
                         Model Routing
                       </div>
-                      <div className="mt-1 text-[11px] text-white/48">
+                      <div className="mt-1 hidden text-[11px] text-white/48 sm:block">
                         Provider tabs reflect the models currently exposed by
                         OpenCode.
                       </div>
                     </div>
-                    <label className="flex h-8 w-[13rem] shrink-0 items-center gap-2 rounded-xs border border-white/8 bg-white/[0.03] px-2.5 text-white/62 transition-colors focus-within:border-white/14 focus-within:bg-white/[0.05] focus-within:text-white/84">
+                    <label className="flex h-8 w-full shrink-0 items-center gap-2 rounded-xs border border-white/8 bg-white/[0.03] px-2.5 text-white/62 transition-colors focus-within:border-white/14 focus-within:bg-white/[0.05] focus-within:text-white/84 sm:w-[13rem]">
                       <SearchIcon className="size-3.5 shrink-0 text-white/34" />
                       <input
                         className="w-full border-0 bg-transparent p-0 text-[11px] text-white/84 outline-none placeholder:text-white/34"
@@ -238,6 +240,8 @@ export function ModelPicker({
                       onValueChange(nextValue);
                       setOpen(false);
                     }}
+                    previousModelSelection={previousModelSelection}
+                    recentModels={recentlyUsedModels}
                     searchQuery={deferredSearchQuery}
                     value={value}
                   />
@@ -255,12 +259,16 @@ function PickerBody({
   activeGroup,
   loading,
   onSelect,
+  previousModelSelection,
+  recentModels,
   searchQuery,
   value,
 }: {
   activeGroup: ProviderGroup | null;
   loading: boolean;
   onSelect: (value: string) => void;
+  previousModelSelection?: ModelSelection | null;
+  recentModels: ModelSelection[];
   searchQuery: string;
   value: string;
 }) {
@@ -274,6 +282,16 @@ function PickerBody({
 
   return (
     <>
+      {recentModels.length > 0 && !searchQuery ? (
+        <RecentlyUsedSection
+          availableModels={activeGroup.models}
+          onSelect={onSelect}
+          previousModelSelection={previousModelSelection}
+          recentModels={recentModels}
+          value={value}
+        />
+      ) : null}
+
       <div className="mt-3 flex items-center gap-2 px-1">
         <span className="truncate text-[10px] text-white/35 uppercase tracking-[0.22em]">
           {activeGroup.providerName}
@@ -493,6 +511,72 @@ function ModelOptionCard({
         </div>
       </span>
     </button>
+  );
+}
+
+function RecentlyUsedSection({
+  availableModels,
+  onSelect,
+  previousModelSelection,
+  recentModels,
+  value,
+}: {
+  availableModels: OpencodeModelSummary[];
+  onSelect: (value: string) => void;
+  previousModelSelection?: ModelSelection | null;
+  recentModels: ModelSelection[];
+  value: string;
+}) {
+  const recentModelsWithDetails = recentModels
+    .map((selection) => {
+      const model = availableModels.find(
+        (m) =>
+          m.providerID === selection.providerID &&
+          m.modelID === selection.modelID
+      );
+      return model ? { model, selection } : null;
+    })
+    .filter(Boolean) as {
+    model: OpencodeModelSummary;
+    selection: ModelSelection;
+  }[];
+
+  if (recentModelsWithDetails.length === 0) {
+    return null;
+  }
+
+  const isPreviousModelSaved =
+    previousModelSelection &&
+    recentModels.some(
+      (m) =>
+        m.providerID === previousModelSelection.providerID &&
+        m.modelID === previousModelSelection.modelID
+    );
+
+  return (
+    <div>
+      <div className="mb-2 flex items-center gap-2 px-1">
+        <span className="truncate text-[10px] text-white/35 uppercase tracking-[0.22em]">
+          Recently Used
+        </span>
+        {isPreviousModelSaved && (
+          <span className="rounded-xs border border-white/8 bg-white/[0.03] px-1.5 py-0.5 text-[9px] text-white/42 uppercase tracking-[0.18em]">
+            Board saved
+          </span>
+        )}
+        <span className="h-px flex-1 bg-white/8" />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        {recentModelsWithDetails.map(({ model }) => (
+          <ModelOptionCard
+            key={createModelKey(model)}
+            model={model}
+            onSelect={onSelect}
+            selected={value === createModelKey(model)}
+          />
+        ))}
+      </div>
+    </div>
   );
 }
 

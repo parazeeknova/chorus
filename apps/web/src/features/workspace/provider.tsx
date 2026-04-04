@@ -55,10 +55,13 @@ export function ChorusWorkspaceProvider({
   children: React.ReactNode;
 }) {
   const [boards, setBoards] = useState<WorkspaceContextValue["boards"]>([]);
+  const [boardLayoutVersion, setBoardLayoutVersion] = useState(0);
   const [preferences, setPreferences] = useState<
     WorkspaceContextValue["preferences"]
   >({
+    boardViewMode: "relaxed",
     composerHintDismissed: false,
+    recentlyUsedModels: [],
     speechVoiceId: null,
   });
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
@@ -107,7 +110,36 @@ export function ChorusWorkspaceProvider({
       });
 
       if (!response.ok) {
-        throw new Error("Failed to mutate workspace");
+        let errorMessage = `Failed to mutate workspace (${response.status} ${response.statusText})`;
+        try {
+          const errorData = await response.json();
+          if (errorData.code) {
+            errorMessage = `${errorMessage}: ${errorData.code}`;
+          }
+          if (errorData.issues) {
+            errorMessage = `${errorMessage} - ${JSON.stringify(errorData.issues)}`;
+          }
+        } catch {
+          // Response body might not be JSON, try text
+          try {
+            const errorText = await response.text();
+            if (errorText) {
+              errorMessage = `${errorMessage}: ${errorText}`;
+            }
+          } catch {
+            // Ignore if we can't read the body
+          }
+        }
+        console.error("Workspace mutation failed:", {
+          status: response.status,
+          statusText: response.statusText,
+          mutation: {
+            type: mutation.type,
+            mutationId: mutation.mutationId,
+            baseRevision: mutation.baseRevision,
+          },
+        });
+        throw new Error(errorMessage);
       }
 
       const snapshot = workspaceSnapshotSchema.parse(await response.json());
@@ -477,6 +509,7 @@ export function ChorusWorkspaceProvider({
 
   const value: WorkspaceContextValue = {
     boards,
+    boardLayoutVersion,
     selectedBoardId,
     selectedBoard,
     recentProjects,
@@ -515,6 +548,25 @@ export function ChorusWorkspaceProvider({
         )
       ).catch((error) => {
         console.error("Failed to update speech voice", error);
+      });
+    },
+    setBoardViewMode: (mode) => {
+      setPreferences((currentPreferences) => ({
+        ...currentPreferences,
+        boardViewMode: mode,
+      }));
+      setBoardLayoutVersion((currentVersion) => currentVersion + 1);
+      mutateWorkspace(
+        createWorkspaceMutation(
+          clientIdRef.current,
+          revisionRef.current,
+          "preference.board_view_mode.set",
+          {
+            mode,
+          }
+        )
+      ).catch((error) => {
+        console.error("Failed to update board view mode", error);
       });
     },
     removeBoard: removeBoardById,
@@ -674,6 +726,49 @@ export function ChorusWorkspaceProvider({
         )
       ).catch((error) => {
         console.error("Failed to update board review mode", error);
+      });
+    },
+    setBoardModel: (boardId, model) => {
+      setBoards((currentBoards) =>
+        currentBoards.map((board) =>
+          board.boardId === boardId
+            ? { ...board, modelSelection: model }
+            : board
+        )
+      );
+      mutateWorkspace(
+        createWorkspaceMutation(
+          clientIdRef.current,
+          revisionRef.current,
+          "board.model.set",
+          {
+            boardId,
+            model,
+          }
+        )
+      ).catch((error) => {
+        console.error("Failed to set board model", error);
+      });
+    },
+    addRecentModel: (model) => {
+      setPreferences((currentPreferences) => {
+        const existing = currentPreferences.recentlyUsedModels;
+        const filtered = existing.filter(
+          (m) =>
+            !(m.providerID === model.providerID && m.modelID === model.modelID)
+        );
+        const updated = [model, ...filtered].slice(0, 5);
+        return { ...currentPreferences, recentlyUsedModels: updated };
+      });
+      mutateWorkspace(
+        createWorkspaceMutation(
+          clientIdRef.current,
+          revisionRef.current,
+          "preference.recently_used_models.add",
+          { model }
+        )
+      ).catch((error) => {
+        console.error("Failed to add recent model", error);
       });
     },
     kanbanHistory: {

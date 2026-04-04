@@ -1,0 +1,25 @@
+{
+  "name": "@chorus/desktop",
+  "version": "0.0.8",
+  "private": true,
+  "description": "Chorus desktop app using Electron",
+  "main": "./dist/main/index.js",
+  "scripts": {
+    "dev": "npm run build && electron .",
+    "build": "electron-vite build",
+    "package": "electron-builder",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "electron-log": "^5.4.3",
+    "electron-updater": "^6.8.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.2",
+    "electron": "35.7.5",
+    "electron-builder": "^26.8.1",
+    "electron-vite": "^5.0.0",
+    "typescript": "^5.9.3",
+    "vite": "^6.4.1"
+  }
+}

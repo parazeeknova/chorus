@@ -17,6 +17,7 @@ import {
 } from "@xyflow/react";
 import { KeyboardIcon, MinusIcon, PlusIcon, XIcon } from "lucide-react";
 import {
+  startTransition,
   useCallback,
   useEffect,
   useEffectEvent,
@@ -24,13 +25,22 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import {
+  BOARD_CARD_HEIGHT,
+  BOARD_CARD_WIDTH,
+  computeBoardLayout,
+  getAutoLayoutBoardIds,
+} from "@/features/canvas/lib/board-layout";
 import type { Columns } from "@/features/kanban/components/kanban";
 import {
   KANBAN_CARD_NODE_TYPE,
   KanbanCardNode,
   type KanbanCardNodeData,
 } from "@/features/kanban/components/kanban-card-node";
-import type { WorkspaceBoard } from "@/features/workspace/types";
+import type {
+  WorkspaceBoard,
+  WorkspacePreferences,
+} from "@/features/workspace/types";
 import { useWorkspace } from "@/features/workspace/workspace-context";
 
 const DEFAULT_VIEWPORT: Viewport = { x: 0, y: 0, zoom: 1 };
@@ -42,6 +52,8 @@ const WORLD_EXTENT: CoordinateExtent = [
 const nodeTypes = {
   [KANBAN_CARD_NODE_TYPE]: KanbanCardNode,
 };
+const AUTO_LAYOUT_NODE_CLASS =
+  "transition-[transform,width,height] duration-[560ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none";
 
 function isEditableTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) {
@@ -196,9 +208,9 @@ function CanvasControls() {
 
   return (
     <Panel
-      className="flex flex-col items-center gap-1 rounded-sm border border-white/10 bg-[#0f0f0f]/90 p-1.5 shadow-[0_4px_20px_rgba(0,0,0,0.5)] backdrop-blur-xl"
-      position="bottom-right"
-      style={{ margin: 0, bottom: "4.25rem", right: "1rem" }}
+      className="!right-4 !bottom-auto !top-[4.5rem] md:!top-auto md:!bottom-[4.25rem] flex flex-col items-center gap-1 rounded-sm border border-white/10 bg-[#0f0f0f]/90 p-1.5 shadow-[0_4px_20px_rgba(0,0,0,0.5)] backdrop-blur-xl"
+      position="top-right"
+      style={{ margin: 0 }}
     >
       <button
         aria-label="Zoom in"
@@ -320,12 +332,16 @@ function KeyboardHelpPanel({ onClose }: { onClose: () => void }) {
 
 function createKanbanCardNode(
   board: WorkspaceBoard,
+  layout: ReturnType<typeof computeBoardLayout>,
   selected: boolean,
   onRemove: (id: string) => void,
   onUpdateColumns: (id: string, columns: Columns) => void
 ): Node<KanbanCardNodeData> {
+  const layoutItem = layout.get(board.boardId);
+
   return {
     id: board.boardId,
+    className: AUTO_LAYOUT_NODE_CLASS,
     type: KANBAN_CARD_NODE_TYPE,
     position: board.position,
     data: {
@@ -345,15 +361,19 @@ function createKanbanCardNode(
     draggable: true,
     selectable: true,
     style: {
-      width: 1280,
-      height: 720,
+      height: layoutItem?.height ?? BOARD_CARD_HEIGHT,
+      transitionProperty: "width, height",
+      width: layoutItem?.width ?? BOARD_CARD_WIDTH,
+      willChange: "transform, width, height",
     },
+    zIndex: layoutItem?.zIndex ?? 0,
   };
 }
 
 function reconcileNodes(
   currentNodes: Node<KanbanCardNodeData>[],
   boards: WorkspaceBoard[],
+  layout: ReturnType<typeof computeBoardLayout>,
   selectedBoardId: string | null,
   onRemove: (id: string) => void,
   onUpdateColumns: (id: string, columns: Columns) => void
@@ -363,6 +383,7 @@ function reconcileNodes(
   return boards.map((board) => {
     const nextNode = createKanbanCardNode(
       board,
+      layout,
       board.boardId === selectedBoardId,
       onRemove,
       onUpdateColumns
@@ -375,13 +396,16 @@ function reconcileNodes(
 
     return {
       ...currentNode,
-      position: currentNode.position,
+      className: nextNode.className,
+      draggable: nextNode.draggable,
+      position: nextNode.position,
       selected: board.boardId === selectedBoardId,
+      style: nextNode.style,
+      zIndex: nextNode.zIndex,
       data: {
         ...currentNode.data,
         ...nextNode.data,
       },
-      style: currentNode.style ?? nextNode.style,
     };
   });
 }
@@ -389,7 +413,9 @@ function reconcileNodes(
 export function BackgroundCanvas() {
   const {
     boards,
+    boardLayoutVersion,
     clearSelection,
+    preferences,
     removeBoard,
     selectedBoardId,
     selectBoard,
@@ -400,11 +426,21 @@ export function BackgroundCanvas() {
   const [edges, setEdges] = useState<Edge[]>([]);
   const [showHelp, setShowHelp] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [fitViewToken, setFitViewToken] = useState(0);
+  const [canvasSize, setCanvasSize] = useState({
+    height: 0,
+    width: 0,
+  });
   const containerRef = useRef<HTMLDivElement>(null);
   const rfInstanceRef = useRef<ReactFlowInstance<
     Node<KanbanCardNodeData>,
     Edge
   > | null>(null);
+  const previousBoardIdsRef = useRef<string[]>([]);
+  const previousBoardLayoutVersionRef = useRef(0);
+  const previousViewModeRef = useRef<
+    WorkspacePreferences["boardViewMode"] | null
+  >(null);
   const isNodeClickRef = useRef(false);
 
   useEffect(() => {
@@ -468,6 +504,38 @@ export function BackgroundCanvas() {
     };
   }, []);
 
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) {
+      return;
+    }
+
+    const observer = new ResizeObserver(([entry]) => {
+      const nextWidth = Math.round(entry.contentRect.width);
+      const nextHeight = Math.round(entry.contentRect.height);
+
+      setCanvasSize((currentSize) => {
+        if (
+          currentSize.width === nextWidth &&
+          currentSize.height === nextHeight
+        ) {
+          return currentSize;
+        }
+
+        return {
+          height: nextHeight,
+          width: nextWidth,
+        };
+      });
+    });
+
+    observer.observe(container);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
   const handleUpdateColumns = useCallback(
     (id: string, columns: Columns) => {
       updateBoardColumns(id, columns);
@@ -519,18 +587,118 @@ export function BackgroundCanvas() {
       setEdges((eds) => addEdge({ ...params, animated: true }, eds)),
     []
   );
+  const boardViewMode = preferences.boardViewMode;
+  const persistBoardPosition = useEffectEvent(
+    (boardId: string, position: { x: number; y: number }) => {
+      updateBoardPosition(boardId, position);
+    }
+  );
 
   useEffect(() => {
-    setNodes((currentNodes) =>
-      reconcileNodes(
-        currentNodes,
-        boards,
-        selectedBoardId,
-        handleRemoveBoard,
-        handleUpdateColumns
-      )
-    );
-  }, [boards, handleRemoveBoard, handleUpdateColumns, selectedBoardId]);
+    if (canvasSize.width === 0) {
+      return;
+    }
+
+    const forceReset =
+      boardLayoutVersion !== previousBoardLayoutVersionRef.current;
+    const autoLayoutBoardIds = getAutoLayoutBoardIds({
+      boards,
+      forceReset,
+      previousBoardIds: previousBoardIdsRef.current,
+      previousViewMode: previousViewModeRef.current,
+      viewMode: boardViewMode,
+    });
+
+    previousBoardIdsRef.current = boards.map((board) => board.boardId);
+    previousBoardLayoutVersionRef.current = boardLayoutVersion;
+    previousViewModeRef.current = boardViewMode;
+
+    if (autoLayoutBoardIds.length === 0) {
+      return;
+    }
+
+    const layout = computeBoardLayout({
+      boards,
+      canvasWidth: canvasSize.width,
+      selectedBoardId: null,
+      viewMode: boardViewMode,
+    });
+    const autoLayoutBoardIdSet = new Set(autoLayoutBoardIds);
+    let movedBoardCount = 0;
+
+    for (const board of boards) {
+      if (!autoLayoutBoardIdSet.has(board.boardId)) {
+        continue;
+      }
+
+      const layoutItem = layout.get(board.boardId);
+
+      if (
+        !layoutItem ||
+        (layoutItem.position.x === board.position.x &&
+          layoutItem.position.y === board.position.y)
+      ) {
+        continue;
+      }
+
+      persistBoardPosition(board.boardId, layoutItem.position);
+      movedBoardCount += 1;
+    }
+
+    if (movedBoardCount > 0) {
+      setFitViewToken((currentToken) => currentToken + 1);
+    }
+  }, [boardLayoutVersion, boardViewMode, boards, canvasSize.width]);
+
+  useEffect(() => {
+    const layout = computeBoardLayout({
+      boards,
+      canvasWidth: canvasSize.width,
+      selectedBoardId,
+      viewMode: boardViewMode,
+    });
+
+    startTransition(() => {
+      setNodes((currentNodes) =>
+        reconcileNodes(
+          currentNodes,
+          boards,
+          layout,
+          selectedBoardId,
+          handleRemoveBoard,
+          handleUpdateColumns
+        )
+      );
+    });
+  }, [
+    boardViewMode,
+    boards,
+    canvasSize.width,
+    handleRemoveBoard,
+    handleUpdateColumns,
+    selectedBoardId,
+  ]);
+
+  useEffect(() => {
+    if (fitViewToken === 0 || nodes.length === 0) {
+      return;
+    }
+
+    let nestedAnimationFrameId = 0;
+    const animationFrameId = window.requestAnimationFrame(() => {
+      nestedAnimationFrameId = window.requestAnimationFrame(() => {
+        rfInstanceRef.current?.fitView({
+          duration: 720,
+          padding: boardViewMode === "stacked" ? 0.18 : 0.12,
+        });
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(animationFrameId);
+      window.cancelAnimationFrame(nestedAnimationFrameId);
+    };
+  }, [boardViewMode, fitViewToken, nodes.length]);
 
   // Navigate to board when selected from dropdown (not from canvas click)
   useEffect(() => {
@@ -556,73 +724,75 @@ export function BackgroundCanvas() {
 
   return (
     <div className="h-full w-full" ref={containerRef}>
-      <ReactFlow
-        className="background-flow dark"
-        defaultViewport={DEFAULT_VIEWPORT}
-        edges={edges}
-        edgesFocusable={true}
-        elementsSelectable={true}
-        maxZoom={4}
-        minZoom={0.15}
-        nodeExtent={WORLD_EXTENT}
-        nodes={nodes}
-        nodesConnectable={true}
-        nodesDraggable={true}
-        nodesFocusable={true}
-        nodeTypes={nodeTypes}
-        onConnect={onConnect}
-        onInit={(instance) => {
-          rfInstanceRef.current = instance;
-        }}
-        onlyRenderVisibleElements
-        onNodeClick={(_, node) => {
-          isNodeClickRef.current = true;
-          selectBoard(node.id);
-        }}
-        onNodeDragStop={(_, node) => {
-          updateBoardPosition(node.id, node.position);
-        }}
-        onNodesChange={(changes) => {
-          setNodes(
-            (currentNodes) =>
-              applyNodeChanges(
-                changes,
-                currentNodes
-              ) as Node<KanbanCardNodeData>[]
-          );
-        }}
-        onPaneClick={clearSelection}
-        panOnDrag
-        panOnScroll={false}
-        selectNodesOnDrag={true}
-        translateExtent={WORLD_EXTENT}
-        zoomOnDoubleClick={false}
-        zoomOnPinch
-        zoomOnScroll={false}
-      >
-        <KeyboardShortcuts
-          onApproveSelected={handleApproveSelected}
-          onNewTask={handleNewTask}
-          onRejectSelected={handleRejectSelected}
-          onRemoveSelected={handleRemoveSelected}
-          onToggleHelp={handleToggleHelp}
-        />
+      {isMounted ? (
+        <ReactFlow
+          className="background-flow dark"
+          defaultViewport={DEFAULT_VIEWPORT}
+          edges={edges}
+          edgesFocusable={true}
+          elementsSelectable={true}
+          maxZoom={4}
+          minZoom={0.15}
+          nodeExtent={WORLD_EXTENT}
+          nodes={nodes}
+          nodesConnectable={true}
+          nodesDraggable={true}
+          nodesFocusable={true}
+          nodeTypes={nodeTypes}
+          onConnect={onConnect}
+          onInit={(instance) => {
+            rfInstanceRef.current = instance;
+          }}
+          onlyRenderVisibleElements
+          onNodeClick={(_, node) => {
+            isNodeClickRef.current = true;
+            selectBoard(node.id);
+          }}
+          onNodeDragStop={(_, node) => {
+            updateBoardPosition(node.id, node.position);
+          }}
+          onNodesChange={(changes) => {
+            setNodes(
+              (currentNodes) =>
+                applyNodeChanges(
+                  changes,
+                  currentNodes
+                ) as Node<KanbanCardNodeData>[]
+            );
+          }}
+          onPaneClick={clearSelection}
+          panOnDrag
+          panOnScroll={false}
+          selectNodesOnDrag={true}
+          translateExtent={WORLD_EXTENT}
+          zoomOnDoubleClick={false}
+          zoomOnPinch
+          zoomOnScroll={false}
+        >
+          <KeyboardShortcuts
+            onApproveSelected={handleApproveSelected}
+            onNewTask={handleNewTask}
+            onRejectSelected={handleRejectSelected}
+            onRemoveSelected={handleRemoveSelected}
+            onToggleHelp={handleToggleHelp}
+          />
 
-        <CanvasControls />
-        <Background
-          bgColor="#0a0a0a"
-          color="rgba(255, 255, 255, 0.4)"
-          gap={26}
-          size={1.8}
-          variant={BackgroundVariant.Dots}
-        />
-      </ReactFlow>
+          <CanvasControls />
+          <Background
+            bgColor="#0a0a0a"
+            color="rgba(255, 255, 255, 0.4)"
+            gap={26}
+            size={1.8}
+            variant={BackgroundVariant.Dots}
+          />
+        </ReactFlow>
+      ) : null}
 
       {/* Keyboard help panel + icon button — portalled to document.body to
           escape the z-10 stacking context imposed by the page layout wrapper. */}
       {isMounted &&
         createPortal(
-          <div className="fixed right-4 bottom-8 z-9999 flex flex-col items-end gap-2">
+          <div className="fixed right-4 bottom-8 z-9999 hidden flex-col items-end gap-2 sm:flex">
             {showHelp && (
               <KeyboardHelpPanel onClose={() => setShowHelp(false)} />
             )}

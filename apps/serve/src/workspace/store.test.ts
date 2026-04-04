@@ -37,6 +37,7 @@ describe("WorkspaceStore", () => {
             approve: [],
             done: [],
           },
+          modelSelection: null,
           position: { x: 10, y: 20 },
           repo: {
             directory: "/tmp/repo",
@@ -51,7 +52,9 @@ describe("WorkspaceStore", () => {
         },
       ],
       preferences: {
+        boardViewMode: "relaxed",
         composerHintDismissed: false,
+        recentlyUsedModels: [],
         speechVoiceId: null,
       },
       selectedBoardId: "board-1",
@@ -70,6 +73,7 @@ describe("WorkspaceStore", () => {
             approve: [],
             done: [],
           },
+          modelSelection: null,
           position: { x: 10, y: 20 },
           repo: {
             directory: "/tmp/repo",
@@ -84,7 +88,9 @@ describe("WorkspaceStore", () => {
         },
       ],
       preferences: {
+        boardViewMode: "relaxed",
         composerHintDismissed: false,
+        recentlyUsedModels: [],
         speechVoiceId: null,
       },
       previousWorkspaces: [
@@ -121,6 +127,7 @@ describe("WorkspaceStore", () => {
             approve: [],
             done: [],
           },
+          modelSelection: null,
           position: { x: 0, y: 0 },
           repo: {
             directory: "/tmp/repo",
@@ -135,7 +142,9 @@ describe("WorkspaceStore", () => {
         },
       ],
       preferences: {
+        boardViewMode: "relaxed",
         composerHintDismissed: false,
+        recentlyUsedModels: [],
         speechVoiceId: null,
       },
       selectedBoardId: "board-1",
@@ -185,6 +194,7 @@ describe("WorkspaceStore", () => {
             approve: [],
             done: [],
           },
+          modelSelection: null,
           position: { x: 0, y: 0 },
           repo: {
             directory: "/tmp/repo",
@@ -201,7 +211,9 @@ describe("WorkspaceStore", () => {
         },
       ],
       preferences: {
+        boardViewMode: "relaxed",
         composerHintDismissed: false,
+        recentlyUsedModels: [],
         speechVoiceId: null,
       },
       selectedBoardId: "board-1",

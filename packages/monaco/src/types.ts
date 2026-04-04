@@ -46,3 +46,10 @@ export interface DiffFloatingWindowProps {
   original: string;
   visible: boolean;
 }
+
+export interface InlineDiffViewProps {
+  height?: string;
+  language: string;
+  modified: string;
+  original: string;
+}

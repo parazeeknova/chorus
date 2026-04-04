@@ -1,7 +1,7 @@
 "use client";
 
 import { BorderlessFileView, DiffFloatingWindow } from "@chorus/monaco";
-import { type Node, type NodeProps, NodeResizeControl } from "@xyflow/react";
+import type { Node, NodeProps } from "@xyflow/react";
 import {
   ChevronDownIcon,
   Code2Icon,
@@ -21,6 +21,9 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -30,6 +33,7 @@ import {
   type Task,
 } from "@/features/kanban/components/kanban";
 import { useWorkspace } from "@/features/workspace/workspace-context";
+import { fetchSessionDiff, type SessionFileDiff } from "@/lib/opencode-client";
 import { cn } from "@/lib/utils";
 
 export const KANBAN_CARD_NODE_TYPE = "kanbanCard";
@@ -48,6 +52,9 @@ export interface KanbanCardNodeData {
   title: string;
   [key: string]: unknown;
 }
+
+const kanbanHeaderControlClass =
+  "flex h-6 items-center rounded-xs font-medium text-[0.65rem] leading-none";
 
 function FilePath({ path }: { path: string }) {
   const parts = path.split("/");
@@ -86,7 +93,12 @@ function SessionStatus({
 }) {
   if (state === "starting") {
     return (
-      <span className="flex items-center gap-1 rounded-xs border border-cyan-400/20 bg-cyan-400/10 px-1.5 py-0.5">
+      <span
+        className={cn(
+          kanbanHeaderControlClass,
+          "gap-1 border border-cyan-400/20 bg-cyan-400/10 px-2"
+        )}
+      >
         <LoaderCircleIcon className="size-3 animate-spin text-cyan-300/80" />
         <span className="font-medium text-[0.65rem] text-cyan-200/80 leading-none">
           Starting
@@ -97,7 +109,12 @@ function SessionStatus({
 
   if (state === "error") {
     return (
-      <span className="flex items-center gap-1 rounded-xs border border-red-400/20 bg-red-400/10 px-1.5 py-0.5">
+      <span
+        className={cn(
+          kanbanHeaderControlClass,
+          "gap-1 border border-red-400/20 bg-red-400/10 px-2"
+        )}
+      >
         <TriangleAlertIcon className="size-3 text-red-300/80" />
         <span className="font-medium text-[0.65rem] text-red-200/80 leading-none">
           Error
@@ -108,7 +125,12 @@ function SessionStatus({
 
   if (state === "active") {
     return (
-      <span className="flex items-center gap-1 rounded-xs border border-emerald-400/20 bg-emerald-400/10 px-1.5 py-0.5">
+      <span
+        className={cn(
+          kanbanHeaderControlClass,
+          "gap-1 border border-emerald-400/20 bg-emerald-400/10 px-2"
+        )}
+      >
         <span className="size-1.5 rounded-full bg-emerald-300/90" />
         <span className="font-medium text-[0.65rem] text-emerald-200/80 leading-none">
           {sessionId ? "Live" : "Ready"}
@@ -118,7 +140,12 @@ function SessionStatus({
   }
 
   return (
-    <span className="flex items-center gap-1 rounded-xs border border-white/8 bg-white/5 px-1.5 py-0.5">
+    <span
+      className={cn(
+        kanbanHeaderControlClass,
+        "gap-1 border border-white/8 bg-white/5 px-2"
+      )}
+    >
       <span className="size-1.5 rounded-full bg-white/35" />
       <span className="font-medium text-[0.65rem] text-white/55 leading-none">
         Ready
@@ -160,12 +187,17 @@ function inferLanguage(path?: string): string {
 
 function KanbanCardNodeComponent({
   data: rawData,
+  draggable,
   id,
   selected,
 }: NodeProps<Node<Record<string, unknown>>>) {
   const cardData = rawData as unknown as KanbanCardNodeData;
   const [editorMode, setEditorMode] = useState<"kanban" | "file" | null>(null);
   const [diffVisible, setDiffVisible] = useState(false);
+  const [diffFiles, setDiffFiles] = useState<SessionFileDiff[]>([]);
+  const [selectedDiffFile, setSelectedDiffFile] =
+    useState<SessionFileDiff | null>(null);
+  const [isLoadingDiff, setIsLoadingDiff] = useState(false);
   const [localColumns, setLocalColumns] = useState<Columns>(cardData.columns);
 
   const { kanbanHistory, restorePrompt, updateBoardReviewMode } =
@@ -230,8 +262,32 @@ function KanbanCardNodeComponent({
     setEditorMode(null);
   }, []);
 
-  const handleToggleDiff = useCallback(() => {
-    setDiffVisible((prev) => !prev);
+  const handleViewDiffs = useCallback(async () => {
+    if (!cardData.sessionId) {
+      return;
+    }
+    setIsLoadingDiff(true);
+    try {
+      const diffs = await fetchSessionDiff(cardData.sessionId);
+      setDiffFiles(diffs);
+      if (diffs.length > 0) {
+        setSelectedDiffFile(diffs[0]);
+        setDiffVisible(true);
+      }
+    } catch (error) {
+      console.error("Failed to fetch diffs:", error);
+    } finally {
+      setIsLoadingDiff(false);
+    }
+  }, [cardData.sessionId]);
+
+  const handleSelectDiffFile = useCallback((diff: SessionFileDiff) => {
+    setSelectedDiffFile(diff);
+    setDiffVisible(true);
+  }, []);
+
+  const handleCloseDiff = useCallback(() => {
+    setDiffVisible(false);
   }, []);
 
   const findTaskInApprove = useCallback(
@@ -430,28 +486,23 @@ function KanbanCardNodeComponent({
 
   return (
     <>
-      {selected && (
-        <>
-          <NodeResizeControl
-            className="-left-1.5! h-full! w-3! border-0! bg-transparent!"
-            minWidth={800}
-            position="left"
-          />
-          <NodeResizeControl
-            className="-right-1.5! h-full! w-3! border-0! bg-transparent!"
-            minWidth={800}
-            position="right"
-          />
-        </>
-      )}
       <div
         className={cn(
-          "dark flex h-full w-full flex-col rounded-sm border border-white/10 bg-[#111111]/95 shadow-[0_24px_80px_rgba(0,0,0,0.6)] backdrop-blur-xl transition-shadow",
-          "active:shadow-[0_32px_100px_rgba(0,0,0,0.8)] active:ring-1 active:ring-white/15"
+          "dark flex h-full w-full flex-col overflow-hidden rounded-sm border border-white/10 bg-[#111111]/95 shadow-[0_24px_80px_rgba(0,0,0,0.6)] backdrop-blur-xl transition-[box-shadow,border-color,background-color] duration-500",
+          selected
+            ? "border-white/16 shadow-[0_32px_100px_rgba(0,0,0,0.74)]"
+            : "active:shadow-[0_32px_100px_rgba(0,0,0,0.8)] active:ring-1 active:ring-white/15"
         )}
       >
         <div className="flex items-center gap-3 border-white/8 border-b px-3 py-2.5">
-          <div className="flex shrink-0 cursor-grab items-center justify-center rounded-xs p-1 text-white/25 hover:text-white/50 active:cursor-grabbing">
+          <div
+            className={cn(
+              "flex shrink-0 items-center justify-center rounded-xs p-1 transition-colors",
+              draggable
+                ? "cursor-grab text-white/25 hover:text-white/50 active:cursor-grabbing"
+                : "cursor-default text-white/18"
+            )}
+          >
             <GripVerticalIcon className="size-3.5" />
           </div>
 
@@ -513,7 +564,12 @@ function KanbanCardNodeComponent({
             <span className="h-3.5 w-px bg-white/10" />
 
             <DropdownMenu>
-              <DropdownMenuTrigger className="flex items-center gap-1.5 rounded-xs bg-white/15 px-2 py-1 font-medium text-[0.65rem] text-white transition-all hover:bg-white/25 active:scale-95">
+              <DropdownMenuTrigger
+                className={cn(
+                  kanbanHeaderControlClass,
+                  "gap-1.5 bg-white/15 px-2 text-white transition-all hover:bg-white/25 active:scale-95"
+                )}
+              >
                 <Code2Icon className="size-3" />
                 <span>Open in Editor</span>
                 <ChevronDownIcon className="size-3 text-white/50" />
@@ -538,11 +594,45 @@ function KanbanCardNodeComponent({
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="flex cursor-pointer items-center gap-2 rounded-xs px-2 py-1.5 text-white/80 text-xs transition-colors focus:bg-white/10 focus:text-white"
-                  onClick={handleToggleDiff}
+                  disabled={!cardData.sessionId || isLoadingDiff}
+                  onClick={handleViewDiffs}
                 >
                   <Code2Icon className="size-3.5" />
-                  <span>View Diffs</span>
+                  <span>{isLoadingDiff ? "Loading..." : "View Diffs"}</span>
                 </DropdownMenuItem>
+                {diffFiles.length > 0 && (
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger className="flex cursor-pointer items-center gap-2 rounded-xs px-2 py-1.5 text-white/80 text-xs transition-colors focus:bg-white/10 focus:text-white">
+                      <span className="font-medium text-[0.65rem]">
+                        Diff Files
+                      </span>
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent
+                      className="border-white/10 bg-[#1e1e1e] p-1.5"
+                      style={{ maxHeight: "300px", overflowY: "auto" }}
+                    >
+                      {diffFiles.map((diff) => (
+                        <DropdownMenuItem
+                          className="flex cursor-pointer flex-col items-start gap-0.5 rounded-xs px-2 py-1.5 text-white/80 text-xs transition-colors focus:bg-white/10 focus:text-white"
+                          key={diff.file}
+                          onClick={() => handleSelectDiffFile(diff)}
+                        >
+                          <span className="max-w-[200px] truncate font-mono">
+                            {diff.file}
+                          </span>
+                          <span className="flex gap-2 text-[0.6rem]">
+                            <span className="text-emerald-400">
+                              +{diff.additions}
+                            </span>
+                            <span className="text-red-400">
+                              -{diff.deletions}
+                            </span>
+                          </span>
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
 
@@ -600,10 +690,14 @@ function KanbanCardNodeComponent({
       </div>
 
       <DiffFloatingWindow
-        language={inferLanguage(filePath)}
-        modified={`// Modified version of ${filePath}`}
-        onClose={() => setDiffVisible(false)}
-        original={`// Original version of ${filePath}`}
+        language={
+          selectedDiffFile
+            ? inferLanguage(selectedDiffFile.file)
+            : inferLanguage(filePath)
+        }
+        modified={selectedDiffFile?.after ?? ""}
+        onClose={handleCloseDiff}
+        original={selectedDiffFile?.before ?? ""}
         visible={diffVisible}
       />
     </>

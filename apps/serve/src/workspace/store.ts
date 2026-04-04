@@ -10,7 +10,6 @@ import {
   workspaceSnapshotInputSchema,
   workspaceSnapshotSchema,
 } from "@chorus/contracts";
-import type { NormalizedAgentEvent } from "@chorus/oc-adapter";
 import { applyAgentEventToBoard, attachSessionToBoard } from "./projector";
 
 function createHistoryId(board: Pick<WorkspaceBoard, "repo">) {
@@ -51,6 +50,7 @@ function createBoardFromSeed(seed: BoardSeed, index: number): WorkspaceBoard {
       done: [],
     },
     reviewMode: "auto",
+    modelSelection: null,
     session: {
       state: "uninitialized",
     },
@@ -63,7 +63,9 @@ export class WorkspaceStore {
   #snapshot: WorkspaceSnapshot = {
     boards: [],
     preferences: {
+      boardViewMode: "relaxed",
       composerHintDismissed: false,
+      recentlyUsedModels: [],
       speechVoiceId: null,
     },
     previousWorkspaces: [],
@@ -83,7 +85,9 @@ export class WorkspaceStore {
       this.#snapshot = {
         boards: [],
         preferences: {
+          boardViewMode: "relaxed",
           composerHintDismissed: false,
+          recentlyUsedModels: [],
           speechVoiceId: null,
         },
         previousWorkspaces: [],
@@ -272,6 +276,22 @@ export class WorkspaceStore {
         break;
       }
 
+      case "board.model.set": {
+        nextSnapshot = await this.replaceSnapshot({
+          boards: snapshot.boards.map((board) =>
+            board.boardId === mutation.payload.boardId
+              ? {
+                  ...board,
+                  modelSelection: mutation.payload.model,
+                }
+              : board
+          ),
+          preferences: snapshot.preferences,
+          selectedBoardId: snapshot.selectedBoardId,
+        });
+        break;
+      }
+
       case "board.task.plan.update": {
         nextSnapshot = await this.replaceSnapshot({
           boards: snapshot.boards.map((board) => {
@@ -303,11 +323,43 @@ export class WorkspaceStore {
         break;
       }
 
-      default: {
+      case "preference.recently_used_models.add": {
+        const existing = snapshot.preferences.recentlyUsedModels;
+        const filtered = existing.filter(
+          (m) =>
+            !(
+              m.providerID === mutation.payload.model.providerID &&
+              m.modelID === mutation.payload.model.modelID
+            )
+        );
+        const updated = [mutation.payload.model, ...filtered].slice(0, 5);
+        nextSnapshot = await this.replaceSnapshot({
+          boards: snapshot.boards,
+          preferences: {
+            ...snapshot.preferences,
+            recentlyUsedModels: updated,
+          },
+          selectedBoardId: snapshot.selectedBoardId,
+        });
+        break;
+      }
+
+      case "preference.board_view_mode.set": {
+        nextSnapshot = await this.replaceSnapshot({
+          boards: snapshot.boards,
+          preferences: {
+            ...snapshot.preferences,
+            boardViewMode: mutation.payload.mode,
+          },
+          selectedBoardId: snapshot.selectedBoardId,
+        });
+        break;
+      }
+
+      default:
         throw new Error(
           `Unsupported workspace mutation type: ${String(mutation)}`
         );
-      }
     }
 
     this.#rememberMutation(mutation.mutationId);

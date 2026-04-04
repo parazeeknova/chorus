@@ -53,7 +53,7 @@ export class EventStream {
       onEvent,
       abort
     ).catch(() => {
-      // handled internally
+      // stream errors are handled internally by the subscription
     });
 
     return {
@@ -102,9 +102,22 @@ export type NormalizedActivity =
   | "error"
   | "idle";
 
+export interface FileDiffInfo {
+  additions?: number;
+  after?: string;
+  before?: string;
+  deletions?: number;
+  filePath: string;
+}
+
 export interface NormalizedAgentEvent {
   activity?: NormalizedActivity;
+  delta?: string;
   error?: string;
+  fileDiff?: FileDiffInfo;
+  messageID?: string;
+  partID?: string;
+  partType?: "text" | "reasoning" | "tool";
   permissionID?: string;
   sessionID?: string;
   text?: string;
@@ -114,6 +127,216 @@ export interface NormalizedAgentEvent {
   type: string;
 }
 
+function safeNum(v: unknown): number | undefined {
+  return typeof v === "number" ? v : undefined;
+}
+
+function safeStr(v: unknown): string | undefined {
+  return typeof v === "string" ? v : undefined;
+}
+
+function extractFileDiffFromCompleted(
+  toolName: string,
+  metadata: Record<string, unknown>
+): FileDiffInfo | undefined {
+  if ((toolName === "edit" || toolName === "write") && metadata.filediff) {
+    const fd = metadata.filediff as Record<string, unknown>;
+    return {
+      additions: safeNum(fd.additions),
+      after: safeStr(fd.after),
+      before: safeStr(fd.before),
+      deletions: safeNum(fd.deletions),
+      filePath: safeStr(fd.file) ?? "",
+    };
+  }
+  if (toolName === "apply_patch" && Array.isArray(metadata.files)) {
+    const files = metadata.files as Record<string, unknown>[];
+    if (files.length === 0) {
+      return undefined;
+    }
+    const f = files[0];
+    return {
+      additions: safeNum(f.additions),
+      after: safeStr(f.after),
+      before: safeStr(f.before),
+      deletions: safeNum(f.deletions),
+      filePath: safeStr(f.filePath) ?? "",
+    };
+  }
+  return undefined;
+}
+
+function extractFileDiffFromRunning(
+  toolName: string,
+  input: Record<string, unknown>
+): FileDiffInfo | undefined {
+  if (
+    (toolName === "edit" || toolName === "write") &&
+    typeof input.filePath === "string"
+  ) {
+    const diff: FileDiffInfo = { filePath: input.filePath };
+    if (
+      toolName === "edit" &&
+      typeof input.oldString === "string" &&
+      typeof input.newString === "string"
+    ) {
+      diff.before = input.oldString;
+      diff.after = input.newString;
+    }
+    return diff;
+  }
+  return undefined;
+}
+
+function extractFileDiff(
+  toolName: string,
+  state: {
+    input?: Record<string, unknown>;
+    metadata?: Record<string, unknown>;
+    status: string;
+  }
+): FileDiffInfo | undefined {
+  if (state.status === "completed" && state.metadata) {
+    return extractFileDiffFromCompleted(toolName, state.metadata);
+  }
+  if (state.status === "running" && state.input) {
+    return extractFileDiffFromRunning(toolName, state.input);
+  }
+  return undefined;
+}
+
+const assistantMessageRoles = new Map<string, Set<string>>();
+
+function isAssistantMessage(sessionID: string, messageID: string): boolean {
+  const sessionRoles = assistantMessageRoles.get(sessionID);
+  return sessionRoles?.has(messageID) ?? false;
+}
+
+function recordAssistantMessage(sessionID: string, messageID: string) {
+  let sessionRoles = assistantMessageRoles.get(sessionID);
+  if (!sessionRoles) {
+    sessionRoles = new Set();
+    assistantMessageRoles.set(sessionID, sessionRoles);
+  }
+  sessionRoles.add(messageID);
+}
+
+function normalizeMessagePartUpdated(
+  base: NormalizedAgentEvent,
+  raw: Extract<OCEvent, { type: "message.part.updated" }>
+): NormalizedAgentEvent {
+  const part = raw.properties.part;
+  const sessionID = raw.properties.sessionID;
+  const messageID = part.messageID;
+
+  if (!isAssistantMessage(sessionID, messageID)) {
+    return { ...base, sessionID };
+  }
+
+  if (part.type === "text") {
+    return {
+      ...base,
+      sessionID,
+      activity: "writing",
+      messageID,
+      partID: part.id,
+      partType: "text",
+      text: part.text,
+    };
+  }
+  if (part.type === "tool") {
+    const state = part.state;
+    const fileDiff = extractFileDiff(part.tool, state);
+    return {
+      ...base,
+      sessionID,
+      activity: state.status === "running" ? "thinking" : "writing",
+      messageID,
+      partID: part.id,
+      partType: "tool",
+      toolName: part.tool,
+      toolState: state.status,
+      fileDiff,
+    };
+  }
+  if (part.type === "reasoning") {
+    return {
+      ...base,
+      sessionID,
+      activity: "thinking",
+      messageID,
+      partID: part.id,
+      partType: "reasoning",
+      text: part.text,
+    };
+  }
+  return { ...base, sessionID };
+}
+
+function normalizeMessagePartDelta(
+  base: NormalizedAgentEvent,
+  raw: Extract<OCEvent, { type: "message.part.delta" }>
+): NormalizedAgentEvent {
+  const props = raw.properties;
+  const sessionID = props.sessionID;
+  const messageID = props.messageID;
+
+  if (!isAssistantMessage(sessionID, messageID)) {
+    return { ...base, sessionID };
+  }
+
+  return {
+    ...base,
+    sessionID,
+    messageID,
+    partID: props.partID,
+    delta: props.delta,
+  };
+}
+
+function normalizeSessionStatus(
+  base: NormalizedAgentEvent,
+  raw: Extract<OCEvent, { type: "session.status" }>
+): NormalizedAgentEvent {
+  const status = raw.properties.status;
+  let activity: NormalizedActivity = "idle";
+  if (status.type === "busy") {
+    activity = "thinking";
+  }
+  if (status.type === "retry") {
+    activity = "thinking";
+  }
+  return {
+    ...base,
+    sessionID: raw.properties.sessionID,
+    activity,
+  };
+}
+
+function normalizeMessageUpdated(
+  base: NormalizedAgentEvent,
+  raw: Extract<OCEvent, { type: "message.updated" }>
+): NormalizedAgentEvent {
+  const info = raw.properties.info;
+  const sessionID = raw.properties.sessionID;
+  const messageID = info.id;
+
+  if (info.role === "assistant") {
+    recordAssistantMessage(sessionID, messageID);
+  }
+
+  if (info.role === "assistant" && "error" in info && info.error) {
+    return {
+      ...base,
+      sessionID,
+      messageID,
+      activity: "error",
+      error: String(info.error.data?.message ?? ""),
+    };
+  }
+  return { ...base, sessionID, messageID };
+}
+
 export function normalizeEvent(raw: OCEvent): NormalizedAgentEvent {
   const base: NormalizedAgentEvent = {
     type: raw.type,
@@ -121,93 +344,31 @@ export function normalizeEvent(raw: OCEvent): NormalizedAgentEvent {
   };
 
   switch (raw.type) {
-    case "message.part.updated": {
-      const part = raw.properties.part;
-      if (part.type === "text") {
-        return {
-          ...base,
-          sessionID: raw.properties.sessionID,
-          activity: "writing",
-          text: part.text,
-        };
-      }
-      if (part.type === "tool") {
-        return {
-          ...base,
-          sessionID: raw.properties.sessionID,
-          activity: part.state.status === "running" ? "thinking" : "writing",
-          toolName: part.tool,
-          toolState: part.state.status,
-        };
-      }
-      if (part.type === "reasoning") {
-        return {
-          ...base,
-          sessionID: raw.properties.sessionID,
-          activity: "thinking",
-          text: part.text,
-        };
-      }
-      return { ...base, sessionID: raw.properties.sessionID };
-    }
-
-    case "session.status": {
-      const status = raw.properties.status;
-      let activity: NormalizedActivity = "idle";
-      if (status.type === "busy") {
-        activity = "thinking";
-      }
-      if (status.type === "retry") {
-        activity = "thinking";
-      }
-      return {
-        ...base,
-        sessionID: raw.properties.sessionID,
-        activity,
-      };
-    }
-
-    case "session.idle": {
-      return {
-        ...base,
-        sessionID: raw.properties.sessionID,
-        activity: "idle",
-      };
-    }
-
-    case "permission.asked": {
+    case "message.part.updated":
+      return normalizeMessagePartUpdated(base, raw);
+    case "message.part.delta":
+      return normalizeMessagePartDelta(base, raw);
+    case "session.status":
+      return normalizeSessionStatus(base, raw);
+    case "session.idle":
+      return { ...base, sessionID: raw.properties.sessionID, activity: "idle" };
+    case "permission.asked":
       return {
         ...base,
         sessionID: raw.properties.sessionID,
         activity: "waiting_for_approval",
         permissionID: raw.properties.id,
       };
-    }
-
-    case "session.error": {
+    case "session.error":
       return {
         ...base,
         sessionID: raw.properties.sessionID,
         activity: "error",
         error: String(raw.properties.error?.data?.message ?? ""),
       };
-    }
-
-    case "message.updated": {
-      const info = raw.properties.info;
-      if (info.role === "assistant" && "error" in info && info.error) {
-        return {
-          ...base,
-          sessionID: raw.properties.sessionID,
-          activity: "error",
-          error: String(info.error.data?.message ?? ""),
-        };
-      }
-      return { ...base, sessionID: raw.properties.sessionID };
-    }
-
-    default: {
+    case "message.updated":
+      return normalizeMessageUpdated(base, raw);
+    default:
       return base;
-    }
   }
 }

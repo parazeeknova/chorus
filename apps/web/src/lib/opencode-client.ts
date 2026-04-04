@@ -160,3 +160,41 @@ export async function fetchDirectory(
     }
   );
 }
+
+export interface SessionFileDiff {
+  additions: number;
+  after: string;
+  before: string;
+  deletions: number;
+  file: string;
+}
+
+export async function fetchSessionDiff(
+  sessionId: string
+): Promise<SessionFileDiff[]> {
+  try {
+    const response = await fetch(`/api/sessions/${sessionId}/diff`, {
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) {
+      console.error("[opencode-client] Failed to fetch session diff", {
+        sessionId,
+        status: response.status,
+      });
+      return [];
+    }
+    const text = await response.text();
+    if (!text) {
+      return [];
+    }
+    return JSON.parse(text) as SessionFileDiff[];
+  } catch (error) {
+    if (IS_DEV) {
+      console.error("[opencode-client] Fetch session diff failed", {
+        sessionId,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
+    }
+    return [];
+  }
+}

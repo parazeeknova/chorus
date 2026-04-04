@@ -181,6 +181,8 @@ export const agentStepSchema = z.object({
   kind: agentStepKindSchema,
   linesAdded: z.number().optional(),
   linesRemoved: z.number().optional(),
+  modifiedContent: z.string().optional(),
+  originalContent: z.string().optional(),
   status: agentStepStatusSchema,
   summary: z.string().min(1),
 });
@@ -248,6 +250,7 @@ export const workspaceBoardSessionSchema = z.object({
 export const workspaceBoardSchema = z.object({
   boardId: z.string().min(1),
   columns: columnsSchema,
+  modelSelection: modelSelectionSchema.nullable(),
   position: z.object({
     x: z.number(),
     y: z.number(),
@@ -265,8 +268,12 @@ export const workspaceHistoryEntrySchema = z.object({
   title: z.string().min(1),
 });
 
+export const boardViewModeSchema = z.enum(["stacked", "relaxed"]);
+
 export const workspacePreferencesSchema = z.object({
+  boardViewMode: boardViewModeSchema.optional().default("relaxed"),
   composerHintDismissed: z.boolean(),
+  recentlyUsedModels: modelSelectionSchema.array().default([]),
   speechVoiceId: z.string().min(1).nullable().optional().default(null),
 });
 
@@ -331,6 +338,19 @@ export const workspaceMutationSchema = z.discriminatedUnion("type", [
     }),
   }),
   workspaceMutationBaseSchema.extend({
+    type: z.literal("board.model.set"),
+    payload: z.object({
+      boardId: z.string().min(1),
+      model: modelSelectionSchema.nullable(),
+    }),
+  }),
+  workspaceMutationBaseSchema.extend({
+    type: z.literal("preference.recently_used_models.add"),
+    payload: z.object({
+      model: modelSelectionSchema,
+    }),
+  }),
+  workspaceMutationBaseSchema.extend({
     type: z.literal("preference.dismiss_composer_hint"),
     payload: z.object({}),
   }),
@@ -338,6 +358,12 @@ export const workspaceMutationSchema = z.discriminatedUnion("type", [
     type: z.literal("preference.speech_voice.set"),
     payload: z.object({
       voiceId: z.string().min(1).nullable(),
+    }),
+  }),
+  workspaceMutationBaseSchema.extend({
+    type: z.literal("preference.board_view_mode.set"),
+    payload: z.object({
+      mode: boardViewModeSchema,
     }),
   }),
   workspaceMutationBaseSchema.extend({
@@ -445,6 +471,7 @@ export type AgentStep = z.infer<typeof agentStepSchema>;
 export type AgentRunContext = z.infer<typeof agentRunContextSchema>;
 export type Task = z.infer<typeof taskSchema>;
 export type Columns = z.infer<typeof columnsSchema>;
+export type BoardViewMode = z.infer<typeof boardViewModeSchema>;
 export type WorkspaceBoardSession = z.infer<typeof workspaceBoardSessionSchema>;
 export type WorkspaceBoard = z.infer<typeof workspaceBoardSchema>;
 export type WorkspaceHistoryEntry = z.infer<typeof workspaceHistoryEntrySchema>;
