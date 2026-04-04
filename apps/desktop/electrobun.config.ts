@@ -4,7 +4,7 @@ const config: ElectrobunConfig = {
   app: {
     name: "Chorus",
     identifier: "sh.chorus.desktop",
-    version: "0.0.1",
+    version: "0.0.3",
   },
   runtime: {
     exitOnLastWindowClosed: true,
@@ -36,6 +36,14 @@ const config: ElectrobunConfig = {
       bundleCEF: false,
       defaultRenderer: "native",
     },
+  },
+  release: {
+    // Auto-updater configuration
+    // Users will check this URL for updates
+    baseUrl: "https://github.com/parazeeknova/chorus/releases/download",
+    // Electrobun will look for:
+    // - {baseUrl}/v{version}/Chorus-{version}-{platform}.{ext}
+    // Example: https://github.com/parazeeknova/chorus/releases/download/v0.0.3/Chorus-0.0.3-linux.AppImage
   },
 };
 

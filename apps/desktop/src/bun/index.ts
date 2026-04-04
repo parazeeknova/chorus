@@ -8,10 +8,10 @@
  */
 
 import { BrowserWindow } from "electrobun/bun";
-import { startServer } from "./server";
+import { startServer, stopServer } from "./server";
 
-// Start the Elysia serve backend
-const serverPort = startServer();
+// Start the Chorus serve backend
+const serverPort = await startServer();
 
 console.log(`Chorus serve backend started on port ${serverPort}`);
 
@@ -25,6 +25,8 @@ const win = new BrowserWindow({
 
 // Handle window close
 win.on("close", () => {
+  console.log("Window closing, shutting down server...");
+  stopServer();
   process.exit(0);
 });
 

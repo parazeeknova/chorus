@@ -5,11 +5,11 @@ Electrobun-based desktop application that bundles the Chorus web frontend and se
 ## Architecture
 
 This desktop app bundles:
-- **Web Frontend** (`apps/web`): Next.js web app served via Elysia
+- **Web Frontend** (`apps/web`): Next.js web app (served via Elysia)
 - **Serve Backend** (`apps/serve`): Elysia server running in the Bun main process
 - **Desktop Shell**: Electrobun provides native window management using system webview
 
-Everything runs in a single self-contained application - no separate processes needed.
+Everything runs in a single self-contained application.
 
 ## Why Electrobun?
 
@@ -50,6 +50,24 @@ This creates a fully self-contained desktop app:
 - **macOS**: `.app` bundle and `.dmg` installer
 - **Windows**: `.exe` installer
 - **Linux**: `.AppImage` portable app
+
+## Auto-Updater
+
+The desktop app includes auto-updater support via GitHub Releases:
+
+1. Updates are checked against the `release.baseUrl` in `electrobun.config.ts`
+2. Electrobun uses bsdiff for tiny update patches (~14KB)
+3. Updates are downloaded and applied automatically
+
+### Configuration
+
+In `electrobun.config.ts`:
+```typescript
+release: {
+  baseUrl: "https://github.com/parazeeknova/chorus/releases/download",
+  // Electrobun looks for: {baseUrl}/v{version}/Chorus-{version}-{platform}.{ext}
+}
+```
 
 ## Project Structure
 
@@ -93,14 +111,14 @@ The desktop app is automatically built and released via GitHub Actions when you 
 2. **Commit the version change**:
    ```bash
    git add apps/desktop/package.json
-   git commit -m "chore[DESKTOP]: bump version to 0.0.2"
+   git commit -m "chore[DESKTOP]: bump version to 0.0.4"
    ```
 
 3. **Create and push a git tag**:
    ```bash
-   git tag v0.0.2
+   git tag v0.0.4
    git push origin main
-   git push origin v0.0.2
+   git push origin v0.0.4
    ```
 
 4. **GitHub Actions will automatically**:
@@ -118,8 +136,9 @@ Once the workflow completes, the GitHub Release will include:
 
 ## TODO for Full Integration
 
-- [ ] Implement actual Elysia serve integration in `src/bun/server.ts`
-- [ ] Configure Next.js for static export or server-side rendering
-- [ ] Bundle serve code into the Electrobun build
+- [x] Integrate apps/serve into desktop app
+- [x] Add auto-updater configuration
+- [ ] Serve web frontend from Elysia (or proxy to Next.js dev server)
+- [ ] Test production build packaging
 - [ ] Add code signing for production releases
 - [ ] Test on all platforms (macOS, Windows, Linux)

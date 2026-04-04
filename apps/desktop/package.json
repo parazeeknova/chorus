@@ -1,6 +1,6 @@
 {
   "name": "@chorus/desktop",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "private": true,
   "description": "Chorus desktop app bundling web and serve into a single self-contained app",
   "scripts": {
@@ -19,13 +19,13 @@
     "@t3-oss/env-core": "^0.13.11",
     "dexie": "^4.4.2",
     "elysia": "^1.4.28",
+    "electrobun": "^1.16.0",
     "groq-sdk": "^1.1.2",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/bun": "^1.3.11",
     "bun-types": "^1.3.11",
-    "electrobun": "^1.16.0",
     "typescript": "^6.0.2"
   }
 }
