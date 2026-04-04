@@ -1,20 +1,40 @@
-import type { ElectrobunConfig } from "electrobun/config";
+import type { ElectrobunConfig } from "electrobun";
 
 const config: ElectrobunConfig = {
-  appId: "sh.chorus.desktop",
-  productName: "Chorus",
+  app: {
+    name: "Chorus",
+    identifier: "sh.chorus.desktop",
+    version: "0.0.1",
+  },
+  runtime: {
+    exitOnLastWindowClosed: true,
+  },
   build: {
-    buildsDir: "dist",
-    sign: false, // Enable this when you have code signing certificates
-  },
-  bun: {
-    entrypoint: "./src/bun/index.ts",
-  },
-  views: {
-    mainview: {
-      html: "../../web/dist/index.html", // Will point to Next.js static export
-      preload: "./src/mainview/preload.ts",
-      entrypoint: "./src/mainview/index.ts",
+    bun: {
+      entrypoint: "src/bun/index.ts",
+    },
+    views: {
+      mainview: {
+        entrypoint: "src/mainview/index.ts",
+      },
+    },
+    copy: {
+      "src/mainview/index.html": "views/mainview/index.html",
+    },
+    useAsar: false,
+    mac: {
+      codesign: false,
+      notarize: false,
+      bundleCEF: false,
+      defaultRenderer: "native",
+    },
+    linux: {
+      bundleCEF: true,
+      defaultRenderer: "cef",
+    },
+    win: {
+      bundleCEF: false,
+      defaultRenderer: "native",
     },
   },
 };

@@ -5,17 +5,27 @@ Electrobun-based desktop application that bundles the Chorus web frontend and se
 ## Architecture
 
 This desktop app bundles:
-- **Web Frontend** (`apps/web`): Next.js web app (static export)
+- **Web Frontend** (`apps/web`): Next.js web app served via Elysia
 - **Serve Backend** (`apps/serve`): Elysia server running in the Bun main process
-- **Desktop Shell**: Electrobun provides native window management and system integration
+- **Desktop Shell**: Electrobun provides native window management using system webview
 
 Everything runs in a single self-contained application - no separate processes needed.
+
+## Why Electrobun?
+
+| Feature | Electrobun | Electron |
+|---------|-----------|----------|
+| Bundle Size | ~12MB | ~200MB |
+| Updates | ~14KB patches | Full downloads |
+| Runtime | Bun | Node.js |
+| Build Speed | Ultra-fast | Slower |
+| Memory | Lower | Higher |
 
 ## Development
 
 ### Prerequisites
 
-- bun installed
+- bun installed (v1.3.11+)
 - Run `bun install` from repo root first
 
 ### Run in Development Mode
@@ -27,8 +37,8 @@ bun run dev
 
 This starts the Electrobun app which:
 1. Starts the Elysia serve backend in the main process
-2. Serves the Next.js web UI
-3. Opens a native desktop window loading the UI
+2. Creates a native desktop window
+3. Loads the Chorus web UI from the local server
 
 ### Building for Production
 
@@ -36,10 +46,27 @@ This starts the Electrobun app which:
 bun run build
 ```
 
-This creates a fully self-contained desktop app in `dist/`:
+This creates a fully self-contained desktop app:
 - **macOS**: `.app` bundle and `.dmg` installer
 - **Windows**: `.exe` installer
 - **Linux**: `.AppImage` portable app
+
+## Project Structure
+
+```
+apps/desktop/
+├── src/
+│   ├── bun/
+│   │   ├── index.ts       # Main process entry point
+│   │   └── server.ts      # Elysia serve integration
+│   └── mainview/
+│       ├── index.html     # View HTML
+│       └── index.ts       # View logic
+├── dist/                   # Build output
+├── electrobun.config.ts    # Electrobun configuration
+├── tsconfig.json
+└── package.json
+```
 
 ## Configuration
 
@@ -51,24 +78,6 @@ The app uses the same configuration as `apps/serve`:
 
 Set via environment variables:
 - `CHORUS_SERVE_PORT` - Port for the Elysia server (default: 2000)
-- See `apps/serve/src/config.ts` for more options
-
-## Project Structure
-
-```
-apps/desktop/
-├── src/
-│   ├── bun/
-│   │   ├── index.ts       # Main process entry point
-│   │   └── server.ts      # Elysia serve integration
-│   └── mainview/
-│       ├── index.ts       # View logic
-│       └── preload.ts     # Secure bridge script
-├── dist/                   # Build output
-├── electrobun.config.ts    # Electrobun configuration
-├── tsconfig.json
-└── package.json
-```
 
 ## Releasing
 
@@ -78,7 +87,7 @@ The desktop app is automatically built and released via GitHub Actions when you 
 
 1. **Update the version** in `apps/desktop/package.json`:
    ```bash
-   # Manually edit apps/desktop/package.json and bump the version
+   # Edit apps/desktop/package.json and bump the version
    ```
 
 2. **Commit the version change**:
@@ -107,12 +116,10 @@ Once the workflow completes, the GitHub Release will include:
 - **Windows**: `.exe` installer
 - **Linux**: `.AppImage` portable app
 
-Users can download these from the Releases page on GitHub.
+## TODO for Full Integration
 
-## Advantages of Electrobun
-
-- **Tiny bundles**: ~12MB self-contained apps (using system webview)
-- **Fast updates**: As small as 14KB using bsdiff binary patching
-- **TypeScript everywhere**: Write TS for main process and webviews
-- **Bun-powered**: Ultra-fast bundling and execution
-- **Cross-platform**: Single codebase for macOS, Windows, and Linux
+- [ ] Implement actual Elysia serve integration in `src/bun/server.ts`
+- [ ] Configure Next.js for static export or server-side rendering
+- [ ] Bundle serve code into the Electrobun build
+- [ ] Add code signing for production releases
+- [ ] Test on all platforms (macOS, Windows, Linux)

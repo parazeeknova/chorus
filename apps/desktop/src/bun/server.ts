@@ -4,9 +4,6 @@
  * This imports and starts the full Chorus serve backend from apps/serve
  */
 
-// Import the full serve app
-// Note: This will need to be updated once we integrate the actual serve code
-
 /**
  * Start the Elysia server
  * @returns The port the server is running on
