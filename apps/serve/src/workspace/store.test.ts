@@ -51,6 +51,7 @@ describe("WorkspaceStore", () => {
       ],
       preferences: {
         composerHintDismissed: false,
+        speechVoiceId: null,
       },
       selectedBoardId: "board-1",
     });
@@ -82,6 +83,7 @@ describe("WorkspaceStore", () => {
       ],
       preferences: {
         composerHintDismissed: false,
+        speechVoiceId: null,
       },
       previousWorkspaces: [
         {
@@ -131,6 +133,7 @@ describe("WorkspaceStore", () => {
       ],
       preferences: {
         composerHintDismissed: false,
+        speechVoiceId: null,
       },
       selectedBoardId: "board-1",
     });
@@ -195,6 +198,7 @@ describe("WorkspaceStore", () => {
       ],
       preferences: {
         composerHintDismissed: false,
+        speechVoiceId: null,
       },
       selectedBoardId: "board-1",
     });

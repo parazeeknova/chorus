@@ -40,6 +40,7 @@ describe("BoardTaskService", () => {
       ],
       preferences: {
         composerHintDismissed: false,
+        speechVoiceId: null,
       },
       selectedBoardId: "board-1",
     });
@@ -99,6 +100,7 @@ describe("BoardTaskService", () => {
       ],
       preferences: {
         composerHintDismissed: false,
+        speechVoiceId: null,
       },
       selectedBoardId: "board-1",
     });

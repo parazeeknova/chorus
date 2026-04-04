@@ -27,9 +27,9 @@ import {
   type AutocompleteItem,
   useAutocomplete,
 } from "@/hooks/use-autocomplete";
+import { useVoiceConfig } from "@/hooks/use-voice-config";
 import { useVoiceRecording } from "@/hooks/use-voice-recording";
 import { cn } from "@/lib/utils";
-import { fetchVoiceConfig, type GroqVoice } from "@/lib/voice-api";
 
 const composerSelectTriggerClass =
   "h-7 min-w-0 gap-1.5 rounded-xs border border-white/8 bg-white/[0.04] px-2.5 py-1 font-medium text-[11px] text-white/72 shadow-none transition-colors hover:border-white/14 hover:bg-white/[0.07] hover:text-white/90 focus-visible:border-white/16 focus-visible:bg-white/[0.08] focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 disabled:opacity-40 dark:border-white/8 dark:bg-white/[0.04] dark:hover:bg-white/[0.07]";
@@ -50,8 +50,6 @@ export function PromptInput() {
   const [defaultModel, setDefaultModel] = useState<
     ModelSelection | undefined
   >();
-  const [selectedVoice, setSelectedVoice] = useState("hannah");
-  const [voices, setVoices] = useState<GroqVoice[]>([]);
   const [textareaRect, setTextareaRect] = useState<{
     top: number;
     left: number;
@@ -72,17 +70,7 @@ export function PromptInput() {
   } = useWorkspace();
 
   const autocomplete = useAutocomplete(selectedBoard?.repo.directory);
-
-  useEffect(() => {
-    fetchVoiceConfig()
-      .then((config) => {
-        setVoices(config.voices);
-        setSelectedVoice(config.defaultVoice);
-      })
-      .catch(() => {
-        // Silently fail - voice config is optional
-      });
-  }, []);
+  const { defaultModelId: defaultSpeechModelId } = useVoiceConfig();
 
   const isBusy =
     isQueueingPrompt || selectedBoard?.session.state === "starting";
@@ -103,7 +91,9 @@ export function PromptInput() {
   };
 
   const { isRecording, isTranscribing, startRecording, stopRecording } =
-    useVoiceRecording(handleTranscriptionComplete);
+    useVoiceRecording(handleTranscriptionComplete, {
+      modelId: defaultSpeechModelId ?? undefined,
+    });
 
   useEffect(() => {
     let isCancelled = false;
@@ -314,38 +304,6 @@ export function PromptInput() {
                     onValueChange={setSelectedModelKey}
                     value={selectedModelKey}
                   />
-                  {voices.length > 0 && (
-                    <Select
-                      onValueChange={(value) =>
-                        value && setSelectedVoice(value)
-                      }
-                      value={selectedVoice}
-                    >
-                      <SelectTrigger
-                        className={cn(
-                          composerSelectTriggerClass,
-                          "text-white/64"
-                        )}
-                        size="sm"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent
-                        align="start"
-                        className={cn("min-w-52", composerSelectContentClass)}
-                      >
-                        {voices.map((voice) => (
-                          <SelectItem
-                            className={composerSelectItemClass}
-                            key={voice.id}
-                            value={voice.id}
-                          >
-                            {voice.name} ({voice.gender})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <Select

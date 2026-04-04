@@ -14,7 +14,10 @@ interface UseVoiceRecordingReturn {
 }
 
 export function useVoiceRecording(
-  onTranscriptionComplete: (text: string) => void
+  onTranscriptionComplete: (text: string) => void,
+  options?: {
+    modelId?: string;
+  }
 ): UseVoiceRecordingReturn {
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -82,7 +85,9 @@ export function useVoiceRecording(
 
       try {
         setIsTranscribing(true);
-        const result = await transcribeSpeech(blob);
+        const result = await transcribeSpeech(blob, {
+          modelId: options?.modelId,
+        });
         onTranscriptionComplete(result.text);
       } catch (err) {
         const message =
@@ -92,7 +97,7 @@ export function useVoiceRecording(
         setIsTranscribing(false);
       }
     },
-    [onTranscriptionComplete]
+    [onTranscriptionComplete, options?.modelId]
   );
 
   const cleanupAudioContext = useCallback(() => {

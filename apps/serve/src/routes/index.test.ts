@@ -46,6 +46,7 @@ function makeMockBoardTasks() {
       boards: [],
       preferences: {
         composerHintDismissed: false,
+        speechVoiceId: null,
       },
       previousWorkspaces: [],
       revision: 1,

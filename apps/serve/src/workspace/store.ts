@@ -63,6 +63,7 @@ export class WorkspaceStore {
     boards: [],
     preferences: {
       composerHintDismissed: false,
+      speechVoiceId: null,
     },
     previousWorkspaces: [],
     revision: 0,
@@ -82,6 +83,7 @@ export class WorkspaceStore {
         boards: [],
         preferences: {
           composerHintDismissed: false,
+          speechVoiceId: null,
         },
         previousWorkspaces: [],
         revision: 0,
@@ -235,6 +237,18 @@ export class WorkspaceStore {
           preferences: {
             ...snapshot.preferences,
             composerHintDismissed: true,
+          },
+          selectedBoardId: snapshot.selectedBoardId,
+        });
+        break;
+      }
+
+      case "preference.speech_voice.set": {
+        nextSnapshot = await this.replaceSnapshot({
+          boards: snapshot.boards,
+          preferences: {
+            ...snapshot.preferences,
+            speechVoiceId: mutation.payload.voiceId,
           },
           selectedBoardId: snapshot.selectedBoardId,
         });

@@ -249,6 +249,7 @@ export const workspaceHistoryEntrySchema = z.object({
 
 export const workspacePreferencesSchema = z.object({
   composerHintDismissed: z.boolean(),
+  speechVoiceId: z.string().min(1).nullable().optional().default(null),
 });
 
 export const workspaceSnapshotInputSchema = z.object({
@@ -314,6 +315,12 @@ export const workspaceMutationSchema = z.discriminatedUnion("type", [
   workspaceMutationBaseSchema.extend({
     type: z.literal("preference.dismiss_composer_hint"),
     payload: z.object({}),
+  }),
+  workspaceMutationBaseSchema.extend({
+    type: z.literal("preference.speech_voice.set"),
+    payload: z.object({
+      voiceId: z.string().min(1).nullable(),
+    }),
   }),
 ]);
 

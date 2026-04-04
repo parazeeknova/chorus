@@ -57,6 +57,7 @@ export function ChorusWorkspaceProvider({
     WorkspaceContextValue["preferences"]
   >({
     composerHintDismissed: false,
+    speechVoiceId: null,
   });
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
   const [recentProjects, setRecentProjects] = useState<
@@ -478,6 +479,24 @@ export function ChorusWorkspaceProvider({
       ).catch((error) => {
         console.error("Failed to dismiss composer hint", error);
       }),
+    setSpeechVoiceId: (voiceId) => {
+      setPreferences((currentPreferences) => ({
+        ...currentPreferences,
+        speechVoiceId: voiceId,
+      }));
+      mutateWorkspace(
+        createWorkspaceMutation(
+          clientIdRef.current,
+          revisionRef.current,
+          "preference.speech_voice.set",
+          {
+            voiceId,
+          }
+        )
+      ).catch((error) => {
+        console.error("Failed to update speech voice", error);
+      });
+    },
     removeBoard: removeBoardById,
     selectBoard: (boardId) => {
       setSelectedBoardId(boardId);

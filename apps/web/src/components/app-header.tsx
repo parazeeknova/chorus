@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
+import { getProviderIconData } from "@/components/icons";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,12 +40,29 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useWorkspace } from "@/features/workspace/workspace-context";
+import { useVoiceConfig } from "@/hooks/use-voice-config";
 import { cn } from "@/lib/utils";
 
 const menuItems = ["Edit", "View", "Window", "Help"];
 const islandChrome =
   "pointer-events-auto relative rounded-sm border border-white/10 bg-zinc-950/68 shadow-[0_18px_50px_rgba(0,0,0,0.42)] backdrop-blur-2xl";
+const settingsPanelClass =
+  "w-[22rem] rounded-xs border border-white/10 bg-[#121212]/98 p-2 text-white shadow-[0_20px_54px_rgba(0,0,0,0.52)] ring-1 ring-white/8 backdrop-blur-xl";
+const settingsSelectTriggerClass =
+  "h-8 w-full justify-between rounded-none border border-white/8 bg-white/[0.03] px-2.5 text-[11px] font-medium text-white/84 shadow-none transition-colors hover:border-white/12 hover:bg-white/[0.05] focus-visible:border-white/14 focus-visible:bg-white/[0.06] focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0";
+const settingsSelectContentClass =
+  "border-white/10 bg-[#151515]/98 p-1 text-white/92 shadow-[0_18px_44px_rgba(0,0,0,0.45)] backdrop-blur-xl";
+const settingsSelectItemClass =
+  "min-h-8 rounded-none px-2.5 py-1.5 text-[11px] text-white/78 focus:bg-white/7 focus:!text-white/88 focus:**:!text-white/88 aria-selected:bg-white/10 aria-selected:!text-white aria-selected:**:!text-white data-[highlighted]:bg-white/7 data-[highlighted]:!text-white/88 data-[highlighted]:**:!text-white/88";
+const DEFAULT_SPEECH_VOICE_VALUE = "__default_speech_voice__";
 
 function buildProvidersUrl(
   refreshToken: string,
@@ -366,6 +384,585 @@ function NotificationItem({
   );
 }
 
+function ProviderMark({
+  providerID,
+  providerName,
+  className,
+}: {
+  className?: string;
+  providerID?: string;
+  providerName?: string;
+}) {
+  const iconData =
+    getProviderIconData(providerID, providerName) ??
+    getProviderIconData("opencode", "OpenCode");
+
+  if (!iconData) {
+    return null;
+  }
+
+  const paths = Array.from(iconData.body.matchAll(/<path\s+([^>]*?)\/?>/g));
+
+  return (
+    <svg
+      aria-hidden="true"
+      className={cn("size-4 fill-current", className)}
+      viewBox={iconData.viewBox}
+    >
+      {paths.map((match) => (
+        <path
+          key={`${iconData.name}-${match[1] ?? ""}`}
+          {...parseSvgPathAttributes(match[1] ?? "")}
+        />
+      ))}
+    </svg>
+  );
+}
+
+function parseSvgPathAttributes(
+  source: string
+): React.SVGProps<SVGPathElement> {
+  const attributes: Record<string, string> = {};
+
+  for (const match of source.matchAll(/([:\w-]+)="([^"]*)"/g)) {
+    const [, rawName, value] = match;
+    if (!(rawName && value !== undefined)) {
+      continue;
+    }
+
+    const normalizedName = rawName.replace(/-([a-z])/g, (_, char: string) =>
+      char.toUpperCase()
+    );
+    attributes[normalizedName] = value;
+  }
+
+  return attributes;
+}
+
+function SettingsMetric({
+  label,
+  value,
+}: {
+  label: string;
+  value: number | string;
+}) {
+  return (
+    <div className="flex min-w-0 flex-col border border-white/8 bg-white/[0.025] px-2 py-1.5">
+      <span className="text-[9px] text-white/32 uppercase tracking-[0.2em]">
+        {label}
+      </span>
+      <span className="mt-1 font-medium text-[12px] text-white/88">
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function SettingsTabButton({
+  active,
+  children,
+  onClick,
+}: {
+  active: boolean;
+  children: React.ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className={cn(
+        "flex h-8 items-center justify-center border px-2.5 font-medium text-[10px] uppercase tracking-[0.18em] transition-colors",
+        active
+          ? "border-white/12 bg-white/[0.08] text-white"
+          : "border-white/8 bg-white/[0.02] text-white/44 hover:border-white/12 hover:bg-white/[0.05] hover:text-white/76"
+      )}
+      onClick={onClick}
+      type="button"
+    >
+      {children}
+    </button>
+  );
+}
+
+function SettingsInfoCard({
+  label,
+  value,
+  hint,
+}: {
+  hint?: string;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="border border-white/8 bg-white/[0.025] px-2.5 py-2">
+      <div className="text-[9px] text-white/32 uppercase tracking-[0.18em]">
+        {label}
+      </div>
+      <div className="mt-1 truncate font-medium text-[11px] text-white/88">
+        {value}
+      </div>
+      {hint ? (
+        <div className="mt-1 text-[10px] text-white/40 leading-4">{hint}</div>
+      ) : null}
+    </div>
+  );
+}
+
+function ProviderStatusRow({ provider }: { provider: OpencodeProviderStatus }) {
+  return (
+    <div className="flex items-center gap-2.5 border border-white/8 bg-white/[0.025] px-2.5 py-2">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center border border-white/8 bg-white/[0.03] text-white/70">
+        <ProviderMark providerID={provider.id} providerName={provider.name} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="truncate font-medium text-[11px] text-white/88 uppercase tracking-[0.08em]">
+            {provider.name}
+          </span>
+          <span
+            className={cn(
+              "shrink-0 border px-1.5 py-0.5 text-[9px] uppercase tracking-[0.18em]",
+              provider.connected
+                ? "border-emerald-400/18 bg-emerald-400/[0.08] text-emerald-200/78"
+                : "border-white/8 bg-white/[0.04] text-white/38"
+            )}
+          >
+            {provider.connected ? "Live" : "Idle"}
+          </span>
+        </div>
+        <div className="mt-1 truncate text-[10px] text-white/42">
+          {provider.modelCount} models
+          {provider.supportsOauth ? " · OAuth" : ""}
+          {provider.supportsApi ? " · API key" : ""}
+        </div>
+      </div>
+      <span
+        className={cn(
+          "size-1.5 shrink-0",
+          provider.connected ? "bg-emerald-400" : "bg-white/18"
+        )}
+      />
+    </div>
+  );
+}
+
+function StoredCredentialRow({
+  credential,
+  enabled,
+  onEnable,
+}: {
+  credential: OpencodeCredentialSummary;
+  enabled: boolean;
+  onEnable: () => void;
+}) {
+  return (
+    <button
+      className="flex w-full items-center gap-2.5 border border-white/8 bg-white/[0.025] px-2.5 py-2 text-left transition-colors hover:border-white/12 hover:bg-white/[0.05] disabled:cursor-default disabled:opacity-70"
+      disabled={enabled}
+      onClick={onEnable}
+      type="button"
+    >
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center border border-white/8 bg-white/[0.03] text-white/70">
+        <ProviderMark providerID={credential.id} providerName={credential.id} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="truncate font-medium text-[11px] text-white/88 uppercase tracking-[0.08em]">
+          {credential.id}
+        </div>
+        <div className="mt-1 truncate text-[10px] text-white/42">
+          {credential.type}
+          {enabled ? " · enabled globally" : ""}
+        </div>
+      </div>
+      <span
+        className={cn(
+          "shrink-0 border px-1.5 py-0.5 text-[9px] uppercase tracking-[0.18em]",
+          enabled
+            ? "border-emerald-400/18 bg-emerald-400/[0.08] text-emerald-200/78"
+            : "border-cyan-400/18 bg-cyan-400/[0.07] text-cyan-100/78"
+        )}
+      >
+        {enabled ? "Enabled" : "Enable"}
+      </span>
+    </button>
+  );
+}
+
+function SettingsActionItem({
+  children,
+  className,
+  ...props
+}: React.ComponentProps<typeof DropdownMenuItem>) {
+  return (
+    <DropdownMenuItem
+      className={cn(
+        "cursor-pointer gap-2.5 rounded-xs border border-white/8 bg-white/[0.02] px-2.5 py-2 text-white/82 transition-colors focus:border-white/14 focus:bg-white/[0.06] focus:text-white data-disabled:border-white/5 data-disabled:bg-transparent data-disabled:opacity-35",
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </DropdownMenuItem>
+  );
+}
+
+async function postOpenCodeAction(path: string, directory: string) {
+  const response = await fetch(path, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ directory }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to post ${path}`);
+  }
+
+  return response;
+}
+
+function useProviderSettings(selectedDirectory: string | null) {
+  const [providerStatus, setProviderStatus] = useState<
+    OpencodeProviderStatus[]
+  >([]);
+  const [storedCredentials, setStoredCredentials] = useState<
+    OpencodeCredentialSummary[]
+  >([]);
+  const [configuredProviderIDs, setConfiguredProviderIDs] = useState<string[]>(
+    []
+  );
+  const [providerStatusRefreshTick, setProviderStatusRefreshTick] = useState(0);
+  const [authLoginNotice, setAuthLoginNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isCancelled = false;
+    const refreshToken = providerStatusRefreshTick.toString(36);
+
+    async function loadProviderStatus() {
+      try {
+        const [providers, credentials, configuredProviders] = await Promise.all(
+          [
+            fetchProviderStatus(
+              buildProvidersUrl(refreshToken, selectedDirectory)
+            ),
+            fetchStoredCredentials(),
+            fetchConfiguredProviders(),
+          ]
+        );
+
+        if (isCancelled) {
+          return;
+        }
+
+        if (providers) {
+          setProviderStatus(providers);
+        }
+
+        if (credentials) {
+          setStoredCredentials(credentials);
+        }
+
+        if (configuredProviders) {
+          setConfiguredProviderIDs(configuredProviders);
+        }
+      } catch (error) {
+        console.error("Failed to load provider status", error);
+      }
+    }
+
+    loadProviderStatus().catch((error) => {
+      console.error("Failed to load provider status", error);
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [providerStatusRefreshTick, selectedDirectory]);
+
+  return {
+    authLoginNotice,
+    configuredProviderIDs,
+    connectedProviderCount: providerStatus.filter(
+      (provider) => provider.connected
+    ).length,
+    providerStatus,
+    refreshProviderStatus: () => {
+      setProviderStatusRefreshTick((tick) => tick + 1);
+    },
+    async configureCredentialProvider(providerID: string) {
+      const response = await fetch("/api/opencode/configure-provider", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          directory: selectedDirectory ?? undefined,
+          providerID,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to configure OpenCode provider");
+      }
+
+      const payload = (await response.json()) as {
+        configured: boolean;
+        providerIDs?: string[];
+      };
+
+      if (payload.providerIDs) {
+        setConfiguredProviderIDs(payload.providerIDs);
+      }
+
+      setAuthLoginNotice(
+        `Configured ${providerID} globally for Chorus and reloaded the current board instance.`
+      );
+      setProviderStatusRefreshTick((tick) => tick + 1);
+    },
+    async openOpencodeAuthLogin() {
+      if (!selectedDirectory) {
+        return;
+      }
+
+      await postOpenCodeAction("/api/opencode/auth-login", selectedDirectory);
+      setAuthLoginNotice(
+        "Auth login completed. If no provider appears yet, enable one of the stored global credentials below for Chorus."
+      );
+      setProviderStatusRefreshTick((tick) => tick + 1);
+    },
+    async openOpencodeModels() {
+      if (!selectedDirectory) {
+        return;
+      }
+
+      await postOpenCodeAction("/api/opencode/models", selectedDirectory);
+    },
+    storedCredentials,
+  };
+}
+
+function ProviderSettingsPanel({
+  authLoginNotice,
+  configuredProviderIDs,
+  connectedProviderCount,
+  providerStatus,
+  selectedDirectory,
+  storedCredentials,
+  onConfigureCredentialProvider,
+  onOpenOpencodeAuthLogin,
+  onOpenOpencodeModels,
+  onRefreshProviderStatus,
+}: {
+  authLoginNotice: string | null;
+  configuredProviderIDs: string[];
+  connectedProviderCount: number;
+  onConfigureCredentialProvider: (providerID: string) => Promise<void>;
+  onOpenOpencodeAuthLogin: () => Promise<void>;
+  onOpenOpencodeModels: () => Promise<void>;
+  onRefreshProviderStatus: () => void;
+  providerStatus: OpencodeProviderStatus[];
+  selectedDirectory: string | null;
+  storedCredentials: OpencodeCredentialSummary[];
+}) {
+  return (
+    <>
+      {selectedDirectory && connectedProviderCount === 0 ? (
+        <div className="mt-2 border border-amber-400/12 bg-amber-400/[0.08] px-2.5 py-2 text-[10px] text-amber-100/78 leading-4">
+          No providers are active yet. Enable one of the stored credentials
+          below and Chorus will reload the current board instance.
+        </div>
+      ) : null}
+      {authLoginNotice ? (
+        <div className="mt-2 border border-cyan-400/12 bg-cyan-400/[0.07] px-2.5 py-2 text-[10px] text-cyan-100/78 leading-4">
+          {authLoginNotice}
+        </div>
+      ) : null}
+      <div className="mt-2">
+        <div className="px-1 text-[10px] text-white/32 uppercase tracking-[0.2em]">
+          Providers
+        </div>
+        <div className="mt-1 flex max-h-52 flex-col gap-1 overflow-y-auto pr-0.5">
+          {providerStatus.length === 0 ? (
+            <div className="border border-white/8 bg-white/[0.025] px-2.5 py-2 text-[10px] text-white/42">
+              No providers are currently loaded.
+            </div>
+          ) : (
+            providerStatus.map((provider) => (
+              <ProviderStatusRow key={provider.id} provider={provider} />
+            ))
+          )}
+        </div>
+      </div>
+      {storedCredentials.length > 0 ? (
+        <div className="mt-2 border-white/6 border-t pt-2">
+          <div className="px-1 text-[10px] text-white/32 uppercase tracking-[0.2em]">
+            Stored Credentials
+          </div>
+          <div className="mt-1 flex max-h-44 flex-col gap-1 overflow-y-auto pr-0.5">
+            {storedCredentials.map((credential) => (
+              <StoredCredentialRow
+                credential={credential}
+                enabled={configuredProviderIDs.includes(credential.id)}
+                key={credential.id}
+                onEnable={() => {
+                  onConfigureCredentialProvider(credential.id).catch(
+                    (error) => {
+                      console.error(
+                        "Failed to configure stored credential",
+                        error
+                      );
+                    }
+                  );
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
+      <div className="mt-2 border-white/6 border-t pt-2">
+        <div className="px-1 text-[10px] text-white/32 uppercase tracking-[0.2em]">
+          Actions
+        </div>
+        <div className="mt-1 flex flex-col gap-1">
+          <SettingsActionItem
+            disabled={!selectedDirectory}
+            onClick={() => {
+              onOpenOpencodeModels().catch((error) => {
+                console.error("Failed to open OpenCode models", error);
+              });
+            }}
+          >
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center border border-white/8 bg-white/[0.03] text-white/62">
+              <CpuIcon className="size-3.5" />
+            </span>
+            <div className="flex min-w-0 flex-col">
+              <span className="text-[11px] uppercase tracking-[0.08em]">
+                Open model selector
+              </span>
+              <span className="truncate text-[10px] text-white/40">
+                {selectedDirectory ?? "Select a board first"}
+              </span>
+            </div>
+          </SettingsActionItem>
+          <SettingsActionItem
+            disabled={!selectedDirectory}
+            onClick={() => {
+              onOpenOpencodeAuthLogin().catch((error) => {
+                console.error("Failed to launch auth login", error);
+              });
+            }}
+          >
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center border border-white/8 bg-white/[0.03] text-white/62">
+              <PlugZapIcon className="size-3.5" />
+            </span>
+            <div className="flex min-w-0 flex-col">
+              <span className="text-[11px] uppercase tracking-[0.08em]">
+                Launch auth login
+              </span>
+              <span className="truncate text-[10px] text-white/40">
+                {selectedDirectory
+                  ? "Run auth login, then reload this board instance"
+                  : "Select a board first"}
+              </span>
+            </div>
+          </SettingsActionItem>
+          <SettingsActionItem onClick={onRefreshProviderStatus}>
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center border border-white/8 bg-white/[0.03] text-white/62">
+              <CheckCircle2Icon className="size-3.5" />
+            </span>
+            <div className="flex min-w-0 flex-col">
+              <span className="text-[11px] uppercase tracking-[0.08em]">
+                Refresh provider status
+              </span>
+              <span className="truncate text-[10px] text-white/40">
+                Recheck connections and available models
+              </span>
+            </div>
+          </SettingsActionItem>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function VoiceSettingsPanel({
+  defaultModelId,
+  isLoadingVoiceConfig,
+  resolvedSpeechVoiceValue,
+  selectedSpeechVoiceLabel,
+  setSpeechVoiceId,
+  voices,
+}: {
+  defaultModelId: string | null;
+  isLoadingVoiceConfig: boolean;
+  resolvedSpeechVoiceValue: string;
+  selectedSpeechVoiceLabel: string;
+  setSpeechVoiceId: (voiceId: string | null) => void;
+  voices: Array<{ gender: string; id: string; name: string }>;
+}) {
+  return (
+    <div className="mt-2 flex flex-col gap-2">
+      <SettingsInfoCard
+        hint="Current playback voice preference in Chorus."
+        label="Active voice"
+        value={selectedSpeechVoiceLabel}
+      />
+      <div className="border border-white/8 bg-white/[0.025] px-2.5 py-2">
+        <div className="text-[9px] text-white/32 uppercase tracking-[0.18em]">
+          Voice
+        </div>
+        <div className="mt-1">
+          {voices.length > 0 ? (
+            <Select
+              onValueChange={(value) => {
+                setSpeechVoiceId(
+                  value === DEFAULT_SPEECH_VOICE_VALUE ? null : value
+                );
+              }}
+              value={resolvedSpeechVoiceValue}
+            >
+              <SelectTrigger className={settingsSelectTriggerClass} size="sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent
+                align="start"
+                className={settingsSelectContentClass}
+              >
+                <SelectItem
+                  className={settingsSelectItemClass}
+                  value={DEFAULT_SPEECH_VOICE_VALUE}
+                >
+                  System default
+                </SelectItem>
+                {voices.map((voice) => (
+                  <SelectItem
+                    className={settingsSelectItemClass}
+                    key={voice.id}
+                    value={voice.id}
+                  >
+                    {voice.name} ({voice.gender})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <div className="border border-white/8 bg-white/[0.03] px-2.5 py-2 text-[10px] text-white/42">
+              {isLoadingVoiceConfig
+                ? "Loading voice options…"
+                : "Voice config is unavailable."}
+            </div>
+          )}
+        </div>
+      </div>
+      <SettingsInfoCard
+        hint="Current model used for microphone transcription."
+        label="Speech model"
+        value={defaultModelId ?? "Unavailable"}
+      />
+    </div>
+  );
+}
+
 // ─── NotificationPane ──────────────────────────────────────────────────────────
 function NotificationPane({ onClose }: { onClose: () => void }) {
   const [notifs, setNotifs] = useState<Notification[]>(INITIAL_NOTIFICATIONS);
@@ -611,22 +1208,142 @@ function MobileMenuDrawer({
   );
 }
 
+function SettingsMenu() {
+  const [settingsTab, setSettingsTab] = useState<"providers" | "voice">(
+    "providers"
+  );
+
+  const { preferences, selectedBoard, setSpeechVoiceId } = useWorkspace();
+  const {
+    defaultModelId,
+    defaultVoiceId,
+    isLoading: isLoadingVoiceConfig,
+    voices,
+  } = useVoiceConfig();
+
+  const selectedDirectory = selectedBoard?.repo.directory ?? null;
+  const {
+    authLoginNotice,
+    configuredProviderIDs,
+    connectedProviderCount,
+    configureCredentialProvider,
+    openOpencodeAuthLogin,
+    openOpencodeModels,
+    providerStatus,
+    refreshProviderStatus,
+    storedCredentials,
+  } = useProviderSettings(selectedDirectory);
+  const selectedSpeechVoiceId =
+    preferences.speechVoiceId ?? defaultVoiceId ?? null;
+  const resolvedSpeechVoiceValue =
+    selectedSpeechVoiceId &&
+    voices.some((voice) => voice.id === selectedSpeechVoiceId)
+      ? selectedSpeechVoiceId
+      : DEFAULT_SPEECH_VOICE_VALUE;
+  const selectedSpeechVoiceLabel =
+    voices.find((voice) => voice.id === selectedSpeechVoiceId)?.name ??
+    voices.find((voice) => voice.id === defaultVoiceId)?.name ??
+    selectedSpeechVoiceId ??
+    "System default";
+  const settingsDescription =
+    settingsTab === "providers"
+      ? (selectedBoard?.repo.directory ??
+        "Select a board to manage provider tools")
+      : "Microphone and speech preferences";
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        aria-label="Settings"
+        className="group relative flex h-12 w-12 items-center justify-center text-zinc-300 transition duration-300 hover:text-white"
+      >
+        <div className="absolute inset-[5px] rounded-none border border-white/8 bg-zinc-900/80 transition duration-300 group-hover:border-cyan-300/18 group-hover:bg-zinc-900" />
+        <Settings className="relative z-10 h-4 w-4 transition duration-300 group-hover:rotate-45" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className={settingsPanelClass}>
+        <DropdownMenuGroup>
+          <div className="border-white/6 border-b px-1 pb-2">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <DropdownMenuLabel className="px-0 py-0 text-[10px] text-white/32 uppercase tracking-[0.22em]">
+                  Settings
+                </DropdownMenuLabel>
+                <div className="mt-1 font-medium text-[13px] text-white/95">
+                  {settingsTab === "providers"
+                    ? "Provider settings"
+                    : "Voice & Speech"}
+                </div>
+                <div className="mt-1 truncate text-[10px] text-white/42">
+                  {settingsDescription}
+                </div>
+              </div>
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center border border-white/8 bg-white/[0.03] text-white/72">
+                <Settings className="size-3.5" />
+              </span>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-1.5">
+              <SettingsTabButton
+                active={settingsTab === "providers"}
+                onClick={() => setSettingsTab("providers")}
+              >
+                Providers
+              </SettingsTabButton>
+              <SettingsTabButton
+                active={settingsTab === "voice"}
+                onClick={() => setSettingsTab("voice")}
+              >
+                Voice & Speech
+              </SettingsTabButton>
+            </div>
+            {settingsTab === "providers" ? (
+              <div className="mt-2 grid grid-cols-3 gap-1.5">
+                <SettingsMetric label="Live" value={connectedProviderCount} />
+                <SettingsMetric
+                  label="Providers"
+                  value={providerStatus.length}
+                />
+                <SettingsMetric
+                  label="Stored"
+                  value={storedCredentials.length}
+                />
+              </div>
+            ) : null}
+          </div>
+
+          {settingsTab === "providers" ? (
+            <ProviderSettingsPanel
+              authLoginNotice={authLoginNotice}
+              configuredProviderIDs={configuredProviderIDs}
+              connectedProviderCount={connectedProviderCount}
+              onConfigureCredentialProvider={configureCredentialProvider}
+              onOpenOpencodeAuthLogin={openOpencodeAuthLogin}
+              onOpenOpencodeModels={openOpencodeModels}
+              onRefreshProviderStatus={refreshProviderStatus}
+              providerStatus={providerStatus}
+              selectedDirectory={selectedDirectory}
+              storedCredentials={storedCredentials}
+            />
+          ) : (
+            <VoiceSettingsPanel
+              defaultModelId={defaultModelId}
+              isLoadingVoiceConfig={isLoadingVoiceConfig}
+              resolvedSpeechVoiceValue={resolvedSpeechVoiceValue}
+              selectedSpeechVoiceLabel={selectedSpeechVoiceLabel}
+              setSpeechVoiceId={setSpeechVoiceId}
+              voices={voices}
+            />
+          )}
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 // ─── AppHeader ─────────────────────────────────────────────────────────────────
 export function AppHeader() {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [notifOpen, setNotifOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [providerStatus, setProviderStatus] = useState<
-    OpencodeProviderStatus[]
-  >([]);
-  const [storedCredentials, setStoredCredentials] = useState<
-    OpencodeCredentialSummary[]
-  >([]);
-  const [configuredProviderIDs, setConfiguredProviderIDs] = useState<string[]>(
-    []
-  );
-  const [providerStatusRefreshTick, setProviderStatusRefreshTick] = useState(0);
-  const [authLoginNotice, setAuthLoginNotice] = useState<string | null>(null);
   const notifRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -636,7 +1353,6 @@ export function AppHeader() {
     openFolder,
     previousWorkspaces,
     recentProjects,
-    selectedBoard,
   } = useWorkspace();
 
   // Close notification pane on outside click
@@ -654,131 +1370,6 @@ export function AppHeader() {
   }, [notifOpen]);
 
   const unreadCount = INITIAL_NOTIFICATIONS.filter((n) => !n.read).length;
-  const selectedDirectory = selectedBoard?.repo.directory ?? null;
-  const connectedProviderCount = providerStatus.filter(
-    (provider) => provider.connected
-  ).length;
-
-  useEffect(() => {
-    let isCancelled = false;
-    const refreshToken = providerStatusRefreshTick.toString(36);
-
-    async function loadProviderStatus() {
-      try {
-        const [providers, credentials, configuredProviders] = await Promise.all(
-          [
-            fetchProviderStatus(
-              buildProvidersUrl(refreshToken, selectedDirectory)
-            ),
-            fetchStoredCredentials(),
-            fetchConfiguredProviders(),
-          ]
-        );
-
-        if (isCancelled) {
-          return;
-        }
-
-        if (providers) {
-          setProviderStatus(providers);
-        }
-
-        if (credentials) {
-          setStoredCredentials(credentials);
-        }
-
-        if (configuredProviders) {
-          setConfiguredProviderIDs(configuredProviders);
-        }
-      } catch (error) {
-        console.error("Failed to load provider status", error);
-      }
-    }
-
-    loadProviderStatus().catch((error) => {
-      console.error("Failed to load provider status", error);
-    });
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [providerStatusRefreshTick, selectedDirectory]);
-
-  async function openOpencodeModels() {
-    if (!selectedBoard) {
-      return;
-    }
-
-    const response = await fetch("/api/opencode/models", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        directory: selectedBoard.repo.directory,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to open OpenCode model selector");
-    }
-  }
-
-  async function openOpencodeAuthLogin() {
-    if (!selectedBoard) {
-      return;
-    }
-
-    const response = await fetch("/api/opencode/auth-login", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        directory: selectedBoard.repo.directory,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to launch opencode auth login");
-    }
-
-    setAuthLoginNotice(
-      "Auth login completed. If no provider appears yet, enable one of the stored global credentials below for Chorus."
-    );
-    setProviderStatusRefreshTick((tick) => tick + 1);
-  }
-
-  async function configureCredentialProvider(providerID: string) {
-    const response = await fetch("/api/opencode/configure-provider", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        directory: selectedDirectory ?? undefined,
-        providerID,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to configure OpenCode provider");
-    }
-
-    const payload = (await response.json()) as {
-      configured: boolean;
-      providerIDs?: string[];
-    };
-
-    if (payload.providerIDs) {
-      setConfiguredProviderIDs(payload.providerIDs);
-    }
-
-    setAuthLoginNotice(
-      `Configured ${providerID} globally for Chorus and reloaded the current board instance.`
-    );
-    setProviderStatusRefreshTick((tick) => tick + 1);
-  }
 
   return (
     <>
@@ -1008,176 +1599,7 @@ export function AppHeader() {
               </div>
 
               {/* Settings button with OpenCode provider management */}
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  aria-label="Settings"
-                  className="group relative flex h-12 w-12 items-center justify-center text-zinc-300 transition duration-300 hover:text-white"
-                >
-                  <div className="absolute inset-[5px] rounded-none border border-white/8 bg-zinc-900/80 transition duration-300 group-hover:border-cyan-300/18 group-hover:bg-zinc-900" />
-                  <Settings className="relative z-10 h-4 w-4 transition duration-300 group-hover:rotate-45" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="end"
-                  className="min-w-72 rounded-2xl border border-white/10 bg-[#111111]/96 p-1.5 text-white shadow-2xl backdrop-blur-xl"
-                >
-                  <DropdownMenuGroup>
-                    <DropdownMenuLabel className="text-white/40">
-                      OpenCode
-                    </DropdownMenuLabel>
-                    {selectedBoard && connectedProviderCount === 0 && (
-                      <div className="mb-1 rounded-xl border border-amber-400/12 bg-amber-400/[0.08] px-3 py-2 text-[11px] text-amber-100/80">
-                        No providers are currently loaded for Chorus. Auth is
-                        global, so if login succeeded you can enable one of the
-                        stored credentials below and Chorus will reload the
-                        current board instance.
-                      </div>
-                    )}
-                    {authLoginNotice && (
-                      <div className="mb-1 rounded-xl border border-cyan-400/12 bg-cyan-400/[0.07] px-3 py-2 text-[11px] text-cyan-100/80">
-                        {authLoginNotice}
-                      </div>
-                    )}
-                    <div className="mb-1 flex max-h-52 flex-col gap-1 overflow-y-auto px-1.5 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                      {providerStatus.length === 0 ? (
-                        <div className="rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2 text-[11px] text-white/45">
-                          No providers are currently loaded.
-                        </div>
-                      ) : (
-                        providerStatus.map((provider) => (
-                          <div
-                            className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2"
-                            key={provider.id}
-                          >
-                            <span
-                              className={cn(
-                                "size-2 shrink-0 rounded-full",
-                                provider.connected
-                                  ? "bg-emerald-400"
-                                  : "bg-white/20"
-                              )}
-                            />
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="truncate font-medium text-[12px] text-white/88">
-                                  {provider.name}
-                                </span>
-                                <span className="rounded-md bg-white/[0.06] px-1.5 py-0.5 text-[10px] text-white/35 uppercase tracking-[0.16em]">
-                                  {provider.connected ? "Connected" : "Offline"}
-                                </span>
-                              </div>
-                              <div className="truncate text-[11px] text-white/40">
-                                {provider.modelCount} models
-                                {provider.supportsOauth ? " · OAuth" : ""}
-                                {provider.supportsApi ? " · API key" : ""}
-                              </div>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                    {storedCredentials.length > 0 && (
-                      <div className="mb-1 flex max-h-44 flex-col gap-1 overflow-y-auto px-1.5 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                        <div className="px-1.5 pt-1 text-[10px] text-white/35 uppercase tracking-[0.18em]">
-                          Stored Credentials
-                        </div>
-                        {storedCredentials.map((credential) => (
-                          <button
-                            className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2 text-left transition hover:bg-white/[0.06] disabled:cursor-default disabled:opacity-70"
-                            disabled={configuredProviderIDs.includes(
-                              credential.id
-                            )}
-                            key={credential.id}
-                            onClick={() => {
-                              configureCredentialProvider(credential.id).catch(
-                                (error) => {
-                                  console.error(
-                                    "Failed to configure stored credential",
-                                    error
-                                  );
-                                }
-                              );
-                            }}
-                            type="button"
-                          >
-                            <span className="size-2 shrink-0 rounded-full bg-cyan-400" />
-                            <div className="min-w-0 flex-1">
-                              <div className="truncate font-medium text-[12px] text-white/88">
-                                {credential.id}
-                              </div>
-                              <div className="truncate text-[11px] text-white/40">
-                                {credential.type}
-                                {configuredProviderIDs.includes(credential.id)
-                                  ? " · enabled globally"
-                                  : ""}
-                              </div>
-                            </div>
-                            <span className="rounded-md bg-white/[0.06] px-1.5 py-0.5 text-[10px] text-white/45 uppercase tracking-[0.16em]">
-                              {configuredProviderIDs.includes(credential.id)
-                                ? "Enabled"
-                                : "Enable"}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    <DropdownMenuItem
-                      className="cursor-pointer rounded-lg px-3 py-2 text-sm text-white/85 focus:bg-white/10 focus:text-white data-disabled:pointer-events-none data-disabled:opacity-40"
-                      disabled={!selectedBoard}
-                      onClick={() => {
-                        openOpencodeModels().catch((error) => {
-                          console.error(
-                            "Failed to open OpenCode models",
-                            error
-                          );
-                        });
-                      }}
-                    >
-                      <CpuIcon className="size-4" />
-                      <div className="flex min-w-0 flex-col">
-                        <span>Open model selector</span>
-                        <span className="truncate text-[11px] text-white/40">
-                          {selectedBoard
-                            ? selectedBoard.repo.directory
-                            : "Select a board first"}
-                        </span>
-                      </div>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="cursor-pointer rounded-lg px-3 py-2 text-sm text-white/85 focus:bg-white/10 focus:text-white data-disabled:pointer-events-none data-disabled:opacity-40"
-                      disabled={!selectedBoard}
-                      onClick={() => {
-                        openOpencodeAuthLogin().catch((error) => {
-                          console.error("Failed to launch auth login", error);
-                        });
-                      }}
-                    >
-                      <PlugZapIcon className="size-4" />
-                      <div className="flex min-w-0 flex-col">
-                        <span>Launch auth login</span>
-                        <span className="truncate text-[11px] text-white/40">
-                          {selectedBoard
-                            ? "Run `opencode auth login`, then Chorus reloads the OpenCode instance for this board"
-                            : "Select a board first"}
-                        </span>
-                      </div>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="cursor-pointer rounded-lg px-3 py-2 text-sm text-white/85 focus:bg-white/10 focus:text-white"
-                      onClick={() => {
-                        setProviderStatusRefreshTick((tick) => tick + 1);
-                      }}
-                    >
-                      <CheckCircle2Icon className="size-4" />
-                      <div className="flex min-w-0 flex-col">
-                        <span>Refresh provider status</span>
-                        <span className="truncate text-[11px] text-white/40">
-                          Recheck connected providers and available models
-                        </span>
-                      </div>
-                    </DropdownMenuItem>
-                  </DropdownMenuGroup>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <SettingsMenu />
             </div>
           </div>
         </div>

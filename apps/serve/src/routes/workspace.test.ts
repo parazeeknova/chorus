@@ -19,6 +19,7 @@ describe("workspace routes", () => {
       boards: [],
       preferences: {
         composerHintDismissed: false,
+        speechVoiceId: null,
       },
       selectedBoardId: null,
     });
@@ -36,6 +37,7 @@ describe("workspace routes", () => {
       boards: [],
       preferences: {
         composerHintDismissed: false,
+        speechVoiceId: null,
       },
       previousWorkspaces: [],
       revision: 1,
