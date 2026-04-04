@@ -24,6 +24,7 @@ export interface SessionCreateInput {
 
 export interface SessionPromptInput {
   agent?: string;
+  directory?: string;
   format?: OutputFormat;
   model?: {
     providerID: string;
@@ -37,10 +38,12 @@ export interface SessionPromptInput {
   system?: string;
   text: string;
   variant?: string;
+  workspace?: string;
 }
 
 export interface SessionPromptAsyncInput {
   agent?: string;
+  directory?: string;
   model?: {
     providerID: string;
     modelID: string;
@@ -52,19 +55,24 @@ export interface SessionPromptAsyncInput {
   system?: string;
   text: string;
   variant?: string;
+  workspace?: string;
 }
 
 export interface SessionCommandInput {
   agent?: string;
   arguments?: string;
   command: string;
+  directory?: string;
   model?: string;
   sessionID: string;
+  workspace?: string;
 }
 
 export interface SessionForkInput {
+  directory?: string;
   messageID?: string;
   sessionID: string;
+  workspace?: string;
 }
 
 export class SessionManager {
@@ -121,6 +129,8 @@ export class SessionManager {
     const parts = input.parts ?? [{ type: "text" as const, text: input.text }];
     const result = await this.client.session.prompt({
       sessionID: input.sessionID,
+      directory: input.directory,
+      workspace: input.workspace,
       model: input.model,
       agent: input.agent,
       parts,
@@ -136,6 +146,8 @@ export class SessionManager {
     const parts = input.parts ?? [{ type: "text" as const, text: input.text }];
     await this.client.session.promptAsync({
       sessionID: input.sessionID,
+      directory: input.directory,
+      workspace: input.workspace,
       model: input.model,
       agent: input.agent,
       parts,
@@ -147,6 +159,8 @@ export class SessionManager {
   async command(input: SessionCommandInput) {
     const result = await this.client.session.command({
       sessionID: input.sessionID,
+      directory: input.directory,
+      workspace: input.workspace,
       command: input.command,
       arguments: input.arguments,
       agent: input.agent,
@@ -158,6 +172,8 @@ export class SessionManager {
   async fork(input: SessionForkInput): Promise<Session> {
     const result = await this.client.session.fork({
       sessionID: input.sessionID,
+      directory: input.directory,
+      workspace: input.workspace,
       messageID: input.messageID,
     });
     return unwrap(result.data, "session.fork");

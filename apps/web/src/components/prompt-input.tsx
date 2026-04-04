@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUp, Mic, MoreHorizontal } from "lucide-react";
+import { ArrowUp, Mic, MoreHorizontal, XIcon } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,12 +11,51 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useWorkspace } from "@/features/workspace/workspace-context";
 import { useVoiceRecording } from "@/hooks/use-voice-recording";
+
+const MODEL_OPTIONS = {
+  default: undefined,
+  claude: {
+    providerID: "anthropic",
+    modelID: "claude-sonnet-4-5",
+  },
+  gpt4_1: {
+    providerID: "openai",
+    modelID: "gpt-4.1",
+  },
+  gemini: {
+    providerID: "google",
+    modelID: "gemini-2.5-pro",
+  },
+} as const;
 
 export function PromptInput() {
   const [prompt, setPrompt] = useState("");
-  const [selectedKanban, setSelectedKanban] = useState("main");
-  const [selectedModel, setSelectedModel] = useState("chorus");
+  const [selectedModel, setSelectedModel] =
+    useState<keyof typeof MODEL_OPTIONS>("default");
+  const {
+    boards,
+    dismissComposerHint,
+    isQueueingPrompt,
+    preferences,
+    queuePrompt,
+    selectedBoard,
+    selectBoard,
+  } = useWorkspace();
+
+  const isBusy =
+    isQueueingPrompt || selectedBoard?.session.state === "starting";
+  const hasActiveRun = selectedBoard?.session.currentTaskId !== undefined;
+  let sessionMessage = "First prompt will start a new OpenCode session.";
+
+  if (hasActiveRun) {
+    sessionMessage = "Wait for the current run to finish.";
+  } else if (isBusy) {
+    sessionMessage = "Starting session…";
+  } else if (selectedBoard?.session.sessionId) {
+    sessionMessage = "Prompt will reuse the active session.";
+  }
 
   const handleTranscriptionComplete = (text: string) => {
     setPrompt((prev) => prev + (prev ? " " : "") + text);
@@ -28,42 +67,40 @@ export function PromptInput() {
   const handleVoiceButtonClick = async () => {
     if (isRecording) {
       await stopRecording();
-    } else {
-      await startRecording();
-    }
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!prompt.trim()) {
       return;
     }
 
-    // TODO: Handle prompt submission
-    console.log(
-      "Prompt submitted:",
-      prompt,
-      "to kanban:",
-      selectedKanban,
-      "with model:",
-      selectedModel
-    );
-    setPrompt("");
+    await startRecording();
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!(prompt.trim() && selectedBoard) || isBusy || hasActiveRun) {
+      return;
+    }
+
+    const result = await queuePrompt({
+      text: prompt.trim(),
+      model: MODEL_OPTIONS[selectedModel],
+    });
+
+    if (result) {
+      setPrompt("");
+    }
   };
 
   const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setPrompt(e.target.value);
-    // Reset height to allow shrinking on delete
     e.target.style.height = "auto";
-    // Set height to match content (scroll height)
     e.target.style.height = `${e.target.scrollHeight}px`;
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit(e);
-      // Reset height after submit
+      handleSubmit(e).catch((error) => {
+        console.error("Failed to submit prompt", error);
+      });
       const target = e.target as HTMLTextAreaElement;
       target.style.height = "auto";
     }
@@ -72,6 +109,24 @@ export function PromptInput() {
   return (
     <div className="fixed right-0 bottom-8 left-0 z-40 flex justify-center px-4">
       <div className="w-full max-w-3xl">
+        {!preferences.composerHintDismissed && (
+          <div className="mb-2 flex items-start justify-between gap-3 rounded-lg border border-white/10 bg-black/45 px-3 py-2 text-[11px] text-white/70 leading-4 shadow-lg backdrop-blur-md">
+            <span>
+              Boards persist across browsers on this machine.{" "}
+              {selectedBoard
+                ? `${selectedBoard.title} is selected. ${sessionMessage}`
+                : "Open or select a board, then send the first prompt to start its OpenCode session."}
+            </span>
+            <button
+              aria-label="Dismiss composer hint"
+              className="rounded-md p-0.5 text-white/35 transition-colors hover:bg-white/8 hover:text-white/70"
+              onClick={dismissComposerHint}
+              type="button"
+            >
+              <XIcon className="size-3.5" />
+            </button>
+          </div>
+        )}
         <form className="relative" onSubmit={handleSubmit}>
           <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#0f0f0f]/90 p-2 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.8)] backdrop-blur-2xl transition-colors focus-within:border-white/20 focus-within:bg-[#161616]/95">
             <div className="flex flex-col gap-2 px-3 py-2">
@@ -93,26 +148,32 @@ export function PromptInput() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="border-white/10 bg-[#161616] text-white/90">
-                      <SelectItem value="chorus">Chorus</SelectItem>
-                      <SelectItem value="gpt4">GPT-4</SelectItem>
-                      <SelectItem value="claude">Claude</SelectItem>
-                      <SelectItem value="gemini">Gemini</SelectItem>
+                      <SelectItem value="default">OpenCode Default</SelectItem>
+                      <SelectItem value="claude">Claude Sonnet 4.5</SelectItem>
+                      <SelectItem value="gpt4_1">GPT-4.1</SelectItem>
+                      <SelectItem value="gemini">Gemini 2.5 Pro</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="flex items-center gap-2">
                   <Select
-                    onValueChange={(value) => value && setSelectedKanban(value)}
-                    value={selectedKanban}
+                    onValueChange={(value) => value && selectBoard(value)}
+                    value={selectedBoard?.boardId ?? null}
                   >
                     <SelectTrigger className="h-7 w-auto gap-1 rounded-md border-0 bg-transparent px-2.5 py-1 font-medium text-white/50 text-xs shadow-none hover:bg-white/10 hover:text-white/80 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 data-[state=open]:bg-white/10 data-[state=open]:text-white dark:bg-transparent dark:data-[state=open]:bg-white/10 dark:data-[state=open]:text-white dark:hover:bg-white/10">
-                      <SelectValue />
+                      <SelectValue placeholder="Select a board" />
                     </SelectTrigger>
                     <SelectContent className="border-white/10 bg-[#161616] text-white/90">
-                      <SelectItem value="main">Main Kanban</SelectItem>
-                      <SelectItem value="dev">Dev Tasks</SelectItem>
-                      <SelectItem value="design">Design Board</SelectItem>
-                      <SelectItem value="bugs">Bug Tracker</SelectItem>
+                      {boards.map((board) => (
+                        <SelectItem key={board.boardId} value={board.boardId}>
+                          <span className="flex min-w-0 flex-col">
+                            <span className="truncate">{board.title}</span>
+                            <span className="truncate text-[11px] text-white/40">
+                              {board.repo.directory}
+                            </span>
+                          </span>
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <Button
@@ -141,7 +202,11 @@ export function PromptInput() {
                   </Button>
                   <Button
                     className="h-7 w-7 rounded-md bg-white text-black shadow-none transition-transform hover:bg-white/90 focus:ring-0 active:scale-95 disabled:scale-100 disabled:opacity-30 disabled:hover:bg-white dark:bg-white dark:text-black dark:hover:bg-white/90"
-                    disabled={!prompt.trim()}
+                    disabled={
+                      !(prompt.trim() && selectedBoard) ||
+                      isBusy ||
+                      hasActiveRun
+                    }
                     size="icon"
                     type="submit"
                   >

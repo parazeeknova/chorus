@@ -1,6 +1,9 @@
+import { queueBoardPromptInputSchema } from "@chorus/contracts";
 import { Elysia, t } from "elysia";
 import type { OpenCodeBridge } from "../bridge/opencode/bridge";
 import type { WsClientManager } from "../events/broadcaster";
+import { createWorkspaceMessage } from "../routes/workspace";
+import type { BoardTaskService } from "../tasks/board-task-service";
 import type { WsMessage } from "./types";
 import {
   SUPPORTED_MESSAGE_TYPES,
@@ -20,16 +23,7 @@ function generateId(): string {
 }
 
 const WS_PAYLOAD_SCHEMAS = {
-  [WS_MESSAGE_TYPE.TASK_QUEUE]: t.Object({
-    text: t.String(),
-    model: t.Optional(
-      t.Object({
-        providerID: t.String(),
-        modelID: t.String(),
-      })
-    ),
-    agent: t.Optional(t.String()),
-  }),
+  [WS_MESSAGE_TYPE.TASK_QUEUE]: t.Any(),
   [WS_MESSAGE_TYPE.TASK_APPROVE]: t.Object({
     requestID: t.String(),
     sessionID: t.String(),
@@ -71,7 +65,8 @@ const WS_PAYLOAD_SCHEMAS = {
 
 export function createWsHandler(
   bridge: OpenCodeBridge,
-  manager: WsClientManager
+  manager: WsClientManager,
+  boardTasks: BoardTaskService
 ) {
   return new Elysia().ws("/ws", {
     body: t.Object({
@@ -103,18 +98,21 @@ export function createWsHandler(
         return;
       }
 
-      handleMessage(ws, message, bridge, manager, data).catch((error) => {
-        console.error("[ws] handler error:", error);
-        ws.send(
-          JSON.stringify({
-            type: WS_RESPONSE_TYPE.ERROR,
-            payload: {
-              message: error instanceof Error ? error.message : "unknown error",
-            },
-            timestamp: Date.now(),
-          })
-        );
-      });
+      handleMessage(ws, message, bridge, manager, boardTasks, data).catch(
+        (error) => {
+          console.error("[ws] handler error:", error);
+          ws.send(
+            JSON.stringify({
+              type: WS_RESPONSE_TYPE.ERROR,
+              payload: {
+                message:
+                  error instanceof Error ? error.message : "unknown error",
+              },
+              timestamp: Date.now(),
+            })
+          );
+        }
+      );
     },
 
     close(ws) {
@@ -140,6 +138,7 @@ async function handleMessage(
   message: { type: string; payload?: unknown },
   bridge: OpenCodeBridge,
   manager: WsClientManager,
+  boardTasks: BoardTaskService,
   _data: ClientData
 ): Promise<void> {
   const wsSend = (payload: Record<string, unknown>) => {
@@ -161,27 +160,18 @@ async function handleMessage(
 
   switch (msg.type) {
     case WS_MESSAGE_TYPE.TASK_QUEUE: {
-      const payload = validate(WS_MESSAGE_TYPE.TASK_QUEUE, msg.payload);
-
-      const session = await bridge.createSession({
-        title: payload.text.slice(0, 80),
-      });
-
-      await bridge.promptSession({
-        sessionID: session.id,
-        text: payload.text,
-        model: payload.model,
-        agent: payload.agent,
-      });
+      validate(WS_MESSAGE_TYPE.TASK_QUEUE, msg.payload);
+      const payload = queueBoardPromptInputSchema.parse(msg.payload);
+      const response = await boardTasks.queuePrompt(payload);
 
       wsSend({
         type: WS_RESPONSE_TYPE.TASK_QUEUED,
-        payload: {
-          sessionID: session.id,
-          accepted: true,
-        },
-        timestamp: Date.now(),
+        payload: response,
+        timestamp: response.timestamp,
       });
+      manager.broadcastRaw(
+        createWorkspaceMessage(boardTasks.getWorkspaceSnapshot())
+      );
       break;
     }
 

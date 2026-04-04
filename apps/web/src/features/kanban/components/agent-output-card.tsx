@@ -1,8 +1,10 @@
 "use client";
 
+import { BorderlessFileView } from "@chorus/monaco";
 import {
   BrainIcon,
   CheckCircle2Icon,
+  ChevronDownIcon,
   ChevronRightIcon,
   FilePenLineIcon,
   Loader2Icon,
@@ -10,6 +12,7 @@ import {
   TerminalIcon,
   WrenchIcon,
 } from "lucide-react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 export type AgentStepKind =
@@ -36,6 +39,7 @@ export interface AgentRunContext {
   elapsed: string;
   model: string;
   sessionId?: string;
+  startedAt?: number;
   steps: AgentStep[];
   taskTitle: string;
 }
@@ -119,22 +123,56 @@ const STEP_META: Record<
   command: { icon: TerminalIcon, label: "Run", color: "text-white/50" },
 };
 
+function inferLanguage(filePath?: string): string {
+  if (!filePath) {
+    return "plaintext";
+  }
+  const ext = filePath.split(".").pop()?.toLowerCase();
+  const langMap: Record<string, string> = {
+    ts: "typescript",
+    tsx: "typescript",
+    js: "javascript",
+    jsx: "javascript",
+    py: "python",
+    rs: "rust",
+    go: "go",
+    rb: "ruby",
+    java: "java",
+    css: "css",
+    scss: "scss",
+    html: "html",
+    json: "json",
+    yaml: "yaml",
+    yml: "yaml",
+    md: "markdown",
+    sh: "shell",
+    bash: "shell",
+    toml: "toml",
+    xml: "xml",
+    sql: "sql",
+  };
+  return ext ? (langMap[ext] ?? "plaintext") : "plaintext";
+}
+
 function StepRow({ step }: { step: AgentStep }) {
   const meta = STEP_META[step.kind];
   const Icon = meta.icon;
   const isRunning = step.status === "running";
+  const [expanded, setExpanded] = useState(false);
+
+  const showExpandable =
+    step.kind === "file_edit" ||
+    (step.content && (step.kind === "response" || step.kind === "thinking"));
 
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-2">
-        {/* Status indicator */}
         {isRunning ? (
           <Loader2Icon className="size-3 shrink-0 animate-spin text-white/40" />
         ) : (
           <CheckCircle2Icon className="size-3 shrink-0 text-white/20" />
         )}
 
-        {/* Kind icon + label */}
         <Icon className={cn("size-3 shrink-0", meta.color)} />
         <span
           className={cn(
@@ -145,12 +183,10 @@ function StepRow({ step }: { step: AgentStep }) {
           {meta.label}
         </span>
 
-        {/* Summary */}
         <span className="min-w-0 flex-1 truncate font-mono text-[0.72rem] text-white/60">
           {step.summary}
         </span>
 
-        {/* Diff stats for file edits */}
         {step.kind === "file_edit" && (
           <span className="flex shrink-0 items-center gap-1.5 text-[0.65rem]">
             {step.linesAdded !== undefined && step.linesAdded > 0 && (
@@ -162,13 +198,21 @@ function StepRow({ step }: { step: AgentStep }) {
           </span>
         )}
 
-        {/* Chevron for expandable content */}
-        {step.content && (
-          <ChevronRightIcon className="size-3 shrink-0 text-white/20" />
+        {showExpandable && (
+          <button
+            className="shrink-0 rounded p-0.5 transition-colors hover:bg-white/10"
+            onClick={() => setExpanded(!expanded)}
+            type="button"
+          >
+            {expanded ? (
+              <ChevronDownIcon className="size-3 text-white/30" />
+            ) : (
+              <ChevronRightIcon className="size-3 text-white/20" />
+            )}
+          </button>
         )}
       </div>
 
-      {/* Inline content for response/thinking (last step or running) */}
       {step.content &&
         (step.status === "running" ||
           step.kind === "response" ||
@@ -179,6 +223,20 @@ function StepRow({ step }: { step: AgentStep }) {
             </p>
           </div>
         )}
+
+      {expanded && step.kind === "file_edit" && step.filePath && (
+        <div className="ml-5 overflow-hidden rounded-md border border-white/5 bg-[#0d0d0d]">
+          <BorderlessFileView
+            filePath={step.filePath}
+            height="200px"
+            language={inferLanguage(step.filePath)}
+            value={
+              step.content ??
+              `// File: ${step.filePath}\n// Content will appear here once the agent provides it`
+            }
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -204,9 +262,7 @@ export function AgentOutputCard({
         className
       )}
     >
-      {/* Visual link: coloured top bar connecting to source task */}
       <div className="flex items-center gap-2 border-white/8 border-b bg-white/1.5 px-3 py-2">
-        {/* Pulse dot */}
         <span className="relative flex size-2">
           {isLive && (
             <span className="absolute inline-flex size-full animate-ping rounded-full bg-sky-400 opacity-50" />
@@ -219,27 +275,22 @@ export function AgentOutputCard({
           />
         </span>
 
-        {/* Source task title (truncated) */}
         <span className="min-w-0 flex-1 truncate font-medium text-[0.7rem] text-white/70">
           {run.taskTitle}
         </span>
 
-        {/* Model badge */}
         <span className="shrink-0 rounded-md border border-white/8 bg-white/5 px-1.5 py-0.5 font-mono text-[0.6rem] text-white/40">
           {run.model}
         </span>
       </div>
 
-      {/* Steps list */}
       <div className="flex flex-col gap-3 px-3 py-3">
         {run.steps.map((step) => (
           <StepRow key={step.id} step={step} />
         ))}
       </div>
 
-      {/* Footer: progress + elapsed */}
       <div className="flex items-center gap-3 border-white/5 border-t px-3 py-2">
-        {/* Progress bar */}
         <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/8">
           <div
             className={cn(

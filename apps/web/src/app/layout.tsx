@@ -5,6 +5,7 @@ import "./globals.css";
 import { AppHeader } from "@/components/app-header";
 import { PromptInput } from "@/components/prompt-input";
 import { PostHogProvider } from "@/components/providers/posthog-provider";
+import { ChorusWorkspaceProvider } from "@/features/workspace/provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,9 +34,11 @@ export default function RootLayout({
     >
       <body className="flex h-screen flex-col overflow-hidden">
         <PostHogProvider>
-          <AppHeader />
-          <div className="flex-1 overflow-hidden">{children}</div>
-          <PromptInput />
+          <ChorusWorkspaceProvider>
+            <AppHeader />
+            <div className="flex-1 overflow-hidden">{children}</div>
+            <PromptInput />
+          </ChorusWorkspaceProvider>
         </PostHogProvider>
       </body>
     </html>

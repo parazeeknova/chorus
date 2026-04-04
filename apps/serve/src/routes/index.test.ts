@@ -1,5 +1,6 @@
 import { describe, expect, mock, test } from "bun:test";
 import { Elysia } from "elysia";
+import { createWsClientManager } from "../events/broadcaster";
 import { createHttpRoutes } from "./index";
 
 function makeMockBridge() {
@@ -38,11 +39,37 @@ function makeMockBridge() {
     })),
   };
 }
+
+function makeMockBoardTasks() {
+  return {
+    getWorkspaceSnapshot: mock(() => ({
+      boards: [],
+      preferences: {
+        composerHintDismissed: false,
+      },
+      previousWorkspaces: [],
+      revision: 1,
+      selectedBoardId: null,
+    })),
+    queuePrompt: mock(async (input: unknown) => ({
+      boardId: (input as { boardId: string }).boardId,
+      sessionId: "sess-123",
+      createdSession: true,
+      accepted: true,
+      timestamp: 123,
+    })),
+  };
+}
+
 describe("HTTP routes", () => {
   function makeApp() {
     const bridge = makeMockBridge();
-    const app = new Elysia().use(createHttpRoutes(bridge as never));
-    return { app, bridge };
+    const boardTasks = makeMockBoardTasks();
+    const wsManager = createWsClientManager();
+    const app = new Elysia().use(
+      createHttpRoutes(bridge as never, boardTasks as never, wsManager)
+    );
+    return { app, bridge, boardTasks };
   }
 
   describe("GET /health", () => {
@@ -82,14 +109,18 @@ describe("HTTP routes", () => {
   });
 
   describe("POST /tasks", () => {
-    test("creates a session and prompts it", async () => {
-      const { app, bridge } = makeApp();
+    test("queues a board-aware prompt", async () => {
+      const { app, boardTasks } = makeApp();
 
       const res = await app.handle(
         new Request("http://localhost/tasks", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ text: "build a feature" }),
+          body: JSON.stringify({
+            boardId: "board-1",
+            directory: "/tmp/repo",
+            text: "build a feature",
+          }),
         })
       );
 
@@ -97,48 +128,30 @@ describe("HTTP routes", () => {
 
       const body = await res.json();
       expect(body).toEqual({
-        sessionID: "sess-123",
+        boardId: "board-1",
+        sessionId: "sess-123",
+        createdSession: true,
         accepted: true,
-        timestamp: expect.any(Number),
+        timestamp: 123,
       });
 
-      expect(bridge.createSession).toHaveBeenCalledWith({
-        title: "build a feature",
-      });
-
-      expect(bridge.promptSession).toHaveBeenCalledWith({
-        sessionID: "sess-123",
+      expect(boardTasks.queuePrompt).toHaveBeenCalledWith({
+        boardId: "board-1",
+        directory: "/tmp/repo",
         text: "build a feature",
-        model: undefined,
-        agent: undefined,
-      });
-    });
-
-    test("truncates title to 80 chars", async () => {
-      const { app, bridge } = makeApp();
-      const longText = "a".repeat(200);
-
-      await app.handle(
-        new Request("http://localhost/tasks", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ text: longText }),
-        })
-      );
-
-      expect(bridge.createSession).toHaveBeenCalledWith({
-        title: "a".repeat(80),
       });
     });
 
     test("passes model and agent when provided", async () => {
-      const { app, bridge } = makeApp();
+      const { app, boardTasks } = makeApp();
 
       await app.handle(
         new Request("http://localhost/tasks", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
+            boardId: "board-1",
+            directory: "/tmp/repo",
             text: "do work",
             model: { providerID: "anthropic", modelID: "claude-sonnet-4" },
             agent: "build",
@@ -146,8 +159,9 @@ describe("HTTP routes", () => {
         })
       );
 
-      expect(bridge.promptSession).toHaveBeenCalledWith({
-        sessionID: "sess-123",
+      expect(boardTasks.queuePrompt).toHaveBeenCalledWith({
+        boardId: "board-1",
+        directory: "/tmp/repo",
         text: "do work",
         model: { providerID: "anthropic", modelID: "claude-sonnet-4" },
         agent: "build",
@@ -161,7 +175,10 @@ describe("HTTP routes", () => {
         new Request("http://localhost/tasks", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({}),
+          body: JSON.stringify({
+            boardId: "board-1",
+            directory: "/tmp/repo",
+          }),
         })
       );
 

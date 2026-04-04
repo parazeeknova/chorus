@@ -1,0 +1,225 @@
+import { z } from "zod";
+
+export const repoProjectSchema = z.object({
+  directory: z.string().min(1),
+  worktree: z.string().min(1),
+  projectId: z.string().min(1).optional(),
+  projectName: z.string().min(1).optional(),
+  sandboxes: z.array(z.string()).default([]),
+});
+
+export const repoContextSchema = repoProjectSchema.extend({
+  branch: z.string().min(1).optional(),
+});
+
+export const boardSeedSchema = z.object({
+  title: z.string().min(1),
+  repo: repoContextSchema,
+});
+
+export const projectListResponseSchema = z.object({
+  projects: z.array(repoProjectSchema),
+});
+
+export const modelSelectionSchema = z.object({
+  providerID: z.string().min(1),
+  modelID: z.string().min(1),
+});
+
+export const agentStepKindSchema = z.union([
+  z.literal("thinking"),
+  z.literal("response"),
+  z.literal("file_edit"),
+  z.literal("tool_call"),
+  z.literal("command"),
+]);
+
+export const agentStepStatusSchema = z.union([
+  z.literal("running"),
+  z.literal("done"),
+  z.literal("error"),
+]);
+
+export const agentStepSchema = z.object({
+  content: z.string().optional(),
+  filePath: z.string().optional(),
+  id: z.string().min(1),
+  kind: agentStepKindSchema,
+  linesAdded: z.number().optional(),
+  linesRemoved: z.number().optional(),
+  status: agentStepStatusSchema,
+  summary: z.string().min(1),
+});
+
+export const agentRunContextSchema = z.object({
+  elapsed: z.string().min(1),
+  model: z.string().min(1),
+  sessionId: z.string().min(1).optional(),
+  startedAt: z.number().optional(),
+  steps: z.array(agentStepSchema),
+  taskTitle: z.string().min(1),
+});
+
+export const taskSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().min(1),
+  labelVariant: z.union([
+    z.literal("primary-light"),
+    z.literal("success-light"),
+    z.literal("warning-light"),
+    z.literal("destructive-light"),
+    z.literal("info-light"),
+  ]),
+  linesAdded: z.number().optional(),
+  linesRemoved: z.number().optional(),
+  run: agentRunContextSchema.optional(),
+  runId: z.string().min(1).optional(),
+  summary: z.string().optional(),
+  title: z.string().min(1),
+});
+
+export const columnsSchema = z.record(z.string(), z.array(taskSchema));
+
+export const boardSessionStateSchema = z.union([
+  z.literal("uninitialized"),
+  z.literal("starting"),
+  z.literal("active"),
+  z.literal("error"),
+]);
+
+export const workspaceBoardSessionSchema = z.object({
+  currentTaskId: z.string().min(1).optional(),
+  errorMessage: z.string().optional(),
+  sessionId: z.string().min(1).optional(),
+  state: boardSessionStateSchema,
+});
+
+export const workspaceBoardSchema = z.object({
+  boardId: z.string().min(1),
+  columns: columnsSchema,
+  position: z.object({
+    x: z.number(),
+    y: z.number(),
+  }),
+  repo: repoContextSchema,
+  session: workspaceBoardSessionSchema,
+  title: z.string().min(1),
+});
+
+export const workspaceHistoryEntrySchema = z.object({
+  id: z.string().min(1),
+  lastOpenedAt: z.number(),
+  repo: repoContextSchema,
+  title: z.string().min(1),
+});
+
+export const workspacePreferencesSchema = z.object({
+  composerHintDismissed: z.boolean(),
+});
+
+export const workspaceSnapshotInputSchema = z.object({
+  boards: z.array(workspaceBoardSchema),
+  preferences: workspacePreferencesSchema,
+  selectedBoardId: z.string().min(1).nullable(),
+});
+
+export const workspaceSnapshotSchema = workspaceSnapshotInputSchema.extend({
+  previousWorkspaces: z.array(workspaceHistoryEntrySchema),
+  revision: z.number().int().nonnegative(),
+});
+
+export const workspaceMutationBaseSchema = z.object({
+  baseRevision: z.number().int().nonnegative().nullable(),
+  clientId: z.string().min(1),
+  mutationId: z.string().min(1),
+});
+
+export const workspaceMutationSchema = z.discriminatedUnion("type", [
+  workspaceMutationBaseSchema.extend({
+    type: z.literal("board.create"),
+    payload: z.object({
+      seed: boardSeedSchema,
+    }),
+  }),
+  workspaceMutationBaseSchema.extend({
+    type: z.literal("board.remove"),
+    payload: z.object({
+      boardId: z.string().min(1),
+    }),
+  }),
+  workspaceMutationBaseSchema.extend({
+    type: z.literal("board.select"),
+    payload: z.object({
+      boardId: z.string().min(1).nullable(),
+    }),
+  }),
+  workspaceMutationBaseSchema.extend({
+    type: z.literal("board.move"),
+    payload: z.object({
+      boardId: z.string().min(1),
+      position: z.object({
+        x: z.number(),
+        y: z.number(),
+      }),
+    }),
+  }),
+  workspaceMutationBaseSchema.extend({
+    type: z.literal("board.columns.replace"),
+    payload: z.object({
+      boardId: z.string().min(1),
+      columns: columnsSchema,
+    }),
+  }),
+  workspaceMutationBaseSchema.extend({
+    type: z.literal("board.session.patch"),
+    payload: z.object({
+      boardId: z.string().min(1),
+      session: workspaceBoardSessionSchema.partial(),
+    }),
+  }),
+  workspaceMutationBaseSchema.extend({
+    type: z.literal("preference.dismiss_composer_hint"),
+    payload: z.object({}),
+  }),
+]);
+
+export const queueBoardPromptInputSchema = z.object({
+  boardId: z.string().min(1),
+  directory: z.string().min(1),
+  projectId: z.string().min(1).optional(),
+  sessionId: z.string().min(1).optional(),
+  text: z.string().min(1),
+  agent: z.string().min(1).optional(),
+  model: modelSelectionSchema.optional(),
+});
+
+export const queueBoardPromptResponseSchema = z.object({
+  boardId: z.string().min(1),
+  sessionId: z.string().min(1),
+  createdSession: z.boolean(),
+  accepted: z.boolean(),
+  timestamp: z.number(),
+});
+
+export type RepoProject = z.infer<typeof repoProjectSchema>;
+export type RepoContext = z.infer<typeof repoContextSchema>;
+export type BoardSeed = z.infer<typeof boardSeedSchema>;
+export type ProjectListResponse = z.infer<typeof projectListResponseSchema>;
+export type ModelSelection = z.infer<typeof modelSelectionSchema>;
+export type AgentStep = z.infer<typeof agentStepSchema>;
+export type AgentRunContext = z.infer<typeof agentRunContextSchema>;
+export type Task = z.infer<typeof taskSchema>;
+export type Columns = z.infer<typeof columnsSchema>;
+export type WorkspaceBoardSession = z.infer<typeof workspaceBoardSessionSchema>;
+export type WorkspaceBoard = z.infer<typeof workspaceBoardSchema>;
+export type WorkspaceHistoryEntry = z.infer<typeof workspaceHistoryEntrySchema>;
+export type WorkspacePreferences = z.infer<typeof workspacePreferencesSchema>;
+export type WorkspaceSnapshotInput = z.infer<
+  typeof workspaceSnapshotInputSchema
+>;
+export type WorkspaceSnapshot = z.infer<typeof workspaceSnapshotSchema>;
+export type WorkspaceMutation = z.infer<typeof workspaceMutationSchema>;
+export type QueueBoardPromptInput = z.infer<typeof queueBoardPromptInputSchema>;
+export type QueueBoardPromptResponse = z.infer<
+  typeof queueBoardPromptResponseSchema
+>;

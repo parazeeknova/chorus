@@ -2,6 +2,7 @@ import type { OpencodeClient } from "@opencode-ai/sdk/v2";
 import { createOpencodeClient as createSDKClient } from "@opencode-ai/sdk/v2";
 import { EventStream, normalizeEvent } from "./features/events/event-stream";
 import { PermissionHandler } from "./features/permissions/permission-handler";
+import { ProjectManager } from "./features/projects/project-manager";
 import { RaceManager } from "./features/race/race-manager";
 import { SessionManager } from "./features/session/session-manager";
 
@@ -25,6 +26,12 @@ export type {
   PermissionHandlerInput,
   PermissionReply,
 } from "./features/permissions/permission-handler";
+export type {
+  ProjectLookupInput,
+  RepoContext,
+  RepoProject,
+  RepoWorktree,
+} from "./features/projects/project-manager";
 export type { RaceConfig, RaceResult } from "./features/race/race-manager";
 export type {
   SessionCommandInput,
@@ -51,6 +58,7 @@ export class OpenCodeAdapter {
   readonly sessions: SessionManager;
   readonly events: EventStream;
   readonly permissions: PermissionHandler;
+  readonly projects: ProjectManager;
   readonly races: RaceManager;
 
   constructor(client: OpencodeClient) {
@@ -58,6 +66,7 @@ export class OpenCodeAdapter {
     this.sessions = new SessionManager(client);
     this.events = new EventStream(client);
     this.permissions = new PermissionHandler(client);
+    this.projects = new ProjectManager(client);
     this.races = new RaceManager(client);
   }
 

@@ -1,0 +1,532 @@
+"use client";
+
+import {
+  boardSeedSchema,
+  projectListResponseSchema,
+  queueBoardPromptResponseSchema,
+  type WorkspaceMutation,
+  type WorkspaceSnapshot,
+  workspaceSnapshotSchema,
+} from "@chorus/contracts";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
+import {
+  attachPromptTask,
+  attachSessionToBoard,
+  createPromptTask,
+  updateBoardColumns as nextBoardColumns,
+  updateBoardPosition as nextBoardPosition,
+} from "./state";
+import type {
+  AgentEventEnvelope,
+  WorkspaceBoard,
+  WorkspaceContextValue,
+} from "./types";
+import { WorkspaceContext } from "./workspace-context";
+
+function getChorusWsUrl() {
+  return process.env.NEXT_PUBLIC_CHORUS_WS_URL ?? "ws://localhost:2000/ws";
+}
+
+function getModelLabel(model?: { modelID: string; providerID: string }) {
+  return model ? `${model.providerID}/${model.modelID}` : "OpenCode default";
+}
+
+function createWorkspaceMutation<T extends WorkspaceMutation["type"]>(
+  clientId: string,
+  baseRevision: number,
+  type: T,
+  payload: Extract<WorkspaceMutation, { type: T }>["payload"]
+): WorkspaceMutation {
+  return {
+    baseRevision,
+    clientId,
+    mutationId: crypto.randomUUID(),
+    type,
+    payload,
+  } as Extract<WorkspaceMutation, { type: T }>;
+}
+
+export function ChorusWorkspaceProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const [boards, setBoards] = useState<WorkspaceContextValue["boards"]>([]);
+  const [preferences, setPreferences] = useState<
+    WorkspaceContextValue["preferences"]
+  >({
+    composerHintDismissed: false,
+  });
+  const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
+  const [recentProjects, setRecentProjects] = useState<
+    WorkspaceContextValue["recentProjects"]
+  >([]);
+  const [previousWorkspaces, setPreviousWorkspaces] = useState<
+    WorkspaceContextValue["previousWorkspaces"]
+  >([]);
+  const [isOpeningFolder, setIsOpeningFolder] = useState(false);
+  const [isQueueingPrompt, setIsQueueingPrompt] = useState(false);
+  const clientIdRef = useRef(crypto.randomUUID());
+  const revisionRef = useRef(0);
+
+  const selectedBoard = boards.find(
+    (board) => board.boardId === selectedBoardId
+  );
+
+  const applySnapshot = useEffectEvent((snapshot: WorkspaceSnapshot) => {
+    if (snapshot.revision < revisionRef.current) {
+      return;
+    }
+
+    revisionRef.current = snapshot.revision;
+    setBoards(snapshot.boards);
+    setPreferences(snapshot.preferences);
+    setSelectedBoardId(snapshot.selectedBoardId);
+    setPreviousWorkspaces(snapshot.previousWorkspaces);
+  });
+
+  const mutateWorkspace = useEffectEvent(
+    async (mutation: WorkspaceMutation) => {
+      const response = await fetch("/api/workspace", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(mutation),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to mutate workspace");
+      }
+
+      const snapshot = workspaceSnapshotSchema.parse(await response.json());
+      applySnapshot(snapshot);
+      return snapshot;
+    }
+  );
+
+  const removeBoardById = useEffectEvent((boardId: string) => {
+    setBoards((currentBoards) => {
+      const remainingBoards = currentBoards.filter(
+        (board) => board.boardId !== boardId
+      );
+
+      setSelectedBoardId((currentSelectedBoardId) => {
+        if (currentSelectedBoardId !== boardId) {
+          return currentSelectedBoardId;
+        }
+
+        return remainingBoards[0]?.boardId ?? null;
+      });
+
+      return remainingBoards;
+    });
+
+    mutateWorkspace(
+      createWorkspaceMutation(
+        clientIdRef.current,
+        revisionRef.current,
+        "board.remove",
+        {
+          boardId,
+        }
+      )
+    ).catch((error) => {
+      console.error("Failed to remove board", error);
+    });
+  });
+
+  const loadProjects = useEffectEvent(async () => {
+    const response = await fetch("/api/projects", {
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      return;
+    }
+
+    const payload = projectListResponseSchema.parse(await response.json());
+    setRecentProjects(payload.projects);
+  });
+
+  useEffect(() => {
+    loadProjects();
+  }, []);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function hydrateWorkspace() {
+      try {
+        const [projectsResponse, workspaceResponse] = await Promise.all([
+          fetch("/api/projects", {
+            cache: "no-store",
+          }),
+          fetch("/api/workspace", {
+            cache: "no-store",
+          }),
+        ]);
+
+        if (isCancelled) {
+          return;
+        }
+
+        if (projectsResponse.ok) {
+          const projectsPayload = projectListResponseSchema.parse(
+            await projectsResponse.json()
+          );
+          setRecentProjects(projectsPayload.projects);
+        }
+
+        if (workspaceResponse.ok) {
+          const snapshot = workspaceSnapshotSchema.parse(
+            await workspaceResponse.json()
+          );
+
+          applySnapshot(snapshot);
+        }
+      } catch (error) {
+        console.error("Failed to hydrate workspace", error);
+      }
+    }
+
+    hydrateWorkspace().catch((error) => {
+      console.error("Failed to hydrate workspace", error);
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const socket = new WebSocket(getChorusWsUrl());
+
+    socket.onmessage = (message) => {
+      try {
+        const parsed = JSON.parse(message.data) as AgentEventEnvelope;
+        if (parsed.type === "workspace.updated") {
+          const snapshot = workspaceSnapshotSchema.parse(parsed.payload);
+          applySnapshot(snapshot);
+          return;
+        }
+      } catch (error) {
+        console.error("Failed to parse Chorus event", error);
+      }
+    };
+
+    return () => {
+      socket.close();
+    };
+  }, []);
+
+  const openFolder = useEffectEvent(async () => {
+    setIsOpeningFolder(true);
+
+    try {
+      const response = await fetch("/api/projects/open-folder", {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to open folder");
+      }
+
+      const payload = await response.json();
+      if (payload === null) {
+        return;
+      }
+
+      const seed = boardSeedSchema.parse(payload);
+      await mutateWorkspace(
+        createWorkspaceMutation(
+          clientIdRef.current,
+          revisionRef.current,
+          "board.create",
+          {
+            seed,
+          }
+        )
+      );
+
+      loadProjects();
+    } finally {
+      setIsOpeningFolder(false);
+    }
+  });
+
+  const createBoardFromRecentProject = useEffectEvent(
+    (project: WorkspaceContextValue["recentProjects"][number]) => {
+      mutateWorkspace(
+        createWorkspaceMutation(
+          clientIdRef.current,
+          revisionRef.current,
+          "board.create",
+          {
+            seed: {
+              title:
+                project.projectName ??
+                project.directory.split("/").filter(Boolean).at(-1) ??
+                project.directory,
+              repo: {
+                ...project,
+              },
+            },
+          }
+        )
+      ).catch((error) => {
+        console.error("Failed to create board from project", error);
+      });
+    }
+  );
+
+  const createBoardFromHistory = useEffectEvent(
+    (entry: WorkspaceContextValue["previousWorkspaces"][number]) => {
+      mutateWorkspace(
+        createWorkspaceMutation(
+          clientIdRef.current,
+          revisionRef.current,
+          "board.create",
+          {
+            seed: {
+              title: entry.title,
+              repo: entry.repo,
+            },
+          }
+        )
+      ).catch((error) => {
+        console.error("Failed to create board from history", error);
+      });
+    }
+  );
+
+  const queuePrompt = useEffectEvent(
+    async (input: {
+      agent?: string;
+      model?: {
+        modelID: string;
+        providerID: string;
+      };
+      text: string;
+    }) => {
+      if (!selectedBoard) {
+        return null;
+      }
+
+      const task = createPromptTask({
+        board: selectedBoard,
+        modelLabel: getModelLabel(input.model),
+        prompt: input.text,
+      });
+      const preparedSessionState =
+        selectedBoard.session.sessionId === undefined ? "starting" : "active";
+      const preparedBoard: WorkspaceBoard = {
+        ...attachPromptTask(selectedBoard, task),
+        session: {
+          ...attachPromptTask(selectedBoard, task).session,
+          state: preparedSessionState,
+        },
+      };
+
+      setBoards((currentBoards) =>
+        currentBoards.map((board) =>
+          board.boardId === selectedBoard.boardId ? preparedBoard : board
+        )
+      );
+
+      setIsQueueingPrompt(true);
+
+      try {
+        await mutateWorkspace(
+          createWorkspaceMutation(
+            clientIdRef.current,
+            revisionRef.current,
+            "board.columns.replace",
+            {
+              boardId: selectedBoard.boardId,
+              columns: preparedBoard.columns,
+            }
+          )
+        );
+        await mutateWorkspace(
+          createWorkspaceMutation(
+            clientIdRef.current,
+            revisionRef.current,
+            "board.session.patch",
+            {
+              boardId: selectedBoard.boardId,
+              session: {
+                currentTaskId: preparedBoard.session.currentTaskId,
+                errorMessage: undefined,
+                sessionId: selectedBoard.session.sessionId,
+                state: preparedSessionState,
+              },
+            }
+          )
+        );
+
+        const response = await fetch("/api/tasks", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            boardId: selectedBoard.boardId,
+            directory: selectedBoard.repo.directory,
+            projectId: selectedBoard.repo.projectId,
+            sessionId: selectedBoard.session.sessionId,
+            text: input.text,
+            agent: input.agent,
+            model: input.model,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to queue prompt");
+        }
+
+        const payload = queueBoardPromptResponseSchema.parse(
+          await response.json()
+        );
+
+        setBoards((currentBoards) =>
+          currentBoards.map((board) =>
+            board.boardId === payload.boardId
+              ? attachSessionToBoard(board, payload.sessionId)
+              : board
+          )
+        );
+
+        return {
+          ...payload,
+          task,
+        };
+      } catch (error) {
+        setBoards((currentBoards) =>
+          currentBoards.map((board) =>
+            board.boardId === selectedBoard.boardId
+              ? {
+                  ...board,
+                  session: {
+                    ...board.session,
+                    state: "error",
+                    errorMessage:
+                      error instanceof Error ? error.message : "Queue failed",
+                    currentTaskId: undefined,
+                  },
+                }
+              : board
+          )
+        );
+
+        return null;
+      } finally {
+        setIsQueueingPrompt(false);
+      }
+    }
+  );
+
+  const value: WorkspaceContextValue = {
+    boards,
+    selectedBoardId,
+    selectedBoard,
+    recentProjects,
+    previousWorkspaces,
+    preferences,
+    isOpeningFolder,
+    isQueueingPrompt,
+    loadProjects,
+    openFolder,
+    createBoardFromProject: createBoardFromRecentProject,
+    createBoardFromHistory,
+    dismissComposerHint: () =>
+      mutateWorkspace(
+        createWorkspaceMutation(
+          clientIdRef.current,
+          revisionRef.current,
+          "preference.dismiss_composer_hint",
+          {}
+        )
+      ).catch((error) => {
+        console.error("Failed to dismiss composer hint", error);
+      }),
+    removeBoard: removeBoardById,
+    selectBoard: (boardId) => {
+      setSelectedBoardId(boardId);
+      mutateWorkspace(
+        createWorkspaceMutation(
+          clientIdRef.current,
+          revisionRef.current,
+          "board.select",
+          {
+            boardId,
+          }
+        )
+      ).catch((error) => {
+        console.error("Failed to select board", error);
+      });
+    },
+    clearSelection: () => {
+      setSelectedBoardId(null);
+      mutateWorkspace(
+        createWorkspaceMutation(
+          clientIdRef.current,
+          revisionRef.current,
+          "board.select",
+          {
+            boardId: null,
+          }
+        )
+      ).catch((error) => {
+        console.error("Failed to clear selection", error);
+      });
+    },
+    updateBoardColumns: (boardId, columns) => {
+      setBoards((currentBoards) =>
+        currentBoards.map((board) =>
+          board.boardId === boardId ? nextBoardColumns(board, columns) : board
+        )
+      );
+      mutateWorkspace(
+        createWorkspaceMutation(
+          clientIdRef.current,
+          revisionRef.current,
+          "board.columns.replace",
+          {
+            boardId,
+            columns,
+          }
+        )
+      ).catch((error) => {
+        console.error("Failed to update board columns", error);
+      });
+    },
+    updateBoardPosition: (boardId, position) => {
+      setBoards((currentBoards) =>
+        currentBoards.map((board) =>
+          board.boardId === boardId ? nextBoardPosition(board, position) : board
+        )
+      );
+      mutateWorkspace(
+        createWorkspaceMutation(
+          clientIdRef.current,
+          revisionRef.current,
+          "board.move",
+          {
+            boardId,
+            position,
+          }
+        )
+      ).catch((error) => {
+        console.error("Failed to update board position", error);
+      });
+    },
+    queuePrompt,
+  };
+
+  return (
+    <WorkspaceContext.Provider value={value}>
+      {children}
+    </WorkspaceContext.Provider>
+  );
+}

@@ -9,7 +9,6 @@ import {
   type CoordinateExtent,
   type Edge,
   type Node,
-  type OnNodesChange,
   Panel,
   ReactFlow,
   useReactFlow,
@@ -18,15 +17,14 @@ import {
 import { KeyboardIcon, MinusIcon, PlusIcon, XIcon } from "lucide-react";
 import { useCallback, useEffect, useEffectEvent, useState } from "react";
 import { createPortal } from "react-dom";
-import {
-  type Columns,
-  defaultColumns,
-} from "@/features/kanban/components/kanban";
+import type { Columns } from "@/features/kanban/components/kanban";
 import {
   KANBAN_CARD_NODE_TYPE,
   KanbanCardNode,
   type KanbanCardNodeData,
 } from "@/features/kanban/components/kanban-card-node";
+import type { WorkspaceBoard } from "@/features/workspace/types";
+import { useWorkspace } from "@/features/workspace/workspace-context";
 
 const DEFAULT_VIEWPORT: Viewport = { x: 0, y: 0, zoom: 1 };
 const WORLD_EXTENT: CoordinateExtent = [
@@ -311,19 +309,28 @@ function KeyboardHelpPanel({ onClose }: { onClose: () => void }) {
 }
 
 function createKanbanCardNode(
-  id: string,
-  position: { x: number; y: number },
-  data: {
-    id: string;
-    title: string;
-    columns: Columns;
-  }
+  board: WorkspaceBoard,
+  selected: boolean,
+  onRemove: (id: string) => void,
+  onUpdateColumns: (id: string, columns: Columns) => void
 ): Node<KanbanCardNodeData> {
   return {
-    id,
+    id: board.boardId,
     type: KANBAN_CARD_NODE_TYPE,
-    position,
-    data,
+    position: board.position,
+    data: {
+      boardId: board.boardId,
+      title: board.title,
+      columns: board.columns,
+      filePath: board.repo.directory,
+      gitBranch: board.repo.branch,
+      projectName: board.repo.projectName,
+      sessionId: board.session.sessionId,
+      sessionState: board.session.state,
+      onRemove,
+      onUpdateColumns,
+    },
+    selected,
     draggable: true,
     selectable: true,
     style: {
@@ -333,39 +340,52 @@ function createKanbanCardNode(
   };
 }
 
+function reconcileNodes(
+  currentNodes: Node<KanbanCardNodeData>[],
+  boards: WorkspaceBoard[],
+  selectedBoardId: string | null,
+  onRemove: (id: string) => void,
+  onUpdateColumns: (id: string, columns: Columns) => void
+): Node<KanbanCardNodeData>[] {
+  const currentNodesById = new Map(currentNodes.map((node) => [node.id, node]));
+
+  return boards.map((board) => {
+    const nextNode = createKanbanCardNode(
+      board,
+      board.boardId === selectedBoardId,
+      onRemove,
+      onUpdateColumns
+    );
+    const currentNode = currentNodesById.get(board.boardId);
+
+    if (!currentNode) {
+      return nextNode;
+    }
+
+    return {
+      ...currentNode,
+      position: currentNode.position,
+      selected: board.boardId === selectedBoardId,
+      data: {
+        ...currentNode.data,
+        ...nextNode.data,
+      },
+      style: currentNode.style ?? nextNode.style,
+    };
+  });
+}
+
 export function BackgroundCanvas() {
-  const [nodes, setNodes] = useState<Node<KanbanCardNodeData>[]>([
-    createKanbanCardNode(
-      "card-1",
-      { x: 100, y: 100 },
-      {
-        id: "card-1",
-        title: "Sprint 1",
-        columns: defaultColumns("card-1"),
-      }
-    ),
-    createKanbanCardNode(
-      "card-2",
-      { x: 900, y: 200 },
-      {
-        id: "card-2",
-        title: "Sprint 2",
-        columns: {
-          queue: [
-            {
-              id: "card-2-queue-research",
-              title: "Research competitors",
-              label: "Research",
-              labelVariant: "info-light",
-            },
-          ],
-          in_progress: [],
-          approve: [],
-          done: [],
-        },
-      }
-    ),
-  ]);
+  const {
+    boards,
+    clearSelection,
+    removeBoard,
+    selectedBoardId,
+    selectBoard,
+    updateBoardColumns,
+    updateBoardPosition,
+  } = useWorkspace();
+  const [nodes, setNodes] = useState<Node<KanbanCardNodeData>[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [showHelp, setShowHelp] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
@@ -374,16 +394,27 @@ export function BackgroundCanvas() {
     setIsMounted(true);
   }, []);
 
-  const handleRemoveCard = useCallback((id: string) => {
-    setNodes((nds) => nds.filter((n) => n.id !== id));
-    setEdges((eds) => eds.filter((e) => e.source !== id && e.target !== id));
-  }, []);
+  const handleUpdateColumns = useCallback(
+    (id: string, columns: Columns) => {
+      updateBoardColumns(id, columns);
+    },
+    [updateBoardColumns]
+  );
 
-  const handleUpdateColumns = useCallback((id: string, columns: Columns) => {
-    setNodes((nds) =>
-      nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, columns } } : n))
-    );
-  }, []);
+  const handleRemoveBoard = useCallback(
+    (boardId: string) => {
+      removeBoard(boardId);
+      setNodes((currentNodes) =>
+        currentNodes.filter((node) => node.id !== boardId)
+      );
+      setEdges((currentEdges) =>
+        currentEdges.filter(
+          (edge) => edge.source !== boardId && edge.target !== boardId
+        )
+      );
+    },
+    [removeBoard]
+  );
 
   /**
    * Remove whichever card is currently selected (first selected node).
@@ -415,22 +446,17 @@ export function BackgroundCanvas() {
     []
   );
 
-  const onNodesChange: OnNodesChange = useCallback(
-    (changes) =>
-      setNodes(
-        (nds) => applyNodeChanges(changes, nds) as Node<KanbanCardNodeData>[]
-      ),
-    []
-  );
-
-  const nodesWithCallbacks = nodes.map((node) => ({
-    ...node,
-    data: {
-      ...node.data,
-      onRemove: handleRemoveCard,
-      onUpdateColumns: handleUpdateColumns,
-    },
-  }));
+  useEffect(() => {
+    setNodes((currentNodes) =>
+      reconcileNodes(
+        currentNodes,
+        boards,
+        selectedBoardId,
+        handleRemoveBoard,
+        handleUpdateColumns
+      )
+    );
+  }, [boards, handleRemoveBoard, handleUpdateColumns, selectedBoardId]);
 
   return (
     <div className="h-full w-full">
@@ -443,14 +469,29 @@ export function BackgroundCanvas() {
         maxZoom={4}
         minZoom={0.15}
         nodeExtent={WORLD_EXTENT}
-        nodes={nodesWithCallbacks}
+        nodes={nodes}
         nodesConnectable={true}
         nodesDraggable={true}
         nodesFocusable={true}
         nodeTypes={nodeTypes}
         onConnect={onConnect}
         onlyRenderVisibleElements
-        onNodesChange={onNodesChange}
+        onNodeClick={(_, node) => {
+          selectBoard(node.id);
+        }}
+        onNodeDragStop={(_, node) => {
+          updateBoardPosition(node.id, node.position);
+        }}
+        onNodesChange={(changes) => {
+          setNodes(
+            (currentNodes) =>
+              applyNodeChanges(
+                changes,
+                currentNodes
+              ) as Node<KanbanCardNodeData>[]
+          );
+        }}
+        onPaneClick={clearSelection}
         panOnDrag
         panOnScroll={false}
         selectNodesOnDrag={true}
@@ -488,7 +529,7 @@ export function BackgroundCanvas() {
             <button
               aria-label="Keyboard shortcuts"
               className={[
-                "flex size-[44px] items-center justify-center rounded-xl border transition-all duration-150",
+                "flex size-11 items-center justify-center rounded-xl border transition-all duration-150",
                 "shadow-[0_4px_20px_rgba(0,0,0,0.5)] backdrop-blur-xl",
                 showHelp
                   ? "border-white/20 bg-white/15 text-white/80"
