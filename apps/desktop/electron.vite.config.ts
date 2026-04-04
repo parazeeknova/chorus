@@ -27,7 +27,5 @@ export default defineConfig({
       },
     },
   },
-  renderer: {
-    // No renderer build - we load from URL
-  },
+  // No renderer config - we load from URL (localhost:2000)
 });

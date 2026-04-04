@@ -1,8 +1,3 @@
-/**
- * Preload script for Chorus desktop app
- * Runs before the renderer and has access to Electron APIs
- */
-
 import { contextBridge } from "electron";
 
 // Expose safe APIs to the renderer process

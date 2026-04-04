@@ -1,7 +1,3 @@
-/**
- * Main process entry point for Chorus desktop app (Electron)
- */
-
 import path from "node:path";
 import { app, BrowserWindow, shell } from "electron";
 
