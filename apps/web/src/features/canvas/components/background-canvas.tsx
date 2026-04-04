@@ -208,9 +208,9 @@ function CanvasControls() {
 
   return (
     <Panel
-      className="flex flex-col items-center gap-1 rounded-sm border border-white/10 bg-[#0f0f0f]/90 p-1.5 shadow-[0_4px_20px_rgba(0,0,0,0.5)] backdrop-blur-xl"
-      position="bottom-right"
-      style={{ margin: 0, bottom: "4.25rem", right: "1rem" }}
+      className="!right-4 !bottom-auto !top-[4.5rem] md:!top-auto md:!bottom-[4.25rem] flex flex-col items-center gap-1 rounded-sm border border-white/10 bg-[#0f0f0f]/90 p-1.5 shadow-[0_4px_20px_rgba(0,0,0,0.5)] backdrop-blur-xl"
+      position="top-right"
+      style={{ margin: 0 }}
     >
       <button
         aria-label="Zoom in"
@@ -766,7 +766,7 @@ export function BackgroundCanvas() {
           escape the z-10 stacking context imposed by the page layout wrapper. */}
       {isMounted &&
         createPortal(
-          <div className="fixed right-4 bottom-8 z-9999 flex flex-col items-end gap-2">
+          <div className="fixed right-4 bottom-8 z-9999 hidden flex-col items-end gap-2 sm:flex">
             {showHelp && (
               <KeyboardHelpPanel onClose={() => setShowHelp(false)} />
             )}
