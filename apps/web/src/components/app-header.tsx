@@ -1,14 +1,20 @@
 "use client";
 
 import {
+  ArchiveIcon,
   BellIcon,
   CheckCircle2Icon,
+  CheckIcon,
+  ChevronRightIcon,
   EyeIcon,
   FolderOpenIcon,
   HelpCircleIcon,
+  SendIcon,
   Settings,
+  SquareIcon,
   TriangleAlertIcon,
   XIcon,
+  ZapIcon,
 } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
@@ -117,6 +123,191 @@ const NOTIF_META: Record<
   },
 };
 
+// ─── NotificationItem ──────────────────────────────────────────────────────────
+function NotificationItem({
+  notification: n,
+  onDismiss,
+}: {
+  notification: Notification;
+  onDismiss: (id: number) => void;
+}) {
+  const meta = NOTIF_META[n.type];
+  const Icon = meta.icon;
+  const [answerOpen, setAnswerOpen] = useState(false);
+  const [answer, setAnswer] = useState("");
+
+  return (
+    <div
+      className={cn(
+        "group relative flex flex-col gap-0 px-4 py-3.5 transition-colors",
+        n.read ? "bg-transparent" : "bg-white/[0.022]",
+        "hover:bg-white/[0.035]"
+      )}
+    >
+      {/* unread dot */}
+      {!n.read && (
+        <span
+          className={cn(
+            "absolute top-4 left-1.5 size-1.5 rounded-full",
+            meta.dot
+          )}
+        />
+      )}
+
+      {/* top row: icon + text */}
+      <div className="flex gap-3">
+        {/* icon */}
+        <div className="mt-0.5 shrink-0">
+          <Icon className={cn("size-4", meta.iconCls)} />
+        </div>
+
+        {/* text */}
+        <div className="min-w-0 flex-1 pr-6">
+          <div className="flex items-baseline gap-1.5">
+            <span className="font-medium text-[0.72rem] text-white/75">
+              {n.title}
+            </span>
+            <span className="ml-auto shrink-0 text-[0.6rem] text-white/25">
+              {n.time}
+            </span>
+          </div>
+          <p className="mt-0.5 text-[0.67rem] text-white/38 leading-relaxed">
+            {n.body}
+          </p>
+        </div>
+      </div>
+
+      {/* CTAs */}
+      <div className="mt-2.5 ml-7">
+        {n.type === "review" && (
+          <div className="flex gap-1.5">
+            <button
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-emerald-500/25 bg-emerald-500/10 py-1.5 font-medium text-[0.65rem] text-emerald-400 transition-all hover:border-emerald-500/40 hover:bg-emerald-500/18 active:scale-[0.97]"
+              onClick={() => onDismiss(n.id)}
+              type="button"
+            >
+              <CheckIcon className="size-3" />
+              Approve
+            </button>
+            <button
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-rose-500/20 bg-rose-500/8 py-1.5 font-medium text-[0.65rem] text-rose-400/80 transition-all hover:border-rose-500/35 hover:bg-rose-500/15 active:scale-[0.97]"
+              onClick={() => onDismiss(n.id)}
+              type="button"
+            >
+              <XIcon className="size-3" />
+              Reject
+            </button>
+            <button
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-white/6 bg-white/3 py-1.5 text-[0.65rem] text-white/30 transition-all hover:bg-white/6 hover:text-white/55 active:scale-[0.97]"
+              type="button"
+            >
+              <ChevronRightIcon className="size-3" />
+              View diff
+            </button>
+          </div>
+        )}
+
+        {n.type === "question" && !answerOpen && (
+          <div className="flex gap-1.5">
+            <button
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-sky-500/25 bg-sky-500/10 py-1.5 font-medium text-[0.65rem] text-sky-400 transition-all hover:border-sky-500/40 hover:bg-sky-500/18 active:scale-[0.97]"
+              onClick={() => setAnswerOpen(true)}
+              type="button"
+            >
+              <SendIcon className="size-3" />
+              Answer
+            </button>
+          </div>
+        )}
+
+        {n.type === "question" && answerOpen && (
+          <div className="flex flex-col gap-1.5">
+            <textarea
+              autoFocus
+              className="w-full resize-none rounded-lg border border-sky-500/20 bg-sky-950/20 px-2.5 py-2 text-[0.67rem] text-white/70 placeholder-white/25 outline-none transition-all [scrollbar-width:none] focus:border-sky-500/35 focus:bg-sky-950/30 [&::-webkit-scrollbar]:hidden"
+              onChange={(e) => setAnswer(e.target.value)}
+              placeholder="Type your answer…"
+              rows={2}
+              value={answer}
+            />
+            <div className="flex gap-1.5">
+              <button
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-sky-500/25 bg-sky-500/10 py-1.5 font-medium text-[0.65rem] text-sky-400 transition-all hover:border-sky-500/40 hover:bg-sky-500/18 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40"
+                disabled={!answer.trim()}
+                onClick={() => answer.trim() && onDismiss(n.id)}
+                type="button"
+              >
+                <SendIcon className="size-3" />
+                Send
+              </button>
+              <button
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-white/6 bg-white/3 py-1.5 text-[0.65rem] text-white/30 transition-all hover:bg-white/6 hover:text-white/55 active:scale-[0.97]"
+                onClick={() => {
+                  setAnswerOpen(false);
+                  setAnswer("");
+                }}
+                type="button"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {n.type === "done" && (
+          <div className="flex gap-1.5">
+            <button
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-white/8 bg-white/4 py-1.5 font-medium text-[0.65rem] text-white/55 transition-all hover:border-white/14 hover:bg-white/8 hover:text-white/80 active:scale-[0.97]"
+              type="button"
+            >
+              <ChevronRightIcon className="size-3" />
+              View changes
+            </button>
+            <button
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-emerald-500/15 bg-emerald-500/6 py-1.5 font-medium text-[0.65rem] text-emerald-400/70 transition-all hover:border-emerald-500/28 hover:bg-emerald-500/12 hover:text-emerald-400 active:scale-[0.97]"
+              onClick={() => onDismiss(n.id)}
+              type="button"
+            >
+              <ArchiveIcon className="size-3" />
+              Archive
+            </button>
+          </div>
+        )}
+
+        {n.type === "warning" && (
+          <div className="flex gap-1.5">
+            <button
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-amber-500/25 bg-amber-500/10 py-1.5 font-medium text-[0.65rem] text-amber-400 transition-all hover:border-amber-500/40 hover:bg-amber-500/18 active:scale-[0.97]"
+              type="button"
+            >
+              <ZapIcon className="size-3" />
+              Extend budget
+            </button>
+            <button
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-rose-500/20 bg-rose-500/8 py-1.5 font-medium text-[0.65rem] text-rose-400/80 transition-all hover:border-rose-500/35 hover:bg-rose-500/15 active:scale-[0.97]"
+              onClick={() => onDismiss(n.id)}
+              type="button"
+            >
+              <SquareIcon className="size-3" />
+              Stop session
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* dismiss */}
+      <button
+        className="absolute top-3 right-3 flex size-5 items-center justify-center rounded-md text-white/20 opacity-0 transition-all hover:bg-white/8 hover:text-white/50 group-hover:opacity-100"
+        onClick={() => onDismiss(n.id)}
+        title="Dismiss"
+        type="button"
+      >
+        <XIcon className="size-3" />
+      </button>
+    </div>
+  );
+}
+
 // ─── NotificationPane ──────────────────────────────────────────────────────────
 function NotificationPane({ onClose }: { onClose: () => void }) {
   const [notifs, setNotifs] = useState<Notification[]>(INITIAL_NOTIFICATIONS);
@@ -134,7 +325,7 @@ function NotificationPane({ onClose }: { onClose: () => void }) {
   return (
     <div
       className={cn(
-        "absolute top-[calc(100%+8px)] right-0 w-[340px] overflow-hidden rounded-2xl",
+        "absolute top-[calc(100%+8px)] right-0 w-[360px] overflow-hidden rounded-2xl",
         "border border-white/10 bg-zinc-950/90 shadow-[0_24px_60px_rgba(0,0,0,0.55)] backdrop-blur-2xl"
       )}
     >
@@ -162,67 +353,16 @@ function NotificationPane({ onClose }: { onClose: () => void }) {
       </div>
 
       {/* List */}
-      <div className="flex max-h-[420px] flex-col divide-y divide-white/[0.04] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex max-h-[520px] flex-col divide-y divide-white/[0.04] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {notifs.length === 0 ? (
           <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
             <BellIcon className="size-7 text-zinc-800" />
             <p className="text-[0.7rem] text-white/25">You're all caught up</p>
           </div>
         ) : (
-          notifs.map((n) => {
-            const meta = NOTIF_META[n.type];
-            const Icon = meta.icon;
-            return (
-              <div
-                className={cn(
-                  "group relative flex gap-3 px-4 py-3.5 transition-colors",
-                  n.read ? "bg-transparent" : "bg-white/[0.022]",
-                  "hover:bg-white/[0.035]"
-                )}
-                key={n.id}
-              >
-                {/* unread dot */}
-                {!n.read && (
-                  <span
-                    className={cn(
-                      "absolute top-1/2 left-1.5 size-1.5 -translate-y-1/2 rounded-full",
-                      meta.dot
-                    )}
-                  />
-                )}
-
-                {/* icon */}
-                <div className="mt-0.5 shrink-0">
-                  <Icon className={cn("size-4", meta.iconCls)} />
-                </div>
-
-                {/* text */}
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="font-medium text-[0.72rem] text-white/75">
-                      {n.title}
-                    </span>
-                    <span className="ml-auto shrink-0 text-[0.6rem] text-white/25">
-                      {n.time}
-                    </span>
-                  </div>
-                  <p className="mt-0.5 text-[0.67rem] text-white/38 leading-relaxed">
-                    {n.body}
-                  </p>
-                </div>
-
-                {/* dismiss */}
-                <button
-                  className="absolute top-3 right-3 flex size-5 items-center justify-center rounded-md text-white/20 opacity-0 transition-all hover:bg-white/8 hover:text-white/50 group-hover:opacity-100"
-                  onClick={() => dismiss(n.id)}
-                  title="Dismiss"
-                  type="button"
-                >
-                  <XIcon className="size-3" />
-                </button>
-              </div>
-            );
-          })
+          notifs.map((n) => (
+            <NotificationItem key={n.id} notification={n} onDismiss={dismiss} />
+          ))
         )}
       </div>
     </div>
