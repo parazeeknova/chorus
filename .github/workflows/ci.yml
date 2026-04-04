@@ -68,12 +68,18 @@ jobs:
           key: ${{ runner.os }}-turbo-${{ github.ref_name }}-${{ github.sha }}
 
   build-desktop:
-    name: Build Desktop App
+    name: Build Electrobun Desktop App
     needs: lint-and-types
     if: startsWith(github.ref, 'refs/tags/v')
     strategy:
       matrix:
-        os: [macos-latest, windows-latest, ubuntu-latest]
+        include:
+          - os: macos-latest
+            artifact-pattern: "*.dmg"
+          - os: windows-latest
+            artifact-pattern: "*.exe"
+          - os: ubuntu-latest
+            artifact-pattern: "*.AppImage"
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
 
@@ -89,22 +95,22 @@ jobs:
       - name: Install Dependencies
         run: bun ci
 
-      - name: Build Desktop App
+      - name: Build Electrobun Desktop App
         run: bun run --cwd apps/desktop build
+        # Electrobun builds for the current platform by default
+        # Cross-compilation can be done with: bunx electrobun build --targets macos-arm64,win-x64,linux-x64
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.os }}
           path: |
-            apps/desktop/dist/*.dmg
-            apps/desktop/dist/*.exe
-            apps/desktop/dist/*.AppImage
+            apps/desktop/dist/${{ matrix.artifact-pattern }}
             apps/desktop/dist/*.zip
           if-no-files-found: warn
 
   release:
-    name: Create GitHub Release
+    name: Create Electrobun Release
     needs: build-desktop
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
@@ -121,12 +127,14 @@ jobs:
         with:
           path: release-artifacts
 
-      - name: Create Release
+      - name: Create Electrobun Release
         uses: softprops/action-gh-release@v2
         with:
           files: release-artifacts/**/*
           generate_release_notes: true
           draft: false
           prerelease: false
+          # Release name will be the tag name (e.g., v0.0.1)
+          # Body will be auto-generated from commits
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
