@@ -32,7 +32,7 @@ export default function RootLayout({
     >
       <body className="flex h-screen flex-col overflow-hidden">
         <AppHeader />
-        <div className="flex-1 overflow-hidden pt-12">{children}</div>
+        <div className="flex-1 overflow-hidden">{children}</div>
         <PromptInput />
       </body>
     </html>
