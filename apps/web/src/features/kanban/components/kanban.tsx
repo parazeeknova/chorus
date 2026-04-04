@@ -434,10 +434,7 @@ const COLUMNS: Record<
   {
     title: string;
     icon: React.ReactNode;
-    bg: string;
-    border: string;
-    badge: string;
-    cardGlow: string;
+    accent: string;
     emptyIcon: React.ComponentType<{ className?: string }>;
     emptyHeadline: string;
     emptyHint: string;
@@ -446,11 +443,7 @@ const COLUMNS: Record<
   queue: {
     title: "Queue",
     icon: <ListTodoIcon className="size-4.5 text-white/35" />,
-    bg: "dark:bg-white/[0.015]",
-    border: "dark:border-white/[0.04]",
-    badge: "dark:bg-white/6 dark:text-white/45",
-    cardGlow:
-      "dark:hover:border-white/14 dark:hover:shadow-[0_4px_20px_rgba(255,255,255,0.03)]",
+    accent: "bg-white/24",
     emptyIcon: ListTodoIcon,
     emptyHeadline: "Nothing lined up yet",
     emptyHint: 'Hit "Create Task" to give the agents something to chew on.',
@@ -458,11 +451,7 @@ const COLUMNS: Record<
   in_progress: {
     title: "In Progress",
     icon: <LoaderIcon className="size-4.5 text-sky-400/60" />,
-    bg: "dark:bg-sky-950/10",
-    border: "dark:border-sky-500/[0.07]",
-    badge: "dark:bg-sky-500/10 dark:text-sky-300/60",
-    cardGlow:
-      "dark:hover:border-sky-500/15 dark:hover:shadow-[0_4px_20px_rgba(14,165,233,0.04)]",
+    accent: "bg-sky-400/55",
     emptyIcon: CogIcon,
     emptyHeadline: "All quiet on the agent front",
     emptyHint: "Agents will appear here once a task is running.",
@@ -470,11 +459,7 @@ const COLUMNS: Record<
   approve: {
     title: "Review",
     icon: <EyeIcon className="size-4.5 text-amber-400/60" />,
-    bg: "dark:bg-amber-950/8",
-    border: "dark:border-amber-500/[0.06]",
-    badge: "dark:bg-amber-500/10 dark:text-amber-300/55",
-    cardGlow:
-      "dark:hover:border-amber-500/14 dark:hover:shadow-[0_4px_20px_rgba(245,158,11,0.04)]",
+    accent: "bg-amber-400/55",
     emptyIcon: SearchCheckIcon,
     emptyHeadline: "Nothing needs your eyes",
     emptyHint: "Completed tasks awaiting a human call will land here.",
@@ -482,11 +467,7 @@ const COLUMNS: Record<
   done: {
     title: "Done",
     icon: <CheckCircle2Icon className="size-4.5 text-emerald-400/60" />,
-    bg: "dark:bg-emerald-950/8",
-    border: "dark:border-emerald-500/[0.06]",
-    badge: "dark:bg-emerald-500/10 dark:text-emerald-300/55",
-    cardGlow:
-      "dark:hover:border-emerald-500/14 dark:hover:shadow-[0_4px_20px_rgba(52,211,153,0.04)]",
+    accent: "bg-emerald-400/55",
     emptyIcon: ArchiveIcon,
     emptyHeadline: "The slate is clean",
     emptyHint: "Shipped work stacks up here. Start something great.",
@@ -557,7 +538,6 @@ function ChangedFileRow({ file }: { file: ChangedFile }) {
 
 interface TaskCardProps {
   asHandle?: boolean;
-  cardGlow?: string;
   draggable?: boolean;
   showApprovalControls?: boolean;
   showDone?: boolean;
@@ -569,7 +549,6 @@ interface TaskCardProps {
 function TaskCard({
   task,
   asHandle,
-  cardGlow = "",
   draggable,
   showOutput,
   showDone,
@@ -581,8 +560,7 @@ function TaskCard({
       className={cn(
         "group flex flex-col gap-3 rounded-sm border border-border/50 bg-card p-3.5 shadow-sm",
         "transition-all duration-200 hover:border-border hover:shadow-md",
-        "dark:border-white/8 dark:bg-white/2.5",
-        cardGlow
+        "dark:border-white/8 dark:bg-white/2.5"
       )}
     >
       <span className="font-medium text-[0.85rem] text-foreground leading-snug dark:text-white/85">
@@ -879,12 +857,7 @@ function ColumnHeader({
       <h3 className="truncate font-semibold text-[0.7rem] text-muted-foreground uppercase tracking-widest dark:text-white/40">
         {col.title}
       </h3>
-      <div
-        className={cn(
-          "ml-auto flex size-5 shrink-0 items-center justify-center rounded-full font-semibold text-[10px]",
-          col.badge
-        )}
-      >
+      <div className="ml-auto flex size-5 shrink-0 items-center justify-center rounded-full bg-white/6 font-semibold text-[10px] text-white/45">
         {tasks.length}
       </div>
       {isReview && (
@@ -901,17 +874,14 @@ function TaskList({
   columnId,
   tasks,
   autoAccept,
-  col,
 }: {
   columnId: string;
   tasks: Task[];
   autoAccept: boolean;
-  col: (typeof COLUMNS)[string];
 }) {
   return tasks.map((task) => (
     <TaskCard
       asHandle
-      cardGlow={col.cardGlow}
       draggable={columnId === "queue"}
       key={task.id}
       showApprovalControls={columnId === "approve" && !autoAccept}
@@ -943,16 +913,16 @@ function KanbanColumnRenderer({
       defaultSize={25}
       minSize={15}
     >
-      <div className="flex h-full min-w-0 flex-col px-1.5">
+      <div className="flex h-full min-w-0 flex-col p-1.5">
         <KanbanColumn value={columnId}>
-          <div
-            className={cn(
-              "flex h-full min-w-0 flex-col gap-2.5 rounded-sm border p-3",
-              "border-transparent bg-muted/30",
-              col.bg,
-              col.border
-            )}
-          >
+          <div className="relative flex h-full min-w-0 flex-col gap-2.5 overflow-hidden rounded-sm border border-white/[0.04] bg-white/[0.015] p-3">
+            <div
+              aria-hidden="true"
+              className={cn(
+                "pointer-events-none absolute top-0 right-3 left-3 h-px rounded-full opacity-70",
+                col.accent
+              )}
+            />
             <ColumnHeader
               autoAccept={autoAccept}
               columnId={columnId}
@@ -990,7 +960,6 @@ function KanbanColumnRenderer({
               ) : (
                 <TaskList
                   autoAccept={autoAccept}
-                  col={col}
                   columnId={columnId}
                   tasks={tasks}
                 />
