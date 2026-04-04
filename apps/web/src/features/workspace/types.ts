@@ -33,6 +33,16 @@ export interface AgentEventEnvelope {
   type: string;
 }
 
+export interface PromptPart {
+  filename?: string;
+  isDirectory?: boolean;
+  lineRange?: { start: number; end: number };
+  mime?: string;
+  path?: string;
+  text?: string;
+  type: "text" | "file";
+}
+
 export interface WorkspaceContextValue {
   boards: WorkspaceBoard[];
   clearSelection: () => void;
@@ -41,6 +51,17 @@ export interface WorkspaceContextValue {
   dismissComposerHint: () => void;
   isOpeningFolder: boolean;
   isQueueingPrompt: boolean;
+  kanbanHistory: {
+    canRedo: boolean;
+    canUndo: boolean;
+    redo: () => { columns: Columns; task: Task } | null;
+    recordMove: (
+      columnsBefore: Columns,
+      columnsAfter: Columns,
+      task: Task
+    ) => void;
+    undo: () => { columns: Columns; prompt: string; task: Task } | null;
+  };
   loadProjects: () => Promise<void>;
   openFolder: () => Promise<void>;
   preferences: WorkspacePreferences;
@@ -51,10 +72,13 @@ export interface WorkspaceContextValue {
       modelID: string;
       providerID: string;
     };
+    parts?: PromptPart[];
     text: string;
   }) => Promise<PromptSubmissionResult | null>;
   recentProjects: WorkspaceProject[];
   removeBoard: (boardId: string) => void;
+  restoredPrompt: string;
+  restorePrompt: (text: string) => void;
   selectBoard: (boardId: string) => void;
   selectedBoard?: WorkspaceBoard;
   selectedBoardId: string | null;

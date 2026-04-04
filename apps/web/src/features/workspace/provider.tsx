@@ -10,6 +10,7 @@ import {
 } from "@chorus/contracts";
 import posthog from "posthog-js";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { useKanbanHistory } from "@/features/kanban/hooks/use-kanban-history";
 import {
   attachPromptTask,
   attachSessionToBoard,
@@ -68,8 +69,15 @@ export function ChorusWorkspaceProvider({
   >([]);
   const [isOpeningFolder, setIsOpeningFolder] = useState(false);
   const [isQueueingPrompt, setIsQueueingPrompt] = useState(false);
+  const [restoredPrompt, setRestoredPrompt] = useState("");
   const clientIdRef = useRef(crypto.randomUUID());
   const revisionRef = useRef(0);
+
+  const kanbanHistory = useKanbanHistory();
+
+  const restorePrompt = useEffectEvent((text: string) => {
+    setRestoredPrompt(text);
+  });
 
   const selectedBoard = boards.find(
     (board) => board.boardId === selectedBoardId
@@ -336,6 +344,15 @@ export function ChorusWorkspaceProvider({
         modelID: string;
         providerID: string;
       };
+      parts?: Array<{
+        type: string;
+        text?: string;
+        filename?: string;
+        path?: string;
+        mime?: string;
+        isDirectory?: boolean;
+        lineRange?: { start: number; end: number };
+      }>;
       text: string;
     }) => {
       if (!selectedBoard) {
@@ -407,6 +424,7 @@ export function ChorusWorkspaceProvider({
             text: input.text,
             agent: input.agent,
             model: input.model,
+            parts: input.parts,
           }),
         });
 
@@ -530,12 +548,21 @@ export function ChorusWorkspaceProvider({
     },
     sessionCommand: async (command: "undo" | "redo") => {
       if (!selectedBoard?.session.sessionId) {
+        posthog.capture("session_command_no_session", {
+          command,
+          timestamp: Date.now(),
+        });
         return false;
       }
+
+      const sessionState = selectedBoard.session.state;
+      const hasActiveTask = selectedBoard.session.currentTaskId != null;
 
       posthog.capture("session_command_start", {
         command,
         sessionID: selectedBoard.session.sessionId,
+        sessionState,
+        hasActiveTask,
         timestamp: Date.now(),
       });
 
@@ -547,10 +574,18 @@ export function ChorusWorkspaceProvider({
 
         const response = await fetch(endpoint, { method: "POST" });
 
+        let responseBody: Record<string, unknown> | null = null;
+        try {
+          responseBody = await response.json();
+        } catch {
+          // Response may not be JSON
+        }
+
         if (response.ok) {
           posthog.capture("session_command_success", {
             command,
             sessionID: selectedBoard.session.sessionId,
+            responseBody,
             timestamp: Date.now(),
           });
         } else {
@@ -559,6 +594,7 @@ export function ChorusWorkspaceProvider({
             sessionID: selectedBoard.session.sessionId,
             status: response.status,
             statusText: response.statusText,
+            responseBody,
             timestamp: Date.now(),
           });
         }
@@ -570,6 +606,7 @@ export function ChorusWorkspaceProvider({
           sessionID: selectedBoard.session.sessionId,
           errorMessage: error instanceof Error ? error.message : String(error),
           errorType: error instanceof Error ? error.name : typeof error,
+          errorStack: error instanceof Error ? error.stack : undefined,
           timestamp: Date.now(),
         });
         return false;
@@ -615,6 +652,15 @@ export function ChorusWorkspaceProvider({
         console.error("Failed to update board position", error);
       });
     },
+    kanbanHistory: {
+      canRedo: kanbanHistory.canRedo,
+      canUndo: kanbanHistory.canUndo,
+      redo: kanbanHistory.redo,
+      recordMove: kanbanHistory.recordMove,
+      undo: kanbanHistory.undo,
+    },
+    restoredPrompt,
+    restorePrompt,
     queuePrompt,
   };
 

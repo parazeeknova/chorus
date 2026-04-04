@@ -1,13 +1,16 @@
-const SLASH_REGEX = /\/(\w*)$/;
-const AT_REGEX = /@([\w./]*)$/;
-
+import fuzzysort from "fuzzysort";
 import posthog from "posthog-js";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { boostByFrecency, recordFileUsage } from "@/lib/frecency";
+import { removeLineRange } from "@/lib/line-range";
 import {
   fetchCommands,
   fetchDirectory,
   fetchFiles,
   fetchSkills,
+  type OpencodeCommand,
+  type OpencodeFileNode,
+  type OpencodeSkill,
 } from "@/lib/opencode-client";
 
 export type AutocompleteType = "command" | "skill" | "file" | null;
@@ -15,7 +18,9 @@ export type AutocompleteType = "command" | "skill" | "file" | null;
 export interface AutocompleteItem {
   description?: string;
   id: string;
+  isDirectory?: boolean;
   label: string;
+  path?: string;
   type: AutocompleteType;
 }
 
@@ -29,10 +34,60 @@ interface AutocompleteState {
 interface UseAutocompleteReturn {
   checkTrigger: (value: string, cursorPos: number) => void;
   close: () => void;
+  expandDirectory: (item: AutocompleteItem) => void;
   isLoading: boolean;
   isOpen: boolean;
   items: AutocompleteItem[];
+  onItemSelect: (item: AutocompleteItem) => void;
   state: AutocompleteState | null;
+}
+
+const SLASH_REGEX = /\/(\w*)$/;
+const AT_REGEX = /@([^\s]*)$/;
+
+function fuzzyMatchFiles(
+  items: AutocompleteItem[],
+  query: string
+): AutocompleteItem[] {
+  if (!query) {
+    return items;
+  }
+
+  const targets = items.map((item) => ({
+    item,
+    displayValue: item.path ?? item.label,
+    description: item.description ?? "",
+  }));
+
+  const results = fuzzysort.go(query, targets, {
+    keys: ["displayValue", "description"],
+    limit: 50,
+    threshold: -10_000,
+  });
+
+  return results.map((r) => r.obj.item);
+}
+
+function sortFilesByDepthAndFrecency(
+  items: AutocompleteItem[]
+): AutocompleteItem[] {
+  const withDepth = items.map((item) => ({
+    item,
+    depth: (item.path ?? item.label).split("/").filter(Boolean).length,
+  }));
+
+  withDepth.sort((a, b) => {
+    if (a.item.isDirectory !== b.item.isDirectory) {
+      return a.item.isDirectory ? -1 : 1;
+    }
+    const depthDiff = a.depth - b.depth;
+    if (depthDiff !== 0) {
+      return depthDiff;
+    }
+    return a.item.label.localeCompare(b.item.label);
+  });
+
+  return boostByFrecency(withDepth.map((d) => d.item));
 }
 
 export function useAutocomplete(directory?: string): UseAutocompleteReturn {
@@ -43,11 +98,13 @@ export function useAutocomplete(directory?: string): UseAutocompleteReturn {
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
-  const fetchItems = useCallback(
-    async (type: AutocompleteType, query: string) => {
+  const fetchFileItems = useCallback(
+    async (query: string, dirPath?: string) => {
       posthog.capture("autocomplete_fetch_start", {
-        type,
+        type: "file",
         query,
         directory,
       });
@@ -60,119 +117,164 @@ export function useAutocomplete(directory?: string): UseAutocompleteReturn {
       setIsLoading(true);
 
       try {
-        let results: AutocompleteItem[] = [];
+        let rawItems: AutocompleteItem[] = [];
 
-        if (type === "command" || type === "skill") {
-          const [commands, skills] = await Promise.all([
-            fetchCommands({ directory }),
-            fetchSkills({ directory }),
-          ]);
-
-          posthog.capture("autocomplete_fetch_commands", {
-            count: commands.length,
-            commands: commands.map((c) => c.name),
-          });
-          posthog.capture("autocomplete_fetch_skills", {
-            count: skills.length,
-            skills: skills.map((s) => s.name),
+        if (dirPath || query.includes("/")) {
+          const pathToFetch =
+            dirPath ?? query.slice(0, query.lastIndexOf("/") + 1);
+          const nodes = await fetchDirectory(pathToFetch || "/", { directory });
+          posthog.capture("autocomplete_fetch_directory", {
+            dirPath: pathToFetch,
+            count: nodes.length,
           });
 
-          const builtinCommands = [
-            {
-              name: "undo",
-              description: "Revert the last agent action",
-            },
-            {
-              name: "redo",
-              description: "Restore previously reverted messages",
-            },
-          ];
+          const filterTerm = dirPath
+            ? ""
+            : query.slice(query.lastIndexOf("/") + 1);
 
-          const commandResults = [
-            ...builtinCommands
-              .filter((cmd) =>
-                cmd.name.toLowerCase().includes(query.toLowerCase())
-              )
-              .map((cmd) => ({
-                id: `builtin:${cmd.name}`,
-                label: `/${cmd.name}`,
-                description: cmd.description,
-                type: "command" as const,
-              })),
-            ...commands
-              .filter((cmd) =>
-                cmd.name.toLowerCase().includes(query.toLowerCase())
-              )
-              .map((cmd) => ({
-                id: `cmd:${cmd.name}`,
-                label: `/${cmd.name}`,
-                description: cmd.description ?? "",
-                type: "command" as const,
-              })),
-          ];
+          rawItems = nodes
+            .filter((node: OpencodeFileNode) => {
+              if (!filterTerm) {
+                return true;
+              }
+              return node.name.toLowerCase().includes(filterTerm.toLowerCase());
+            })
+            .map((node: OpencodeFileNode) => ({
+              id: node.path,
+              label: node.name,
+              description: node.type === "directory" ? "Directory" : "File",
+              type: "file" as const,
+              isDirectory: node.type === "directory",
+              path: node.path,
+            }));
+        } else {
+          const cleanQuery = removeLineRange(query);
+          const files = await fetchFiles(cleanQuery, { directory });
+          posthog.capture("autocomplete_fetch_files", {
+            query: cleanQuery,
+            count: files.length,
+          });
 
-          const skillResults = skills
-            .filter((skill) =>
+          rawItems = files.map((file: string) => ({
+            id: file,
+            label: file.split("/").pop() ?? file,
+            description: file,
+            type: "file" as const,
+            isDirectory: false,
+            path: file,
+          }));
+        }
+
+        const fuzzyResults = fuzzyMatchFiles(rawItems, query.replace("#", ""));
+        const sortedResults = sortFilesByDepthAndFrecency(fuzzyResults);
+
+        posthog.capture("autocomplete_fetch_success", {
+          type: "file",
+          resultCount: sortedResults.length,
+        });
+        setItems(sortedResults);
+        setIsOpen(sortedResults.length > 0);
+      } catch (error) {
+        posthog.capture("autocomplete_fetch_error", {
+          type: "file",
+          query,
+          errorMessage: error instanceof Error ? error.message : String(error),
+          errorType: error instanceof Error ? error.name : typeof error,
+        });
+        setItems([]);
+        setIsOpen(false);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [directory]
+  );
+
+  const fetchCommandItems = useCallback(
+    async (query: string) => {
+      posthog.capture("autocomplete_fetch_start", {
+        type: "command",
+        query,
+        directory,
+      });
+
+      if (abortRef.current) {
+        abortRef.current.abort();
+      }
+      abortRef.current = new AbortController();
+
+      setIsLoading(true);
+
+      try {
+        const [commands, skills] = await Promise.all([
+          fetchCommands({ directory }),
+          fetchSkills({ directory }),
+        ]);
+
+        posthog.capture("autocomplete_fetch_commands", {
+          count: commands.length,
+          commands: commands.map((c: OpencodeCommand) => c.name),
+        });
+        posthog.capture("autocomplete_fetch_skills", {
+          count: skills.length,
+          skills: skills.map((s: OpencodeSkill) => s.name),
+        });
+
+        const builtinCommands = [
+          { name: "undo", description: "Revert the last agent action" },
+          { name: "redo", description: "Restore previously reverted messages" },
+        ];
+
+        const allItems = [
+          ...builtinCommands
+            .filter((cmd) =>
+              cmd.name.toLowerCase().includes(query.toLowerCase())
+            )
+            .map((cmd) => ({
+              id: `builtin:${cmd.name}`,
+              label: `/${cmd.name}`,
+              description: cmd.description,
+              type: "command" as const,
+            })),
+          ...commands
+            .filter((cmd: OpencodeCommand) =>
+              cmd.name.toLowerCase().includes(query.toLowerCase())
+            )
+            .map((cmd: OpencodeCommand) => ({
+              id: `cmd:${cmd.name}`,
+              label: `/${cmd.name}`,
+              description: cmd.description ?? "",
+              type: "command" as const,
+            })),
+          ...skills
+            .filter((skill: OpencodeSkill) =>
               skill.name.toLowerCase().includes(query.toLowerCase())
             )
-            .map((skill) => ({
+            .map((skill: OpencodeSkill) => ({
               id: `skill:${skill.name}`,
               label: `/${skill.name}`,
               description: skill.description ?? "",
               type: "skill" as const,
-            }));
+            })),
+        ];
 
-          results = [...commandResults, ...skillResults];
-        } else if (type === "file") {
-          if (query.includes("/")) {
-            const dirPath = query.slice(0, query.lastIndexOf("/")) || "/";
-            const files = await fetchDirectory(dirPath, { directory });
-            posthog.capture("autocomplete_fetch_directory", {
-              dirPath,
-              count: files.length,
-            });
-            results = files
-              .filter((file) =>
-                file.name
-                  .toLowerCase()
-                  .includes(
-                    query.slice(query.lastIndexOf("/") + 1).toLowerCase()
-                  )
-              )
-              .map((file) => ({
-                id: file.path,
-                label: file.name,
-                description: file.type === "directory" ? "Directory" : "File",
-                type: "file" as const,
-              }));
-          } else {
-            const files = await fetchFiles(query, { directory });
-            posthog.capture("autocomplete_fetch_files", {
-              query,
-              count: files.length,
-            });
-            results = files
-              .filter((file) =>
-                file.toLowerCase().includes(query.toLowerCase())
-              )
-              .map((file) => ({
-                id: file,
-                label: file.split("/").pop() ?? file,
-                description: file,
-                type: "file" as const,
-              }));
-          }
-        }
+        const fuzzyResults = fuzzysort.go(query.toLowerCase(), allItems, {
+          keys: ["label", "description"],
+          limit: 50,
+          threshold: -10_000,
+        });
+
+        const results = fuzzyResults.map((r) => r.obj);
 
         posthog.capture("autocomplete_fetch_success", {
-          type,
+          type: "command",
           resultCount: results.length,
         });
         setItems(results);
         setIsOpen(results.length > 0);
       } catch (error) {
         posthog.capture("autocomplete_fetch_error", {
-          type,
+          type: "command",
           query,
           errorMessage: error instanceof Error ? error.message : String(error),
           errorType: error instanceof Error ? error.name : typeof error,
@@ -215,34 +317,56 @@ export function useAutocomplete(directory?: string): UseAutocompleteReturn {
           triggerIndex,
         });
 
-        fetchItems("command", query);
+        fetchCommandItems(query);
       } else if (atMatch) {
-        const query = atMatch[1];
+        const rawQuery = atMatch[1];
         const triggerIndex = cursorPos - atMatch[0].length;
 
         posthog.capture("autocomplete_trigger_detected", {
           trigger: "at",
-          query,
+          query: rawQuery,
           cursorPos,
           triggerIndex,
         });
 
         setState({
           type: "file",
-          query,
+          query: rawQuery,
           cursorPosition: cursorPos,
           triggerIndex,
         });
 
-        fetchItems("file", query);
+        fetchFileItems(rawQuery);
       } else {
         setState(null);
         setIsOpen(false);
         setItems([]);
       }
     },
-    [fetchItems]
+    [fetchCommandItems, fetchFileItems]
   );
+
+  const expandDirectory = useCallback(
+    (item: AutocompleteItem) => {
+      if (!(item.isDirectory && item.path)) {
+        return;
+      }
+
+      const currentState = stateRef.current;
+      if (!currentState) {
+        return;
+      }
+
+      fetchFileItems(`${item.path}/`, item.path);
+    },
+    [fetchFileItems]
+  );
+
+  const onItemSelect = useCallback((item: AutocompleteItem) => {
+    if (item.type === "file" && item.path) {
+      recordFileUsage(item.path);
+    }
+  }, []);
 
   const close = useCallback(() => {
     setIsOpen(false);
@@ -274,5 +398,7 @@ export function useAutocomplete(directory?: string): UseAutocompleteReturn {
     state,
     checkTrigger,
     close,
+    expandDirectory,
+    onItemSelect,
   };
 }

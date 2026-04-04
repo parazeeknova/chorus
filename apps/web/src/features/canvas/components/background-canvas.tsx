@@ -404,6 +404,7 @@ export function BackgroundCanvas() {
     Node<KanbanCardNodeData>,
     Edge
   > | null>(null);
+  const isNodeClickRef = useRef(false);
 
   useEffect(() => {
     setIsMounted(true);
@@ -530,6 +531,28 @@ export function BackgroundCanvas() {
     );
   }, [boards, handleRemoveBoard, handleUpdateColumns, selectedBoardId]);
 
+  // Navigate to board when selected from dropdown (not from canvas click)
+  useEffect(() => {
+    if (!(selectedBoardId && rfInstanceRef.current) || isNodeClickRef.current) {
+      isNodeClickRef.current = false;
+      return;
+    }
+
+    const node = rfInstanceRef.current.getNode(selectedBoardId);
+    if (!node) {
+      return;
+    }
+
+    const nodeWidth = 1280; // KANBAN_CARD_WIDTH from kanban-card-node.tsx
+    const nodeHeight = 720; // KANBAN_CARD_HEIGHT from kanban-card-node.tsx
+
+    rfInstanceRef.current.setCenter(
+      node.position.x + nodeWidth / 2,
+      node.position.y + nodeHeight / 2,
+      { zoom: 1, duration: 300 }
+    );
+  }, [selectedBoardId]);
+
   return (
     <div className="h-full w-full" ref={containerRef}>
       <ReactFlow
@@ -552,6 +575,7 @@ export function BackgroundCanvas() {
         }}
         onlyRenderVisibleElements
         onNodeClick={(_, node) => {
+          isNodeClickRef.current = true;
           selectBoard(node.id);
         }}
         onNodeDragStop={(_, node) => {

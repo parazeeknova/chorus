@@ -322,6 +322,26 @@ export const workspaceMutationSchema = z.discriminatedUnion("type", [
       voiceId: z.string().min(1).nullable(),
     }),
   }),
+  workspaceMutationBaseSchema.extend({
+    type: z.literal("preference.set_voice"),
+    payload: z.object({
+      voice: z.string().min(1),
+    }),
+  }),
+]);
+
+export const promptFilePartSchema = z.object({
+  type: z.literal("file"),
+  filename: z.string(),
+  path: z.string(),
+  mime: z.string().optional(),
+  isDirectory: z.boolean().optional(),
+  lineRange: z.object({ start: z.number(), end: z.number() }).optional(),
+});
+
+export const promptPartSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("text"), text: z.string() }),
+  promptFilePartSchema,
 ]);
 
 export const queueBoardPromptInputSchema = z.object({
@@ -332,6 +352,7 @@ export const queueBoardPromptInputSchema = z.object({
   text: z.string().min(1),
   agent: z.string().min(1).optional(),
   model: modelSelectionSchema.optional(),
+  parts: z.array(promptPartSchema).optional(),
 });
 
 export const queueBoardPromptResponseSchema = z.object({
