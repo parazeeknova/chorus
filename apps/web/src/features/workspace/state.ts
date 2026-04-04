@@ -50,13 +50,24 @@ function buildStep(event: NormalizedAgentEvent): AgentStep | null {
     .slice(2, 8)}`;
 
   if (event.toolName) {
-    return {
+    const step: AgentStep = {
       id,
       kind: "tool_call",
       status: event.activity === "error" ? "error" : "done",
       summary: `${event.toolName}${event.toolState ? ` · ${event.toolState}` : ""}`,
       content: event.text,
     };
+
+    if (event.fileDiff) {
+      step.kind = "file_edit";
+      step.filePath = event.fileDiff.filePath;
+      step.originalContent = event.fileDiff.before;
+      step.modifiedContent = event.fileDiff.after;
+      step.linesAdded = event.fileDiff.additions;
+      step.linesRemoved = event.fileDiff.deletions;
+    }
+
+    return step;
   }
 
   if (event.activity === "thinking") {

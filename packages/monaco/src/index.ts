@@ -2,6 +2,7 @@
 export { BorderlessFileView } from "./components/borderless-file-view";
 export { ChorusMonaco } from "./components/chorus-monaco";
 export { DiffFloatingWindow } from "./components/diff-floating-window";
+export { InlineDiffView } from "./components/inline-diff-view";
 export { useLsp } from "./hooks/use-lsp";
 export type {
   BorderlessFileViewProps,
@@ -9,5 +10,6 @@ export type {
   DiffFloatingWindowProps,
   DiffView,
   EditorMode,
+  InlineDiffViewProps,
   LspConnectionConfig,
 } from "./types";

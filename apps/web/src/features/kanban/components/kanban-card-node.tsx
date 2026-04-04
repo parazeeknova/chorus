@@ -18,12 +18,16 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
   KanbanCardContent,
   type KanbanCardData,
 } from "@/features/kanban/components/kanban";
+import { fetchSessionDiff, type SessionFileDiff } from "@/lib/opencode-client";
 import { cn } from "@/lib/utils";
 
 export const KANBAN_CARD_NODE_TYPE = "kanbanCard";
@@ -159,6 +163,10 @@ function KanbanCardNodeComponent({
   const cardData = rawData as unknown as KanbanCardNodeData;
   const [editorMode, setEditorMode] = useState<"kanban" | "file" | null>(null);
   const [diffVisible, setDiffVisible] = useState(false);
+  const [diffFiles, setDiffFiles] = useState<SessionFileDiff[]>([]);
+  const [selectedDiffFile, setSelectedDiffFile] =
+    useState<SessionFileDiff | null>(null);
+  const [isLoadingDiff, setIsLoadingDiff] = useState(false);
 
   const filePath = cardData.filePath ?? cardData.projectName ?? cardData.title;
 
@@ -181,8 +189,32 @@ function KanbanCardNodeComponent({
     setEditorMode(null);
   }, []);
 
-  const handleToggleDiff = useCallback(() => {
-    setDiffVisible((prev) => !prev);
+  const handleViewDiffs = useCallback(async () => {
+    if (!cardData.sessionId) {
+      return;
+    }
+    setIsLoadingDiff(true);
+    try {
+      const diffs = await fetchSessionDiff(cardData.sessionId);
+      setDiffFiles(diffs);
+      if (diffs.length > 0) {
+        setSelectedDiffFile(diffs[0]);
+        setDiffVisible(true);
+      }
+    } catch (error) {
+      console.error("Failed to fetch diffs:", error);
+    } finally {
+      setIsLoadingDiff(false);
+    }
+  }, [cardData.sessionId]);
+
+  const handleSelectDiffFile = useCallback((diff: SessionFileDiff) => {
+    setSelectedDiffFile(diff);
+    setDiffVisible(true);
+  }, []);
+
+  const handleCloseDiff = useCallback(() => {
+    setDiffVisible(false);
   }, []);
 
   return (
@@ -262,11 +294,45 @@ function KanbanCardNodeComponent({
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="flex cursor-pointer items-center gap-2 rounded-xs px-2 py-1.5 text-white/80 text-xs transition-colors focus:bg-white/10 focus:text-white"
-                  onClick={handleToggleDiff}
+                  disabled={!cardData.sessionId || isLoadingDiff}
+                  onClick={handleViewDiffs}
                 >
                   <Code2Icon className="size-3.5" />
-                  <span>View Diffs</span>
+                  <span>{isLoadingDiff ? "Loading..." : "View Diffs"}</span>
                 </DropdownMenuItem>
+                {diffFiles.length > 0 && (
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger className="flex cursor-pointer items-center gap-2 rounded-xs px-2 py-1.5 text-white/80 text-xs transition-colors focus:bg-white/10 focus:text-white">
+                      <span className="font-medium text-[0.65rem]">
+                        Diff Files
+                      </span>
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent
+                      className="border-white/10 bg-[#1e1e1e] p-1.5"
+                      style={{ maxHeight: "300px", overflowY: "auto" }}
+                    >
+                      {diffFiles.map((diff) => (
+                        <DropdownMenuItem
+                          className="flex cursor-pointer flex-col items-start gap-0.5 rounded-xs px-2 py-1.5 text-white/80 text-xs transition-colors focus:bg-white/10 focus:text-white"
+                          key={diff.file}
+                          onClick={() => handleSelectDiffFile(diff)}
+                        >
+                          <span className="max-w-[200px] truncate font-mono">
+                            {diff.file}
+                          </span>
+                          <span className="flex gap-2 text-[0.6rem]">
+                            <span className="text-emerald-400">
+                              +{diff.additions}
+                            </span>
+                            <span className="text-red-400">
+                              -{diff.deletions}
+                            </span>
+                          </span>
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
 
@@ -318,10 +384,14 @@ function KanbanCardNodeComponent({
       </div>
 
       <DiffFloatingWindow
-        language={inferLanguage(filePath)}
-        modified={`// Modified version of ${filePath}`}
-        onClose={() => setDiffVisible(false)}
-        original={`// Original version of ${filePath}`}
+        language={
+          selectedDiffFile
+            ? inferLanguage(selectedDiffFile.file)
+            : inferLanguage(filePath)
+        }
+        modified={selectedDiffFile?.after ?? ""}
+        onClose={handleCloseDiff}
+        original={selectedDiffFile?.before ?? ""}
         visible={diffVisible}
       />
     </>

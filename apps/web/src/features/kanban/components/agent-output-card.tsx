@@ -1,11 +1,12 @@
 "use client";
 
-import { BorderlessFileView } from "@chorus/monaco";
+import { BorderlessFileView, InlineDiffView } from "@chorus/monaco";
 import {
   BrainIcon,
   CheckCircle2Icon,
   ChevronDownIcon,
   ChevronRightIcon,
+  CopyIcon,
   FilePenLineIcon,
   Loader2Icon,
   MessageSquareIcon,
@@ -13,6 +14,8 @@ import {
   WrenchIcon,
 } from "lucide-react";
 import { useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
 
 export type AgentStepKind =
@@ -31,6 +34,8 @@ export interface AgentStep {
   kind: AgentStepKind;
   linesAdded?: number;
   linesRemoved?: number;
+  modifiedContent?: string;
+  originalContent?: string;
   status: AgentStepStatus;
   summary: string;
 }
@@ -72,6 +77,10 @@ export const PLACEHOLDER_RUN: AgentRunContext = {
       filePath: "apps/serve/src/ws/cursor-handler.ts",
       linesAdded: 64,
       linesRemoved: 0,
+      originalContent:
+        "// Original file content here\n// This will be replaced by the diff editor",
+      modifiedContent:
+        "// New file content here\n// With cursor tracking logic added",
     },
     {
       id: "step-4",
@@ -154,51 +163,30 @@ function inferLanguage(filePath?: string): string {
   return ext ? (langMap[ext] ?? "plaintext") : "plaintext";
 }
 
-function StepRow({ step }: { step: AgentStep }) {
-  const meta = STEP_META[step.kind];
-  const Icon = meta.icon;
+function ThinkingBlock({ step }: { step: AgentStep }) {
   const isRunning = step.status === "running";
   const [expanded, setExpanded] = useState(false);
-
-  const showExpandable =
-    step.kind === "file_edit" ||
-    (step.content && (step.kind === "response" || step.kind === "thinking"));
+  const hasContent = step.content && step.content.length > 0;
 
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-2">
         {isRunning ? (
-          <Loader2Icon className="size-3 shrink-0 animate-spin text-white/40" />
+          <Loader2Icon className="size-3 shrink-0 animate-spin text-violet-400/60" />
         ) : (
           <CheckCircle2Icon className="size-3 shrink-0 text-white/20" />
         )}
 
-        <Icon className={cn("size-3 shrink-0", meta.color)} />
-        <span
-          className={cn(
-            "font-medium text-[0.65rem] uppercase tracking-wider",
-            meta.color
-          )}
-        >
-          {meta.label}
+        <BrainIcon className="size-3 shrink-0 text-violet-400" />
+        <span className="font-medium text-[0.65rem] text-violet-400 uppercase tracking-wider">
+          Thinking
         </span>
 
         <span className="min-w-0 flex-1 truncate font-mono text-[0.72rem] text-white/60">
           {step.summary}
         </span>
 
-        {step.kind === "file_edit" && (
-          <span className="flex shrink-0 items-center gap-1.5 text-[0.65rem]">
-            {step.linesAdded !== undefined && step.linesAdded > 0 && (
-              <span className="text-emerald-400/80">+{step.linesAdded}</span>
-            )}
-            {step.linesRemoved !== undefined && step.linesRemoved > 0 && (
-              <span className="text-red-400/70">-{step.linesRemoved}</span>
-            )}
-          </span>
-        )}
-
-        {showExpandable && (
+        {hasContent && (
           <button
             className="shrink-0 rounded-xs p-0.5 transition-colors hover:bg-white/10"
             onClick={() => setExpanded(!expanded)}
@@ -213,30 +201,229 @@ function StepRow({ step }: { step: AgentStep }) {
         )}
       </div>
 
-      {step.content &&
-        (step.kind === "response" || step.kind === "thinking") && (
-          <div className="ml-5 rounded-xs border border-white/5 bg-white/2 px-3 py-2">
-            <p className="text-[0.72rem] text-white/50 leading-relaxed">
+      {expanded && hasContent && (
+        <div className="ml-5 rounded-xs border border-violet-500/10 bg-violet-500/[0.03] px-3 py-2.5">
+          <div className="text-[0.72rem] text-violet-300/60 leading-relaxed">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {step.content}
-            </p>
+            </ReactMarkdown>
           </div>
-        )}
-
-      {expanded && step.kind === "file_edit" && step.filePath && (
-        <div className="ml-5 overflow-hidden rounded-xs border border-white/5 bg-[#0d0d0d]">
-          <BorderlessFileView
-            filePath={step.filePath}
-            height="200px"
-            language={inferLanguage(step.filePath)}
-            value={
-              step.content ??
-              `// File: ${step.filePath}\n// Content will appear here once the agent provides it`
-            }
-          />
         </div>
       )}
     </div>
   );
+}
+
+function ResponseBlock({ step }: { step: AgentStep }) {
+  const isRunning = step.status === "running";
+  const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const hasContent = step.content && step.content.length > 0;
+
+  function handleCopy() {
+    if (step.content) {
+      navigator.clipboard.writeText(step.content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-2">
+        {isRunning ? (
+          <Loader2Icon className="size-3 shrink-0 animate-spin text-sky-400/60" />
+        ) : (
+          <CheckCircle2Icon className="size-3 shrink-0 text-white/20" />
+        )}
+
+        <MessageSquareIcon className="size-3 shrink-0 text-sky-400" />
+        <span className="font-medium text-[0.65rem] text-sky-400 uppercase tracking-wider">
+          Response
+        </span>
+
+        <span className="min-w-0 flex-1 truncate font-mono text-[0.72rem] text-white/60">
+          {step.summary}
+        </span>
+
+        {hasContent && (
+          <>
+            <button
+              className="shrink-0 rounded-xs p-0.5 transition-colors hover:bg-white/10"
+              onClick={handleCopy}
+              type="button"
+            >
+              <CopyIcon
+                className={cn(
+                  "size-3",
+                  copied ? "text-emerald-400" : "text-white/30"
+                )}
+              />
+            </button>
+            <button
+              className="shrink-0 rounded-xs p-0.5 transition-colors hover:bg-white/10"
+              onClick={() => setExpanded(!expanded)}
+              type="button"
+            >
+              {expanded ? (
+                <ChevronDownIcon className="size-3 text-white/30" />
+              ) : (
+                <ChevronRightIcon className="size-3 text-white/20" />
+              )}
+            </button>
+          </>
+        )}
+      </div>
+
+      {expanded && hasContent && (
+        <div className="ml-5 rounded-xs border border-sky-500/10 bg-sky-500/[0.03] px-3 py-2.5">
+          <div className="text-[0.72rem] text-sky-300/70 leading-relaxed">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {step.content}
+            </ReactMarkdown>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ChangesBlock({ step }: { step: AgentStep }) {
+  const isRunning = step.status === "running";
+  const [expanded, setExpanded] = useState(false);
+  const [showDiff, setShowDiff] = useState(false);
+  const hasOriginal = step.originalContent && step.originalContent.length > 0;
+  const hasModified = step.modifiedContent && step.modifiedContent.length > 0;
+  const canShowDiff = hasOriginal && hasModified;
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-2">
+        {isRunning ? (
+          <Loader2Icon className="size-3 shrink-0 animate-spin text-emerald-400/60" />
+        ) : (
+          <CheckCircle2Icon className="size-3 shrink-0 text-white/20" />
+        )}
+
+        <FilePenLineIcon className="size-3 shrink-0 text-emerald-400" />
+        <span className="font-medium text-[0.65rem] text-emerald-400 uppercase tracking-wider">
+          Edit
+        </span>
+
+        <span className="min-w-0 flex-1 truncate font-mono text-[0.72rem] text-white/60">
+          {step.summary}
+        </span>
+
+        <span className="flex shrink-0 items-center gap-1.5 text-[0.65rem]">
+          {step.linesAdded !== undefined && step.linesAdded > 0 && (
+            <span className="text-emerald-400/80">+{step.linesAdded}</span>
+          )}
+          {step.linesRemoved !== undefined && step.linesRemoved > 0 && (
+            <span className="text-red-400/70">-{step.linesRemoved}</span>
+          )}
+        </span>
+
+        {canShowDiff && (
+          <button
+            className={cn(
+              "shrink-0 rounded-xs px-1.5 py-0.5 font-medium text-[0.6rem] transition-colors",
+              showDiff
+                ? "bg-emerald-500/15 text-emerald-400"
+                : "text-white/30 hover:bg-white/10 hover:text-white/50"
+            )}
+            onClick={() => setShowDiff(!showDiff)}
+            type="button"
+          >
+            {showDiff ? "Hide Diff" : "Diff"}
+          </button>
+        )}
+
+        <button
+          className="shrink-0 rounded-xs p-0.5 transition-colors hover:bg-white/10"
+          onClick={() => setExpanded(!expanded)}
+          type="button"
+        >
+          {expanded ? (
+            <ChevronDownIcon className="size-3 text-white/30" />
+          ) : (
+            <ChevronRightIcon className="size-3 text-white/20" />
+          )}
+        </button>
+      </div>
+
+      {expanded && step.filePath && (
+        <div className="ml-5 overflow-hidden rounded-xs border border-white/5 bg-[#0d0d0d]">
+          {showDiff &&
+          canShowDiff &&
+          step.originalContent &&
+          step.modifiedContent ? (
+            <InlineDiffView
+              language={inferLanguage(step.filePath)}
+              modified={step.modifiedContent}
+              original={step.originalContent}
+            />
+          ) : (
+            <BorderlessFileView
+              filePath={step.filePath}
+              height="200px"
+              language={inferLanguage(step.filePath)}
+              value={
+                step.modifiedContent ??
+                step.content ??
+                `// File: ${step.filePath}\n// Content will appear here once the agent provides it`
+              }
+            />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ToolCallRow({ step }: { step: AgentStep }) {
+  const meta = STEP_META[step.kind];
+  const Icon = meta.icon;
+  const isRunning = step.status === "running";
+
+  return (
+    <div className="flex items-center gap-2">
+      {isRunning ? (
+        <Loader2Icon className="size-3 shrink-0 animate-spin text-white/40" />
+      ) : (
+        <CheckCircle2Icon className="size-3 shrink-0 text-white/20" />
+      )}
+
+      <Icon className={cn("size-3 shrink-0", meta.color)} />
+      <span
+        className={cn(
+          "font-medium text-[0.65rem] uppercase tracking-wider",
+          meta.color
+        )}
+      >
+        {meta.label}
+      </span>
+
+      <span className="min-w-0 flex-1 truncate font-mono text-[0.72rem] text-white/60">
+        {step.summary}
+      </span>
+    </div>
+  );
+}
+
+function StepRow({ step }: { step: AgentStep }) {
+  switch (step.kind) {
+    case "thinking":
+      return <ThinkingBlock step={step} />;
+    case "response":
+      return <ResponseBlock step={step} />;
+    case "file_edit":
+      return <ChangesBlock step={step} />;
+    case "tool_call":
+    case "command":
+      return <ToolCallRow step={step} />;
+    default:
+      return null;
+  }
 }
 
 interface AgentOutputCardProps {

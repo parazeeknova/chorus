@@ -181,6 +181,8 @@ export const agentStepSchema = z.object({
   kind: agentStepKindSchema,
   linesAdded: z.number().optional(),
   linesRemoved: z.number().optional(),
+  modifiedContent: z.string().optional(),
+  originalContent: z.string().optional(),
   status: agentStepStatusSchema,
   summary: z.string().min(1),
 });
