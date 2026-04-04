@@ -51,6 +51,7 @@ describe("WorkspaceStore", () => {
         },
       ],
       preferences: {
+        boardViewMode: "relaxed",
         composerHintDismissed: false,
         recentlyUsedModels: [],
         speechVoiceId: null,
@@ -85,6 +86,7 @@ describe("WorkspaceStore", () => {
         },
       ],
       preferences: {
+        boardViewMode: "relaxed",
         composerHintDismissed: false,
         recentlyUsedModels: [],
         speechVoiceId: null,
@@ -137,6 +139,7 @@ describe("WorkspaceStore", () => {
         },
       ],
       preferences: {
+        boardViewMode: "relaxed",
         composerHintDismissed: false,
         recentlyUsedModels: [],
         speechVoiceId: null,
@@ -204,6 +207,7 @@ describe("WorkspaceStore", () => {
         },
       ],
       preferences: {
+        boardViewMode: "relaxed",
         composerHintDismissed: false,
         recentlyUsedModels: [],
         speechVoiceId: null,

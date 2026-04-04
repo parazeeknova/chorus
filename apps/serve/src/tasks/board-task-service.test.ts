@@ -40,6 +40,7 @@ describe("BoardTaskService", () => {
         },
       ],
       preferences: {
+        boardViewMode: "relaxed",
         composerHintDismissed: false,
         recentlyUsedModels: [],
         speechVoiceId: null,
@@ -102,6 +103,7 @@ describe("BoardTaskService", () => {
         },
       ],
       preferences: {
+        boardViewMode: "relaxed",
         composerHintDismissed: false,
         recentlyUsedModels: [],
         speechVoiceId: null,

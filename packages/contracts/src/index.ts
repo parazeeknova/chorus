@@ -250,7 +250,10 @@ export const workspaceHistoryEntrySchema = z.object({
   title: z.string().min(1),
 });
 
+export const boardViewModeSchema = z.enum(["stacked", "relaxed"]);
+
 export const workspacePreferencesSchema = z.object({
+  boardViewMode: boardViewModeSchema.optional().default("relaxed"),
   composerHintDismissed: z.boolean(),
   recentlyUsedModels: modelSelectionSchema.array().default([]),
   speechVoiceId: z.string().min(1).nullable().optional().default(null),
@@ -337,6 +340,12 @@ export const workspaceMutationSchema = z.discriminatedUnion("type", [
     type: z.literal("preference.speech_voice.set"),
     payload: z.object({
       voiceId: z.string().min(1).nullable(),
+    }),
+  }),
+  workspaceMutationBaseSchema.extend({
+    type: z.literal("preference.board_view_mode.set"),
+    payload: z.object({
+      mode: boardViewModeSchema,
     }),
   }),
   workspaceMutationBaseSchema.extend({
@@ -427,6 +436,7 @@ export type AgentStep = z.infer<typeof agentStepSchema>;
 export type AgentRunContext = z.infer<typeof agentRunContextSchema>;
 export type Task = z.infer<typeof taskSchema>;
 export type Columns = z.infer<typeof columnsSchema>;
+export type BoardViewMode = z.infer<typeof boardViewModeSchema>;
 export type WorkspaceBoardSession = z.infer<typeof workspaceBoardSessionSchema>;
 export type WorkspaceBoard = z.infer<typeof workspaceBoardSchema>;
 export type WorkspaceHistoryEntry = z.infer<typeof workspaceHistoryEntrySchema>;

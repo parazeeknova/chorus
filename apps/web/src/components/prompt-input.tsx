@@ -16,6 +16,11 @@ import {
 } from "@/components/model-picker";
 import { Button } from "@/components/ui/button";
 import {
+  sharedDropdownContentClass,
+  sharedDropdownItemClass,
+  sharedDropdownTriggerClass,
+} from "@/components/ui/dropdown-aesthetics";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -23,6 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import type { WorkspaceBoard } from "@/features/workspace/types";
 import { useWorkspace } from "@/features/workspace/workspace-context";
 import {
   type AutocompleteItem,
@@ -31,6 +37,10 @@ import {
 import { useVoiceRecording } from "@/hooks/use-voice-recording";
 import { extractLineRange, formatLineRange } from "@/lib/line-range";
 import { cn } from "@/lib/utils";
+
+const composerSelectTriggerClass = sharedDropdownTriggerClass;
+const composerSelectContentClass = sharedDropdownContentClass;
+const composerSelectItemClass = sharedDropdownItemClass;
 
 interface PromptPart {
   filename?: string;
@@ -43,14 +53,19 @@ interface PromptPart {
   type: "file" | "command" | "skill";
 }
 
-const composerSelectTriggerClass =
-  "h-7 min-w-0 gap-1.5 rounded-xs border border-white/8 bg-white/[0.04] px-2.5 py-1 font-medium text-[11px] text-white/72 shadow-none transition-colors hover:border-white/14 hover:bg-white/[0.07] hover:text-white/90 focus-visible:border-white/16 focus-visible:bg-white/[0.08] focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 disabled:opacity-40 dark:border-white/8 dark:bg-white/[0.04] dark:hover:bg-white/[0.07]";
+const PATH_SEPARATOR_RE = /[/\\]/;
 
-const composerSelectContentClass =
-  "border-white/10 bg-[#151515]/96 p-1 text-white/92 shadow-[0_18px_44px_rgba(0,0,0,0.45)] backdrop-blur-xl";
+function getRepoBaseName(directory: string) {
+  return directory.split(PATH_SEPARATOR_RE).filter(Boolean).at(-1) ?? directory;
+}
 
-const composerSelectItemClass =
-  "min-h-8 rounded-xs px-2.5 py-1.5 text-[12px] text-white/78 focus:bg-white/7 focus:!text-white/86 focus:**:!text-white/86 aria-selected:bg-white/10 aria-selected:!text-white aria-selected:**:!text-white data-[highlighted]:bg-white/7 data-[highlighted]:!text-white/86 data-[highlighted]:**:!text-white/86";
+function getBoardRepoName(board: WorkspaceBoard) {
+  return (
+    board.repo.projectName?.trim() ||
+    getRepoBaseName(board.repo.directory) ||
+    board.title
+  );
+}
 
 let partIdCounter = 0;
 
@@ -59,6 +74,7 @@ function generatePartId(): string {
 }
 
 export function PromptInput() {
+  const [isMounted, setIsMounted] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [parts, setParts] = useState<PromptPart[]>([]);
   const [selectedModelKey, setSelectedModelKey] = useState(DEFAULT_MODEL_KEY);
@@ -74,7 +90,6 @@ export function PromptInput() {
     left: number;
     width: number;
   } | null>(null);
-  const [isMounted, setIsMounted] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -424,6 +439,10 @@ export function PromptInput() {
 
   const attachedFiles = parts.filter((p) => p.type === "file");
 
+  if (!isMounted) {
+    return null;
+  }
+
   return (
     <div className="fixed right-0 bottom-8 left-0 z-40 flex justify-center px-4">
       <div className="w-full max-w-3xl">
@@ -446,7 +465,54 @@ export function PromptInput() {
           </div>
         )}
         <form className="relative" onSubmit={handleSubmit}>
-          <div className="overflow-hidden rounded-sm border border-white/10 bg-[#0f0f0f]/90 p-2 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.8)] backdrop-blur-2xl transition-colors focus-within:border-white/20 focus-within:bg-[#161616]/95">
+          <div className="overflow-hidden rounded-sm border border-white/10 bg-[#0f0f0f]/90 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.8)] backdrop-blur-2xl transition-colors focus-within:border-white/20 focus-within:bg-[#161616]/95">
+            {/* Mobile-only: board selector pinned to top edge of the card */}
+            <div className="border-white/8 border-b px-3 py-1.5 sm:hidden">
+              <Select
+                onValueChange={(value) => value && selectBoard(value)}
+                value={selectedBoard?.boardId ?? null}
+              >
+                <SelectTrigger
+                  className={cn(
+                    composerSelectTriggerClass,
+                    "w-full border-0 bg-transparent px-0 text-white/58 shadow-none focus:ring-0"
+                  )}
+                  size="sm"
+                >
+                  <span className="min-w-0 flex-1 truncate text-left">
+                    {selectedBoard
+                      ? getBoardRepoName(selectedBoard)
+                      : "Select a board"}
+                  </span>
+                </SelectTrigger>
+                <SelectContent
+                  align="start"
+                  className={cn(
+                    "w-[min(20rem,calc(100vw-2rem))] min-w-0",
+                    composerSelectContentClass
+                  )}
+                >
+                  {boards.map((board) => (
+                    <SelectItem
+                      className={composerSelectItemClass}
+                      key={board.boardId}
+                      value={board.boardId}
+                    >
+                      <span className="flex min-w-0 flex-col">
+                        <span className="truncate">
+                          {getBoardRepoName(board)}
+                        </span>
+                        <span className="truncate text-[11px] text-white/40">
+                          {board.repo.branch ?? board.repo.directory}
+                        </span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Main content area */}
             <div className="flex flex-col gap-2 px-3 py-2">
               {attachedFiles.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
@@ -475,6 +541,7 @@ export function PromptInput() {
               )}
               <Textarea
                 className="max-h-40 min-h-8 w-full resize-none overflow-y-auto rounded-none border-0 bg-transparent p-0 font-medium text-[15px] text-white/90 shadow-none placeholder:text-white/40 focus-visible:ring-0 focus-visible:ring-offset-0 dark:bg-transparent"
+                id="chorus-prompt-input"
                 onChange={handleInput}
                 onKeyDown={handleKeyDown}
                 placeholder="Ask Chorus to build something..."
@@ -482,8 +549,10 @@ export function PromptInput() {
                 rows={1}
                 value={prompt}
               />
+              {/* Bottom toolbar — single row always */}
               <div className="flex items-center justify-between opacity-80 transition-opacity focus-within:opacity-100">
-                <div className="flex items-center gap-2">
+                {/* Left: model picker */}
+                <div className="flex min-w-0 items-center gap-2">
                   <ModelPicker
                     availableModels={availableModels}
                     className={composerSelectTriggerClass}
@@ -495,51 +564,50 @@ export function PromptInput() {
                     value={selectedModelKey}
                   />
                 </div>
+                {/* Right: board (desktop only) + action buttons */}
                 <div className="flex items-center gap-2">
-                  <Select
-                    onValueChange={(value) => value && selectBoard(value)}
-                    value={selectedBoard?.boardId ?? null}
-                  >
-                    <SelectTrigger
-                      className={cn(
-                        composerSelectTriggerClass,
-                        "!bg-transparent !border-0 w-40 text-white/58"
-                      )}
-                      size="sm"
+                  {/* Board selector: desktop only — hidden on mobile */}
+                  <div className="hidden sm:block">
+                    <Select
+                      onValueChange={(value) => value && selectBoard(value)}
+                      value={selectedBoard?.boardId ?? null}
                     >
-                      {isMounted && selectedBoard ? (
-                        <span className="flex min-w-0 flex-col items-start gap-0.5">
-                          <span className="truncate font-medium text-white/90">
+                      <SelectTrigger
+                        className={cn(
+                          composerSelectTriggerClass,
+                          "max-w-40 bg-transparent text-white/58"
+                        )}
+                        size="sm"
+                      >
+                        {isMounted && selectedBoard ? (
+                          <span className="min-w-0 truncate font-medium text-white/90">
                             {selectedBoard.title}
                           </span>
-                          <span className="w-full truncate text-[10px] text-white/40">
-                            {selectedBoard.repo.directory}
-                          </span>
-                        </span>
-                      ) : (
-                        <SelectValue placeholder="Select a board" />
-                      )}
-                    </SelectTrigger>
-                    <SelectContent
-                      align="end"
-                      className={cn("min-w-64", composerSelectContentClass)}
-                    >
-                      {boards.map((board) => (
-                        <SelectItem
-                          className={composerSelectItemClass}
-                          key={board.boardId}
-                          value={board.boardId}
-                        >
-                          <span className="flex min-w-0 flex-col">
-                            <span className="truncate">{board.title}</span>
-                            <span className="truncate text-[11px] text-white/40">
-                              {board.repo.branch ?? board.repo.directory}
+                        ) : (
+                          <SelectValue placeholder="Select a board" />
+                        )}
+                      </SelectTrigger>
+                      <SelectContent
+                        align="end"
+                        className={cn("min-w-64", composerSelectContentClass)}
+                      >
+                        {boards.map((board) => (
+                          <SelectItem
+                            className={composerSelectItemClass}
+                            key={board.boardId}
+                            value={board.boardId}
+                          >
+                            <span className="flex min-w-0 flex-col">
+                              <span className="truncate">{board.title}</span>
+                              <span className="truncate text-[11px] text-white/40">
+                                {board.repo.branch ?? board.repo.directory}
+                              </span>
                             </span>
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <Button
                     className={`h-7 w-7 rounded-xs hover:text-white/90 dark:hover:text-white/90 ${
                       isRecording

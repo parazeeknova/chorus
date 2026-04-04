@@ -83,9 +83,19 @@ export function CommandPalette({
     return null;
   }
 
+  const SIDE_PADDING = 8;
   const top = anchorRect.top - 4;
-  const left = anchorRect.left;
-  const width = Math.max(anchorRect.width, 320);
+  const panelWidth = Math.min(
+    Math.max(anchorRect.width, 320),
+    window.innerWidth - SIDE_PADDING * 2
+  );
+  // Clamp left so we don't overflow the right edge of the viewport
+  const clampedLeft = Math.min(
+    anchorRect.left,
+    window.innerWidth - panelWidth - SIDE_PADDING
+  );
+  const left = Math.max(SIDE_PADDING, clampedLeft);
+  const width = panelWidth;
 
   return (
     <div

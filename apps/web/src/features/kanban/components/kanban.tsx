@@ -1006,6 +1006,9 @@ function KanbanColumnRenderer({
                   "hover:bg-white/93 hover:shadow-[0_0_0_1px_rgba(255,255,255,0.15),0_4px_20px_rgba(255,255,255,0.15)]",
                   "active:scale-[0.98] active:shadow-[0_0_0_1px_rgba(255,255,255,0.1),0_1px_6px_rgba(255,255,255,0.1)]"
                 )}
+                onClick={() => {
+                  document.getElementById("chorus-prompt-input")?.focus();
+                }}
                 type="button"
               >
                 <PlusIcon className="size-3.5 shrink-0" />

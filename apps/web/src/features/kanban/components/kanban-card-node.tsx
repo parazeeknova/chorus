@@ -1,7 +1,7 @@
 "use client";
 
 import { BorderlessFileView, DiffFloatingWindow } from "@chorus/monaco";
-import { type Node, type NodeProps, NodeResizeControl } from "@xyflow/react";
+import type { Node, NodeProps } from "@xyflow/react";
 import {
   ChevronDownIcon,
   Code2Icon,
@@ -50,6 +50,9 @@ export interface KanbanCardNodeData {
   [key: string]: unknown;
 }
 
+const kanbanHeaderControlClass =
+  "flex h-6 items-center rounded-xs font-medium text-[0.65rem] leading-none";
+
 function FilePath({ path }: { path: string }) {
   const parts = path.split("/");
   const filename = parts.pop();
@@ -87,7 +90,12 @@ function SessionStatus({
 }) {
   if (state === "starting") {
     return (
-      <span className="flex items-center gap-1 rounded-xs border border-cyan-400/20 bg-cyan-400/10 px-1.5 py-0.5">
+      <span
+        className={cn(
+          kanbanHeaderControlClass,
+          "gap-1 border border-cyan-400/20 bg-cyan-400/10 px-2"
+        )}
+      >
         <LoaderCircleIcon className="size-3 animate-spin text-cyan-300/80" />
         <span className="font-medium text-[0.65rem] text-cyan-200/80 leading-none">
           Starting
@@ -98,7 +106,12 @@ function SessionStatus({
 
   if (state === "error") {
     return (
-      <span className="flex items-center gap-1 rounded-xs border border-red-400/20 bg-red-400/10 px-1.5 py-0.5">
+      <span
+        className={cn(
+          kanbanHeaderControlClass,
+          "gap-1 border border-red-400/20 bg-red-400/10 px-2"
+        )}
+      >
         <TriangleAlertIcon className="size-3 text-red-300/80" />
         <span className="font-medium text-[0.65rem] text-red-200/80 leading-none">
           Error
@@ -109,7 +122,12 @@ function SessionStatus({
 
   if (state === "active") {
     return (
-      <span className="flex items-center gap-1 rounded-xs border border-emerald-400/20 bg-emerald-400/10 px-1.5 py-0.5">
+      <span
+        className={cn(
+          kanbanHeaderControlClass,
+          "gap-1 border border-emerald-400/20 bg-emerald-400/10 px-2"
+        )}
+      >
         <span className="size-1.5 rounded-full bg-emerald-300/90" />
         <span className="font-medium text-[0.65rem] text-emerald-200/80 leading-none">
           {sessionId ? "Live" : "Ready"}
@@ -119,7 +137,12 @@ function SessionStatus({
   }
 
   return (
-    <span className="flex items-center gap-1 rounded-xs border border-white/8 bg-white/5 px-1.5 py-0.5">
+    <span
+      className={cn(
+        kanbanHeaderControlClass,
+        "gap-1 border border-white/8 bg-white/5 px-2"
+      )}
+    >
       <span className="size-1.5 rounded-full bg-white/35" />
       <span className="font-medium text-[0.65rem] text-white/55 leading-none">
         Ready
@@ -161,6 +184,7 @@ function inferLanguage(path?: string): string {
 
 function KanbanCardNodeComponent({
   data: rawData,
+  draggable,
   id,
   selected,
 }: NodeProps<Node<Record<string, unknown>>>) {
@@ -264,28 +288,23 @@ function KanbanCardNodeComponent({
 
   return (
     <>
-      {selected && (
-        <>
-          <NodeResizeControl
-            className="-left-1.5! h-full! w-3! border-0! bg-transparent!"
-            minWidth={800}
-            position="left"
-          />
-          <NodeResizeControl
-            className="-right-1.5! h-full! w-3! border-0! bg-transparent!"
-            minWidth={800}
-            position="right"
-          />
-        </>
-      )}
       <div
         className={cn(
-          "dark flex h-full w-full flex-col rounded-sm border border-white/10 bg-[#111111]/95 shadow-[0_24px_80px_rgba(0,0,0,0.6)] backdrop-blur-xl transition-shadow",
-          "active:shadow-[0_32px_100px_rgba(0,0,0,0.8)] active:ring-1 active:ring-white/15"
+          "dark flex h-full w-full flex-col overflow-hidden rounded-sm border border-white/10 bg-[#111111]/95 shadow-[0_24px_80px_rgba(0,0,0,0.6)] backdrop-blur-xl transition-[box-shadow,border-color,background-color] duration-500",
+          selected
+            ? "border-white/16 shadow-[0_32px_100px_rgba(0,0,0,0.74)]"
+            : "active:shadow-[0_32px_100px_rgba(0,0,0,0.8)] active:ring-1 active:ring-white/15"
         )}
       >
         <div className="flex items-center gap-3 border-white/8 border-b px-3 py-2.5">
-          <div className="flex shrink-0 cursor-grab items-center justify-center rounded-xs p-1 text-white/25 hover:text-white/50 active:cursor-grabbing">
+          <div
+            className={cn(
+              "flex shrink-0 items-center justify-center rounded-xs p-1 transition-colors",
+              draggable
+                ? "cursor-grab text-white/25 hover:text-white/50 active:cursor-grabbing"
+                : "cursor-default text-white/18"
+            )}
+          >
             <GripVerticalIcon className="size-3.5" />
           </div>
 
@@ -347,7 +366,12 @@ function KanbanCardNodeComponent({
             <span className="h-3.5 w-px bg-white/10" />
 
             <DropdownMenu>
-              <DropdownMenuTrigger className="flex items-center gap-1.5 rounded-xs bg-white/15 px-2 py-1 font-medium text-[0.65rem] text-white transition-all hover:bg-white/25 active:scale-95">
+              <DropdownMenuTrigger
+                className={cn(
+                  kanbanHeaderControlClass,
+                  "gap-1.5 bg-white/15 px-2 text-white transition-all hover:bg-white/25 active:scale-95"
+                )}
+              >
                 <Code2Icon className="size-3" />
                 <span>Open in Editor</span>
                 <ChevronDownIcon className="size-3 text-white/50" />

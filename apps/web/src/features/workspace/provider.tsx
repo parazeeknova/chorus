@@ -54,9 +54,11 @@ export function ChorusWorkspaceProvider({
   children: React.ReactNode;
 }) {
   const [boards, setBoards] = useState<WorkspaceContextValue["boards"]>([]);
+  const [boardLayoutVersion, setBoardLayoutVersion] = useState(0);
   const [preferences, setPreferences] = useState<
     WorkspaceContextValue["preferences"]
   >({
+    boardViewMode: "relaxed",
     composerHintDismissed: false,
     recentlyUsedModels: [],
     speechVoiceId: null,
@@ -505,6 +507,7 @@ export function ChorusWorkspaceProvider({
 
   const value: WorkspaceContextValue = {
     boards,
+    boardLayoutVersion,
     selectedBoardId,
     selectedBoard,
     recentProjects,
@@ -543,6 +546,25 @@ export function ChorusWorkspaceProvider({
         )
       ).catch((error) => {
         console.error("Failed to update speech voice", error);
+      });
+    },
+    setBoardViewMode: (mode) => {
+      setPreferences((currentPreferences) => ({
+        ...currentPreferences,
+        boardViewMode: mode,
+      }));
+      setBoardLayoutVersion((currentVersion) => currentVersion + 1);
+      mutateWorkspace(
+        createWorkspaceMutation(
+          clientIdRef.current,
+          revisionRef.current,
+          "preference.board_view_mode.set",
+          {
+            mode,
+          }
+        )
+      ).catch((error) => {
+        console.error("Failed to update board view mode", error);
       });
     },
     removeBoard: removeBoardById,
