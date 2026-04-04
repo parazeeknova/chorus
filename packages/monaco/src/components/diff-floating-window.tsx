@@ -1,8 +1,7 @@
 import { DiffEditor } from "@monaco-editor/react";
-import type * as monaco from "monaco-editor";
 import type { DiffFloatingWindowProps } from "../types";
 
-const DIFF_THEME: monaco.editor.IStandaloneThemeData = {
+const DIFF_THEME = {
   base: "vs-dark",
   inherit: true,
   rules: [],
@@ -19,6 +18,8 @@ const DIFF_THEME: monaco.editor.IStandaloneThemeData = {
   },
 };
 
+let diffThemeInitialized = false;
+
 export function DiffFloatingWindow({
   original,
   modified,
@@ -31,14 +32,21 @@ export function DiffFloatingWindow({
     return null;
   }
 
-  function handleDiffMount(editor: monaco.editor.IStandaloneDiffEditor) {
-    const monacoInstance = (editor as unknown as { _monaco: typeof monaco })
-      ._monaco;
-    if (monacoInstance) {
-      monacoInstance.editor.defineTheme("chorus-diff", DIFF_THEME);
-      monacoInstance.editor.setTheme("chorus-diff");
+  const handleDiffMount = (
+    _editor: unknown,
+    monacoInstance: {
+      editor: {
+        defineTheme: (name: string, data: unknown) => void;
+        setTheme: (name: string) => void;
+      };
     }
-  }
+  ) => {
+    if (!diffThemeInitialized) {
+      monacoInstance.editor.defineTheme("chorus-diff", DIFF_THEME);
+      diffThemeInitialized = true;
+    }
+    monacoInstance.editor.setTheme("chorus-diff");
+  };
 
   return (
     <div
@@ -101,7 +109,7 @@ export function DiffFloatingWindow({
           height="100%"
           language={language}
           modified={modified}
-          onMount={handleDiffMount}
+          onMount={handleDiffMount as never}
           options={{
             minimap: { enabled: false },
             fontSize: 14,

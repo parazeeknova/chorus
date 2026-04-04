@@ -18,7 +18,7 @@
     },
     "apps/serve": {
       "name": "@chorus/serve",
-      "version": "0.0.13",
+      "version": "0.0.16",
       "dependencies": {
         "@armoriq/sdk": "^0.2.10",
         "@chorus/logger": "workspace:*",
@@ -38,7 +38,7 @@
     },
     "apps/web": {
       "name": "@chorus/web",
-      "version": "0.0.23",
+      "version": "0.0.26",
       "dependencies": {
         "@base-ui/react": "^1.3.0",
         "@chorus/monaco": "workspace:*",
@@ -89,7 +89,7 @@
     },
     "packages/contracts": {
       "name": "@chorus/contracts",
-      "version": "0.0.4",
+      "version": "0.0.6",
       "dependencies": {
         "zod": "^4.3.6",
       },
@@ -111,7 +111,7 @@
     },
     "packages/monaco": {
       "name": "@chorus/monaco",
-      "version": "0.0.5",
+      "version": "0.0.7",
       "dependencies": {
         "@chorus/contracts": "workspace:*",
         "@chorus/oc-adapter": "workspace:*",
@@ -139,7 +139,7 @@
     },
     "packages/opencode-adapter": {
       "name": "@chorus/oc-adapter",
-      "version": "0.0.5",
+      "version": "0.0.7",
       "dependencies": {
         "@opencode-ai/sdk": "^1.3.13",
       },
