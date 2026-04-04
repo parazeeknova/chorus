@@ -1,3 +1,4 @@
+import { isAbsolute, join } from "node:path";
 import type {
   QueueBoardPromptInput,
   QueueBoardPromptResponse,
@@ -12,6 +13,62 @@ const logger = createLogger(
   { env: process.env.NODE_ENV === "production" ? "production" : "development" },
   "SERVE:TASKS"
 );
+
+type SdkPart =
+  | { text: string; type: "text" }
+  | { filename: string; mime: string; type: "file"; url: string };
+
+function resolveFilePath(rawPath: string, directory: string): string {
+  if (isAbsolute(rawPath)) {
+    return rawPath;
+  }
+  return join(directory, rawPath);
+}
+
+function convertPartsToSdk(
+  parts: NonNullable<QueueBoardPromptInput["parts"]>,
+  directory: string
+): SdkPart[] {
+  return parts.flatMap(
+    (part: {
+      type: string;
+      text?: string;
+      filename?: string;
+      path?: string;
+      mime?: string;
+      isDirectory?: boolean;
+      lineRange?: { start: number; end: number };
+    }) => {
+      if (part.type === "text") {
+        return { type: "text" as const, text: part.text ?? "" };
+      }
+      if (part.type === "file") {
+        const resolvedPath = resolveFilePath(part.path ?? "", directory);
+        const fileUrl = `file://${resolvedPath}`;
+        const rangeParams = part.lineRange
+          ? `?start=${part.lineRange.start}&end=${part.lineRange.end}`
+          : "";
+        logger.debug("file-part-resolved", {
+          rawPath: part.path,
+          resolvedPath,
+          fileUrl,
+          filename: part.filename,
+          mime: part.mime,
+          isDirectory: part.isDirectory,
+        });
+        return {
+          type: "file" as const,
+          filename: part.filename ?? "",
+          mime: part.isDirectory
+            ? "application/x-directory"
+            : (part.mime ?? "text/plain"),
+          url: fileUrl + rangeParams,
+        };
+      }
+      return [];
+    }
+  );
+}
 
 export class BoardTaskService {
   readonly #bridge: OpenCodeBridge;
@@ -115,12 +172,17 @@ export class BoardTaskService {
         : undefined,
     });
 
+    const sdkParts = input.parts
+      ? convertPartsToSdk(input.parts, input.directory)
+      : [];
+
     await this.#bridge.promptSessionAsync({
       sessionID: sessionId,
       directory: input.directory,
       text: input.text,
       model: input.model,
       agent: input.agent,
+      parts: sdkParts.length > 0 ? sdkParts : undefined,
     });
 
     logger.info("queue-prompt:prompt-queued", {

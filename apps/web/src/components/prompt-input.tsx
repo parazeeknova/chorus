@@ -6,6 +6,7 @@ import {
   opencodeModelCatalogSchema,
 } from "@chorus/contracts";
 import { ArrowUp, Mic, MoreHorizontal, XIcon } from "lucide-react";
+import posthog from "posthog-js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CommandPalette } from "@/components/command-palette";
 import {
@@ -24,6 +25,7 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { WorkspaceBoard } from "@/features/workspace/types";
@@ -32,13 +34,24 @@ import {
   type AutocompleteItem,
   useAutocomplete,
 } from "@/hooks/use-autocomplete";
-import { useVoiceConfig } from "@/hooks/use-voice-config";
 import { useVoiceRecording } from "@/hooks/use-voice-recording";
+import { extractLineRange, formatLineRange } from "@/lib/line-range";
 import { cn } from "@/lib/utils";
 
 const composerSelectTriggerClass = sharedDropdownTriggerClass;
 const composerSelectContentClass = sharedDropdownContentClass;
 const composerSelectItemClass = sharedDropdownItemClass;
+
+interface PromptPart {
+  filename?: string;
+  id: string;
+  isDirectory?: boolean;
+  lineRange?: { end: number; start: number };
+  mime?: string;
+  name?: string;
+  path?: string;
+  type: "file" | "command" | "skill";
+}
 
 const PATH_SEPARATOR_RE = /[/\\]/;
 
@@ -54,9 +67,16 @@ function getBoardRepoName(board: WorkspaceBoard) {
   );
 }
 
+let partIdCounter = 0;
+
+function generatePartId(): string {
+  return `part-${Date.now()}-${partIdCounter++}`;
+}
+
 export function PromptInput() {
   const [isMounted, setIsMounted] = useState(false);
   const [prompt, setPrompt] = useState("");
+  const [parts, setParts] = useState<PromptPart[]>([]);
   const [selectedModelKey, setSelectedModelKey] = useState(DEFAULT_MODEL_KEY);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [availableModels, setAvailableModels] = useState<
@@ -79,13 +99,26 @@ export function PromptInput() {
     isQueueingPrompt,
     preferences,
     queuePrompt,
+    restoredPrompt,
+    restorePrompt,
     selectBoard,
     sessionCommand,
     selectedBoard,
   } = useWorkspace();
 
   const autocomplete = useAutocomplete(selectedBoard?.repo.directory);
-  const { defaultModelId: defaultSpeechModelId } = useVoiceConfig();
+
+  useEffect(() => {
+    if (restoredPrompt) {
+      setPrompt(restoredPrompt);
+      textareaRef.current?.focus();
+      restorePrompt("");
+    }
+  }, [restoredPrompt, restorePrompt]);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const isBusy =
     isQueueingPrompt || selectedBoard?.session.state === "starting";
@@ -106,13 +139,7 @@ export function PromptInput() {
   };
 
   const { isRecording, isTranscribing, startRecording, stopRecording } =
-    useVoiceRecording(handleTranscriptionComplete, {
-      modelId: defaultSpeechModelId ?? undefined,
-    });
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+    useVoiceRecording(handleTranscriptionComplete);
 
   useEffect(() => {
     let isCancelled = false;
@@ -188,19 +215,118 @@ export function PromptInput() {
     await startRecording();
   };
 
+  const insertPart = useCallback(
+    (item: AutocompleteItem) => {
+      if (!(textareaRef.current && autocomplete.state)) {
+        return;
+      }
+
+      const textarea = textareaRef.current;
+      const { triggerIndex, cursorPosition } = autocomplete.state;
+
+      const before = prompt.slice(0, triggerIndex);
+      const after = prompt.slice(cursorPosition);
+
+      const { range } = extractLineRange(item.id);
+      const displayName = item.path
+        ? (item.path.split("/").filter(Boolean).pop() ?? item.path)
+        : item.label;
+      const displaySuffix = item.isDirectory ? `${displayName}/` : displayName;
+      const lineRangeSuffix = formatLineRange(range);
+      const insertText = `@${displaySuffix}${lineRangeSuffix} `;
+
+      const newPrompt = before + insertText + after;
+      setPrompt(newPrompt);
+
+      let partType: "file" | "command" | "skill" = "file";
+      if (item.type === "command") {
+        partType = "command";
+      } else if (item.type === "skill") {
+        partType = "skill";
+      }
+
+      const part: PromptPart = {
+        id: generatePartId(),
+        type: partType,
+        filename: displaySuffix,
+        path: item.path ?? item.id,
+        isDirectory: item.isDirectory,
+        mime: item.isDirectory ? "application/x-directory" : "text/plain",
+        lineRange: range ?? undefined,
+        name:
+          item.type === "command" || item.type === "skill"
+            ? item.label
+            : undefined,
+      };
+
+      setParts((prev) => [...prev, part]);
+
+      autocomplete.close();
+      setTextareaRect(null);
+
+      requestAnimationFrame(() => {
+        textarea.focus();
+        const newPos = triggerIndex + insertText.length;
+        textarea.setSelectionRange(newPos, newPos);
+      });
+    },
+    [prompt, autocomplete]
+  );
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!(prompt.trim() && selectedBoard) || isBusy || hasActiveRun) {
       return;
     }
 
+    const trimmedPrompt = prompt.trim();
+
+    if (trimmedPrompt === "/undo" || trimmedPrompt === "/redo") {
+      const command = trimmedPrompt.replace("/", "") as "undo" | "redo";
+      const success = await sessionCommand(command);
+      if (success) {
+        setPrompt("");
+        setParts([]);
+      }
+      return;
+    }
+
+    const fileParts = parts.filter((p) => p.type === "file");
+
+    posthog.capture("prompt_submit", {
+      hasFileParts: fileParts.length > 0,
+      filePartCount: fileParts.length,
+      fileParts: fileParts.map((p) => ({
+        filename: p.filename,
+        path: p.path,
+        mime: p.mime,
+        isDirectory: p.isDirectory,
+      })),
+      promptLength: trimmedPrompt.length,
+      directory: selectedBoard.repo.directory,
+    });
+
+    const structuredParts = [
+      { type: "text" as const, text: trimmedPrompt },
+      ...fileParts.map((part) => ({
+        type: "file" as const,
+        filename: part.filename ?? "",
+        path: part.path ?? "",
+        mime: part.mime,
+        isDirectory: part.isDirectory,
+        lineRange: part.lineRange,
+      })),
+    ];
+
     const result = await queuePrompt({
-      text: prompt.trim(),
+      text: trimmedPrompt,
       model: selectedModel,
+      parts: structuredParts,
     });
 
     if (result) {
       setPrompt("");
+      setParts([]);
     }
   };
 
@@ -235,31 +361,23 @@ export function PromptInput() {
         return;
       }
 
-      if (!(textareaRef.current && autocomplete.state)) {
+      autocomplete.onItemSelect(item);
+
+      if (item.isDirectory) {
+        autocomplete.expandDirectory(item);
         return;
       }
 
-      const textarea = textareaRef.current;
-      const { triggerIndex, cursorPosition } = autocomplete.state;
-
-      const before = prompt.slice(0, triggerIndex);
-      const after = prompt.slice(cursorPosition);
-      const insertText =
-        item.type === "file" ? `@${item.id} ` : `${item.label} `;
-
-      const newPrompt = before + insertText + after;
-      setPrompt(newPrompt);
-
-      autocomplete.close();
-      setTextareaRect(null);
-
-      requestAnimationFrame(() => {
-        textarea.focus();
-        const newPos = triggerIndex + insertText.length;
-        textarea.setSelectionRange(newPos, newPos);
-      });
+      insertPart(item);
     },
-    [prompt, autocomplete, sessionCommand]
+    [autocomplete, insertPart, sessionCommand]
+  );
+
+  const handleExpandDirectory = useCallback(
+    (item: AutocompleteItem) => {
+      autocomplete.expandDirectory(item);
+    },
+    [autocomplete]
   );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -279,6 +397,12 @@ export function PromptInput() {
       target.style.height = "auto";
     }
   };
+
+  const removePart = useCallback((partId: string) => {
+    setParts((prev) => prev.filter((p) => p.id !== partId));
+  }, []);
+
+  const attachedFiles = parts.filter((p) => p.type === "file");
 
   if (!isMounted) {
     return null;
@@ -355,6 +479,31 @@ export function PromptInput() {
 
             {/* Main content area */}
             <div className="flex flex-col gap-2 px-3 py-2">
+              {attachedFiles.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {attachedFiles.map((part) => (
+                    <div
+                      className="group flex items-center gap-1 rounded-md bg-white/8 px-1.5 py-0.5 text-[11px] text-white/70"
+                      key={part.id}
+                    >
+                      <span className="max-w-32 truncate">
+                        {part.isDirectory ? "📁 " : "📄 "}
+                        {part.filename}
+                        {part.lineRange
+                          ? `#${part.lineRange.start}-${part.lineRange.end}`
+                          : ""}
+                      </span>
+                      <button
+                        className="ml-0.5 rounded-sm p-0.5 opacity-0 transition-opacity hover:bg-white/10 group-hover:opacity-100"
+                        onClick={() => removePart(part.id)}
+                        type="button"
+                      >
+                        <XIcon className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
               <Textarea
                 className="max-h-40 min-h-8 w-full resize-none overflow-y-auto rounded-none border-0 bg-transparent p-0 font-medium text-[15px] text-white/90 shadow-none placeholder:text-white/40 focus-visible:ring-0 focus-visible:ring-offset-0 dark:bg-transparent"
                 id="chorus-prompt-input"
@@ -393,11 +542,13 @@ export function PromptInput() {
                         )}
                         size="sm"
                       >
-                        <span className="min-w-0 flex-1 truncate text-left">
-                          {selectedBoard
-                            ? getBoardRepoName(selectedBoard)
-                            : "Select a board"}
-                        </span>
+                        {isMounted && selectedBoard ? (
+                          <span className="min-w-0 truncate font-medium text-white/90">
+                            {selectedBoard.title}
+                          </span>
+                        ) : (
+                          <SelectValue placeholder="Select a board" />
+                        )}
                       </SelectTrigger>
                       <SelectContent
                         align="end"
@@ -410,9 +561,7 @@ export function PromptInput() {
                             value={board.boardId}
                           >
                             <span className="flex min-w-0 flex-col">
-                              <span className="truncate">
-                                {getBoardRepoName(board)}
-                              </span>
+                              <span className="truncate">{board.title}</span>
                               <span className="truncate text-[11px] text-white/40">
                                 {board.repo.branch ?? board.repo.directory}
                               </span>
@@ -470,6 +619,7 @@ export function PromptInput() {
             autocomplete.close();
             setTextareaRect(null);
           }}
+          onExpandDirectory={handleExpandDirectory}
           onSelect={handleSelectAutocomplete}
         />
       </div>

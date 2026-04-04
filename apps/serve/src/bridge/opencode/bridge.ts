@@ -138,28 +138,63 @@ export class OpenCodeBridge {
   }
 
   revertSession(sessionID: string) {
-    this.#logger.debug("Reverting session", { sessionID });
+    this.#logger.debug("Reverting session", {
+      sessionID,
+      directory: this.#defaultDirectory,
+    });
     return this.adapter.sessions
-      .revert({ sessionID })
+      .revert({ sessionID, directory: this.#defaultDirectory })
+      .then((result) => {
+        this.#logger.info("Session reverted", {
+          sessionID,
+          messageID: result?.messageID,
+          messageIndex: result?.messageIndex,
+          totalMessages: result?.totalMessages,
+        });
+        return result;
+      })
       .catch((error: unknown) => {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
         this.#logger.error(
           "Failed to revert session",
           error instanceof Error ? error : undefined,
-          { sessionID }
+          {
+            sessionID,
+            directory: this.#defaultDirectory,
+            errorMessage,
+            errorStack,
+          }
         );
         throw error;
       });
   }
 
   unrevertSession(sessionID: string) {
-    this.#logger.debug("Unreverting session", { sessionID });
+    this.#logger.debug("Unreverting session", {
+      sessionID,
+      directory: this.#defaultDirectory,
+    });
     return this.adapter.sessions
-      .unrevert({ sessionID })
+      .unrevert({ sessionID, directory: this.#defaultDirectory })
+      .then((result) => {
+        this.#logger.info("Session unreverted", { sessionID });
+        return result;
+      })
       .catch((error: unknown) => {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
         this.#logger.error(
           "Failed to unrevert session",
           error instanceof Error ? error : undefined,
-          { sessionID }
+          {
+            sessionID,
+            directory: this.#defaultDirectory,
+            errorMessage,
+            errorStack,
+          }
         );
         throw error;
       });

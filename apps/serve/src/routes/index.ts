@@ -3,6 +3,8 @@ import { createLogger } from "@chorus/logger";
 import { Elysia, t } from "elysia";
 import type { OpenCodeBridge } from "../bridge/opencode/bridge";
 import type { WsClientManager } from "../events/broadcaster";
+import { getDiff, restore, track } from "../snapshot";
+import { getRevertState } from "../snapshot/session-revert";
 import type { BoardTaskService } from "../tasks/board-task-service";
 import { createWorkspaceMessage } from "./workspace";
 
@@ -209,14 +211,33 @@ export function createHttpRoutes(
     .post(
       "/sessions/:sessionID/revert",
       async ({ params }) => {
+        const startTime = Date.now();
         try {
           logger.debug("Reverting session", { sessionID: params.sessionID });
-          await bridge.revertSession(params.sessionID);
-          logger.info("Session reverted", { sessionID: params.sessionID });
-          return { success: true, timestamp: Date.now() };
+          const result = await bridge.revertSession(params.sessionID);
+          const duration = Date.now() - startTime;
+          logger.info("Session reverted", {
+            sessionID: params.sessionID,
+            messageID: result?.messageID,
+            messageIndex: result?.messageIndex,
+            totalMessages: result?.totalMessages,
+            durationMs: duration,
+          });
+          return {
+            success: true,
+            messageID: result?.messageID,
+            messageIndex: result?.messageIndex,
+            totalMessages: result?.totalMessages,
+            timestamp: Date.now(),
+          };
         } catch (error) {
+          const duration = Date.now() - startTime;
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
           logger.error("Failed to revert session", error, {
             sessionID: params.sessionID,
+            errorMessage,
+            durationMs: duration,
           });
           throw error;
         }
@@ -231,17 +252,108 @@ export function createHttpRoutes(
     .post(
       "/sessions/:sessionID/unrevert",
       async ({ params }) => {
+        const startTime = Date.now();
         try {
           logger.debug("Unreverting session", { sessionID: params.sessionID });
           await bridge.unrevertSession(params.sessionID);
-          logger.info("Session unreverted", { sessionID: params.sessionID });
+          const duration = Date.now() - startTime;
+          logger.info("Session unreverted", {
+            sessionID: params.sessionID,
+            durationMs: duration,
+          });
           return { success: true, timestamp: Date.now() };
         } catch (error) {
+          const duration = Date.now() - startTime;
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
           logger.error("Failed to unrevert session", error, {
             sessionID: params.sessionID,
+            errorMessage,
+            durationMs: duration,
           });
           throw error;
         }
+      },
+      {
+        params: t.Object({
+          sessionID: t.String(),
+        }),
+      }
+    )
+
+    .post(
+      "/snapshots/track",
+      async ({ body }) => {
+        try {
+          const hash = await track(body.directory);
+          return { hash, timestamp: Date.now() };
+        } catch (error) {
+          logger.error("Failed to track snapshot", error, {
+            directory: body.directory,
+          });
+          throw error;
+        }
+      },
+      {
+        body: t.Object({
+          directory: t.String(),
+        }),
+      }
+    )
+
+    .post(
+      "/snapshots/restore",
+      async ({ body }) => {
+        try {
+          await restore(body.directory, body.hash);
+          return { success: true, timestamp: Date.now() };
+        } catch (error) {
+          logger.error("Failed to restore snapshot", error, {
+            directory: body.directory,
+            hash: body.hash,
+          });
+          throw error;
+        }
+      },
+      {
+        body: t.Object({
+          directory: t.String(),
+          hash: t.String(),
+        }),
+      }
+    )
+
+    .get(
+      "/snapshots/diff",
+      async ({ query }) => {
+        try {
+          const diff = await getDiff(query.directory, query.fromHash);
+          return { diff, timestamp: Date.now() };
+        } catch (error) {
+          logger.error("Failed to get snapshot diff", error, {
+            directory: query.directory,
+            fromHash: query.fromHash,
+          });
+          throw error;
+        }
+      },
+      {
+        query: t.Object({
+          directory: t.String(),
+          fromHash: t.String(),
+        }),
+      }
+    )
+
+    .get(
+      "/sessions/:sessionID/revert-state",
+      ({ params }) => {
+        const state = getRevertState(params.sessionID);
+        return {
+          hasRevertState: state != null,
+          state: state ?? null,
+          timestamp: Date.now(),
+        };
       },
       {
         params: t.Object({

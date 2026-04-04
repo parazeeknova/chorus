@@ -1,4 +1,4 @@
-import { ArrowUp, Book, FileText, Terminal } from "lucide-react";
+import { ArrowUp, Book, FileText, Folder, Terminal } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AutocompleteItem } from "@/hooks/use-autocomplete";
 
@@ -7,6 +7,7 @@ interface CommandPaletteProps {
   isLoading: boolean;
   items: AutocompleteItem[];
   onClose: () => void;
+  onExpandDirectory?: (item: AutocompleteItem) => void;
   onSelect: (item: AutocompleteItem) => void;
 }
 
@@ -21,6 +22,7 @@ export function CommandPalette({
   isLoading,
   onSelect,
   onClose,
+  onExpandDirectory,
   anchorRect,
 }: CommandPaletteProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -43,18 +45,22 @@ export function CommandPalette({
         setSelectedIndex(
           (prev) => (prev - 1 + currentItems.length) % currentItems.length
         );
-      } else if (e.key === "Enter") {
+      } else if (e.key === "Tab") {
         e.preventDefault();
         const selected = currentItems[selectedIndex];
         if (selected) {
-          onSelect(selected);
+          if (selected.isDirectory && onExpandDirectory) {
+            onExpandDirectory(selected);
+          } else {
+            onSelect(selected);
+          }
         }
       } else if (e.key === "Escape") {
         e.preventDefault();
         onClose();
       }
     },
-    [selectedIndex, onSelect, onClose]
+    [selectedIndex, onSelect, onClose, onExpandDirectory]
   );
 
   useEffect(() => {
@@ -112,7 +118,14 @@ export function CommandPalette({
           </div>
         ) : (
           items.map((item, index) => {
-            const Icon = item.type ? ICONS[item.type] : FileText;
+            const isDirectory = item.isDirectory === true;
+            let Icon: typeof FileText = FileText;
+            if (isDirectory) {
+              Icon = Folder;
+            } else if (item.type != null && item.type in ICONS) {
+              Icon = ICONS[item.type];
+            }
+
             return (
               <div
                 aria-selected={index === selectedIndex}
@@ -131,7 +144,11 @@ export function CommandPalette({
                 role="option"
                 tabIndex={0}
               >
-                <Icon className="h-4 w-4 shrink-0 text-white/50" />
+                <Icon
+                  className={`h-4 w-4 shrink-0 ${
+                    isDirectory ? "text-amber-400/70" : "text-white/50"
+                  }`}
+                />
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-medium text-white/90">
                     {item.label}
@@ -142,7 +159,10 @@ export function CommandPalette({
                     </div>
                   )}
                 </div>
-                {index === selectedIndex && (
+                {isDirectory && onExpandDirectory && (
+                  <span className="text-[10px] text-white/25">Tab ↹</span>
+                )}
+                {index === selectedIndex && !isDirectory && (
                   <ArrowUp className="h-3 w-3 rotate-90 text-white/30" />
                 )}
               </div>

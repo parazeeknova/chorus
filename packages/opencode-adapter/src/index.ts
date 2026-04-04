@@ -11,13 +11,17 @@ import { SessionManager } from "./features/session/session-manager";
 import { TuiManager } from "./features/tui/tui-manager";
 
 export type {
+  AgentPartInput,
   Event,
+  FilePartInput,
   Message,
   OpencodeClient,
   Part,
   PermissionRequest,
   Session,
   SessionStatus,
+  SubtaskPartInput,
+  TextPartInput,
 } from "@opencode-ai/sdk/v2";
 export type { ClientOptions, ClientResult } from "./features/client/client";
 export type {

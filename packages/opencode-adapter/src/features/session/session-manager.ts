@@ -214,15 +214,59 @@ export class SessionManager {
   }
 
   async revert(input: SessionRevertInput) {
+    const messages = await this.messages(input.sessionID, {
+      directory: input.directory,
+    });
+
+    const sessionResult = await this.get(input.sessionID);
+    const hasExistingRevert = sessionResult?.revert != null;
+
+    if (hasExistingRevert) {
+      throw new Error(
+        `Session already has a pending revert state (messageID: ${sessionResult.revert?.messageID}). Unrevert first or send a new prompt.`
+      );
+    }
+
+    let lastUserMessageID: string | undefined;
+    let lastUserIndex = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      if (msg.info.role === "user") {
+        lastUserMessageID = msg.info.id;
+        lastUserIndex = i;
+        break;
+      }
+    }
+
+    if (!lastUserMessageID) {
+      throw new Error("No user message found to revert to");
+    }
+
     const result = await this.client.session.revert({
       sessionID: input.sessionID,
       directory: input.directory,
       workspace: input.workspace,
+      messageID: lastUserMessageID,
     });
-    return unwrap(result.data, "session.revert");
+
+    const revertedSession = unwrap(result.data, "session.revert");
+
+    return {
+      session: revertedSession,
+      messageID: lastUserMessageID,
+      messageIndex: lastUserIndex,
+      totalMessages: messages.length,
+    };
   }
 
   async unrevert(input: SessionRevertInput) {
+    const sessionResult = await this.get(input.sessionID);
+    const hasRevertState = sessionResult?.revert != null;
+
+    if (!hasRevertState) {
+      throw new Error("No revert state to unrevert. Nothing to restore.");
+    }
+
     const result = await this.client.session.unrevert({
       sessionID: input.sessionID,
       directory: input.directory,
