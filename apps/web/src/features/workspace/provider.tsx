@@ -8,6 +8,7 @@ import {
   type WorkspaceSnapshot,
   workspaceSnapshotSchema,
 } from "@chorus/contracts";
+import posthog from "posthog-js";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import {
   attachPromptTask,
@@ -480,6 +481,53 @@ export function ChorusWorkspaceProvider({
       ).catch((error) => {
         console.error("Failed to clear selection", error);
       });
+    },
+    sessionCommand: async (command: "undo" | "redo") => {
+      if (!selectedBoard?.session.sessionId) {
+        return false;
+      }
+
+      posthog.capture("session_command_start", {
+        command,
+        sessionID: selectedBoard.session.sessionId,
+        timestamp: Date.now(),
+      });
+
+      try {
+        const endpoint =
+          command === "undo"
+            ? `/api/sessions/${selectedBoard.session.sessionId}/revert`
+            : `/api/sessions/${selectedBoard.session.sessionId}/unrevert`;
+
+        const response = await fetch(endpoint, { method: "POST" });
+
+        if (response.ok) {
+          posthog.capture("session_command_success", {
+            command,
+            sessionID: selectedBoard.session.sessionId,
+            timestamp: Date.now(),
+          });
+        } else {
+          posthog.capture("session_command_error", {
+            command,
+            sessionID: selectedBoard.session.sessionId,
+            status: response.status,
+            statusText: response.statusText,
+            timestamp: Date.now(),
+          });
+        }
+
+        return response.ok;
+      } catch (error) {
+        posthog.capture("session_command_exception", {
+          command,
+          sessionID: selectedBoard.session.sessionId,
+          errorMessage: error instanceof Error ? error.message : String(error),
+          errorType: error instanceof Error ? error.name : typeof error,
+          timestamp: Date.now(),
+        });
+        return false;
+      }
     },
     updateBoardColumns: (boardId, columns) => {
       setBoards((currentBoards) =>

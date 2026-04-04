@@ -39,6 +39,7 @@ export type {
   SessionForkInput,
   SessionPromptAsyncInput,
   SessionPromptInput,
+  SessionRevertInput,
 } from "./features/session/session-manager";
 
 export function createClient(

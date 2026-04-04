@@ -1,3 +1,4 @@
+import { createLogger } from "@chorus/logger";
 import type {
   EventStreamHandle,
   NormalizedAgentEvent,
@@ -24,6 +25,12 @@ export class OpenCodeBridge {
   readonly #subscribers = new Set<EventSubscriber>();
   readonly #activeSessions = new Map<string, string>();
   readonly #startTime = Date.now();
+  readonly #logger = createLogger(
+    {
+      env: process.env.NODE_ENV === "production" ? "production" : "development",
+    },
+    "BRIDGE"
+  );
 
   constructor(baseUrl: string, directory: string) {
     this.#baseUrl = baseUrl;
@@ -101,6 +108,22 @@ export class OpenCodeBridge {
 
   forkSession(input: SessionForkInput) {
     return this.adapter.sessions.fork(input);
+  }
+
+  revertSession(sessionID: string) {
+    this.#logger.debug("Reverting session", { sessionID });
+    return this.adapter.sessions.revert({ sessionID }).catch((error) => {
+      this.#logger.error("Failed to revert session", error, { sessionID });
+      throw error;
+    });
+  }
+
+  unrevertSession(sessionID: string) {
+    this.#logger.debug("Unreverting session", { sessionID });
+    return this.adapter.sessions.unrevert({ sessionID }).catch((error) => {
+      this.#logger.error("Failed to unrevert session", error, { sessionID });
+      throw error;
+    });
   }
 
   startRace(

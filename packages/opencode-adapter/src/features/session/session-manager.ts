@@ -75,6 +75,12 @@ export interface SessionForkInput {
   workspace?: string;
 }
 
+export interface SessionRevertInput {
+  directory?: string;
+  sessionID: string;
+  workspace?: string;
+}
+
 export class SessionManager {
   readonly client: OpencodeClient;
 
@@ -205,5 +211,23 @@ export class SessionManager {
       providerID: options?.providerID,
       modelID: options?.modelID,
     });
+  }
+
+  async revert(input: SessionRevertInput) {
+    const result = await this.client.session.revert({
+      sessionID: input.sessionID,
+      directory: input.directory,
+      workspace: input.workspace,
+    });
+    return unwrap(result.data, "session.revert");
+  }
+
+  async unrevert(input: SessionRevertInput) {
+    const result = await this.client.session.unrevert({
+      sessionID: input.sessionID,
+      directory: input.directory,
+      workspace: input.workspace,
+    });
+    return unwrap(result.data, "session.unrevert");
   }
 }
