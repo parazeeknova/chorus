@@ -86,16 +86,18 @@ const projectService = new ProjectService(
 bridge.subscribe((event) => {
   wsManager.broadcast(event);
 
-  const hasSession = !!event.sessionID;
-  const hasActivity = !!event.activity;
+  if (event.type === "server.heartbeat") {
+    return;
+  }
+
   logger.debug("bridge-event", {
     type: event.type,
-    sessionID: event.sessionID,
-    activity: event.activity,
-    textPreview: event.text ? event.text.slice(0, 80) : undefined,
+    ...(event.sessionID && { sessionID: event.sessionID }),
+    ...(event.activity && { activity: event.activity }),
+    ...(event.text && { textPreview: event.text.slice(0, 80) }),
   });
 
-  if (!(hasSession && hasActivity)) {
+  if (!(event.sessionID && event.activity)) {
     return;
   }
 
@@ -103,10 +105,6 @@ bridge.subscribe((event) => {
     .applyAgentEvent(event)
     .then((snapshot) => {
       if (!snapshot) {
-        logger.debug("workspace-no-snapshot-change", {
-          sessionID: event.sessionID,
-          eventType: event.type,
-        });
         return;
       }
 

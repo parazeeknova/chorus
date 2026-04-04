@@ -208,6 +208,31 @@ export function ChorusWorkspaceProvider({
         const parsed = JSON.parse(message.data) as AgentEventEnvelope;
         if (parsed.type === "workspace.updated") {
           const snapshot = workspaceSnapshotSchema.parse(parsed.payload);
+          console.log("[chorus:ws] workspace.updated", {
+            revision: snapshot.revision,
+            boardCount: snapshot.boards.length,
+            boards: snapshot.boards.map((b) => ({
+              id: b.boardId,
+              title: b.title,
+              sessionId: b.session.sessionId,
+              currentTaskId: b.session.currentTaskId,
+              taskCounts: Object.fromEntries(
+                Object.entries(b.columns).map(([col, tasks]) => [
+                  col,
+                  tasks.length,
+                ])
+              ),
+              steps: Object.values(b.columns)
+                .flat()
+                .filter((t) => t.run)
+                .flatMap((t) => t.run?.steps ?? [])
+                .map((s) => ({
+                  kind: s.kind,
+                  summary: s.summary,
+                  status: s.status,
+                })),
+            })),
+          });
           applySnapshot(snapshot);
           return;
         }

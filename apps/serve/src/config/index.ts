@@ -1,4 +1,5 @@
 export interface ServerConfig {
+  autoStartOpencode: boolean;
   hostname: string;
   opencodeBaseUrl: string;
   opencodeDirectory: string;
@@ -20,5 +21,6 @@ export function loadConfig(): ServerConfig {
     hostname: process.env.HOSTNAME ?? "localhost",
     opencodeBaseUrl: process.env.OPENCODE_BASE_URL ?? "http://localhost:4096",
     opencodeDirectory: process.env.OPENCODE_DIRECTORY ?? process.cwd(),
+    autoStartOpencode: process.env.OPENCODE_AUTO_START !== "false",
   };
 }

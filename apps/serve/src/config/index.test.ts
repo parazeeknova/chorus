@@ -80,6 +80,7 @@ describe("loadConfig", () => {
       hostname: "127.0.0.1",
       opencodeBaseUrl: "http://opencode:4096",
       opencodeDirectory: "/workspace",
+      autoStartOpencode: true,
     });
   });
 

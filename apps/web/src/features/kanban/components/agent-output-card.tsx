@@ -214,9 +214,7 @@ function StepRow({ step }: { step: AgentStep }) {
       </div>
 
       {step.content &&
-        (step.status === "running" ||
-          step.kind === "response" ||
-          step.kind === "thinking") && (
+        (step.kind === "response" || step.kind === "thinking") && (
           <div className="ml-5 rounded-xs border border-white/5 bg-white/2 px-3 py-2">
             <p className="text-[0.72rem] text-white/50 leading-relaxed">
               {step.content}

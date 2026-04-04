@@ -109,7 +109,10 @@ function buildStep(event: NormalizedAgentEvent): AgentStep | null {
       id,
       kind: "thinking",
       status: "running",
-      summary: event.text?.slice(0, 72) ?? "Thinking",
+      summary:
+        event.text && event.text.length > 0
+          ? event.text.slice(0, 72)
+          : "Thinking",
       content: event.text,
     };
   }
@@ -119,7 +122,10 @@ function buildStep(event: NormalizedAgentEvent): AgentStep | null {
       id,
       kind: "response",
       status: "running",
-      summary: event.text?.slice(0, 72) ?? "Streaming response",
+      summary:
+        event.text && event.text.length > 0
+          ? event.text.slice(0, 72)
+          : "Streaming response",
       content: event.text,
     };
   }

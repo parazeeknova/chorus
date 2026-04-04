@@ -56,6 +56,7 @@ import {
 import {
   AgentOutputCard,
   type AgentRunContext,
+  type AgentStep,
   PLACEHOLDER_RUN,
 } from "@/features/kanban/components/agent-output-card";
 import { cn } from "@/lib/utils";
@@ -546,6 +547,27 @@ interface TaskCardProps {
   task: Task;
 }
 
+function DoneStepRow({ step }: { step: AgentStep }) {
+  const kindIcons: Record<AgentStep["kind"], string> = {
+    thinking: "💭",
+    response: "💬",
+    tool_call: "⚙️",
+    file_edit: "📝",
+    command: "⌨️",
+  };
+
+  return (
+    <div className="flex items-start gap-1.5">
+      <span className="mt-0.5 font-mono text-[0.62rem] text-white/30">
+        {kindIcons[step.kind] ?? "•"}
+      </span>
+      <span className="min-w-0 flex-1 font-mono text-[0.68rem] text-white/50 leading-relaxed">
+        {step.summary}
+      </span>
+    </div>
+  );
+}
+
 function TaskCard({
   task,
   asHandle,
@@ -567,10 +589,17 @@ function TaskCard({
         {task.title}
       </span>
 
-      {/* Done: summary + diff stats */}
+      {/* Done: summary + diff stats + run output */}
       {showDone && (
         <div className="flex flex-col gap-2.5 border-white/5 border-t pt-2.5">
-          {task.summary && (
+          {task.run && task.run.steps.length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              {task.run.steps.map((step) => (
+                <DoneStepRow key={step.id} step={step} />
+              ))}
+            </div>
+          )}
+          {!task.run && task.summary && (
             <p className="text-[0.72rem] text-white/38 leading-relaxed">
               {task.summary}
             </p>

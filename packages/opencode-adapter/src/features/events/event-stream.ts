@@ -8,45 +8,79 @@ export interface EventStreamHandle {
   stop: () => void;
 }
 
+interface DirSubscription {
+  abort: AbortController;
+}
+
 export class EventStream {
   readonly client: OpencodeClient;
   #running = false;
-  #abortController: AbortController | null = null;
+  readonly #dirSubscriptions = new Map<string, DirSubscription>();
 
   constructor(client: OpencodeClient) {
     this.client = client;
   }
 
-  async subscribe(onEvent: EventCallback): Promise<EventStreamHandle> {
+  async subscribe(
+    onEvent: EventCallback,
+    options?: { directory?: string }
+  ): Promise<EventStreamHandle> {
     this.#running = true;
-    this.#abortController = new AbortController();
 
-    const events = await this.client.event.subscribe();
+    const key = options?.directory ?? "__default__";
 
-    this.#consume(events.stream as AsyncIterable<OCEvent>, onEvent);
+    if (this.#dirSubscriptions.has(key)) {
+      return {
+        stop: () => {
+          this.#dirSubscriptions.delete(key);
+          if (this.#dirSubscriptions.size === 0) {
+            this.#running = false;
+          }
+        },
+      };
+    }
+
+    const abort = new AbortController();
+    const sub: DirSubscription = { abort };
+    this.#dirSubscriptions.set(key, sub);
+
+    const events = await this.client.event.subscribe({
+      directory: options?.directory,
+    });
+
+    this.#consume(
+      events.stream as AsyncIterable<OCEvent>,
+      onEvent,
+      abort
+    ).catch(() => {
+      // handled internally
+    });
 
     return {
       stop: () => {
-        this.#running = false;
-        this.#abortController?.abort();
-        this.#abortController = null;
+        this.#dirSubscriptions.delete(key);
+        abort.abort();
+        if (this.#dirSubscriptions.size === 0) {
+          this.#running = false;
+        }
       },
     };
   }
 
   async #consume(
     stream: AsyncIterable<OCEvent>,
-    onEvent: EventCallback
+    onEvent: EventCallback,
+    abort: AbortController
   ): Promise<void> {
     try {
       for await (const event of stream) {
-        if (!this.#running) {
+        if (!this.#running || abort.signal.aborted) {
           break;
         }
         onEvent(event);
       }
     } catch (error) {
-      if (this.#running && !this.#abortController?.signal.aborted) {
+      if (this.#running && !abort.signal.aborted) {
         console.error("[oc-adapter] event stream error:", error);
       }
     }
@@ -54,8 +88,10 @@ export class EventStream {
 
   stop() {
     this.#running = false;
-    this.#abortController?.abort();
-    this.#abortController = null;
+    for (const sub of this.#dirSubscriptions.values()) {
+      sub.abort.abort();
+    }
+    this.#dirSubscriptions.clear();
   }
 }
 

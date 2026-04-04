@@ -3,9 +3,15 @@ import type {
   QueueBoardPromptResponse,
 } from "@chorus/contracts";
 import { queueBoardPromptInputSchema } from "@chorus/contracts";
+import { createLogger } from "@chorus/logger";
 import type { OpenCodeBridge } from "../bridge/opencode/bridge";
 import type { WorkspaceStore } from "../workspace/store";
 import { BoardSessionRegistry } from "./board-session-registry";
+
+const logger = createLogger(
+  { env: process.env.NODE_ENV === "production" ? "production" : "development" },
+  "SERVE:TASKS"
+);
 
 export class BoardTaskService {
   readonly #bridge: OpenCodeBridge;
@@ -37,13 +43,42 @@ export class BoardTaskService {
     const existing = this.#registry.get(input.boardId);
     const persistedBoard = this.#workspaceStore.getBoard(input.boardId);
 
+    logger.info("queue-prompt:start", {
+      boardId: input.boardId,
+      directory: input.directory,
+      model: input.model
+        ? `${input.model.providerID}/${input.model.modelID}`
+        : undefined,
+      textPreview: input.text.slice(0, 100),
+    });
+
+    await this.#bridge.subscribeDirectory(input.directory);
+
     let sessionId =
       input.sessionId ??
       existing?.sessionId ??
       persistedBoard?.session.sessionId;
     let createdSession = false;
 
-    if (!sessionId) {
+    if (sessionId) {
+      let source = "persisted";
+      if (input.sessionId) {
+        source = "input";
+      } else if (existing) {
+        source = "registry";
+      }
+
+      logger.info("queue-prompt:reusing-session", {
+        sessionId,
+        boardId: input.boardId,
+        source,
+      });
+    } else {
+      logger.info("queue-prompt:creating-session", {
+        boardId: input.boardId,
+        directory: input.directory,
+      });
+
       const session = await this.#bridge.createSession({
         title: input.text.slice(0, 80),
         directory: input.directory,
@@ -51,6 +86,11 @@ export class BoardTaskService {
 
       sessionId = session.id;
       createdSession = true;
+
+      logger.info("queue-prompt:session-created", {
+        sessionId,
+        boardId: input.boardId,
+      });
     }
 
     this.#registry.set({
@@ -66,12 +106,26 @@ export class BoardTaskService {
       state: "active",
     });
 
-    await this.#bridge.promptSession({
+    logger.info("queue-prompt:sending-async", {
+      sessionId,
+      boardId: input.boardId,
+      directory: input.directory,
+      model: input.model
+        ? `${input.model.providerID}/${input.model.modelID}`
+        : undefined,
+    });
+
+    await this.#bridge.promptSessionAsync({
       sessionID: sessionId,
       directory: input.directory,
       text: input.text,
       model: input.model,
       agent: input.agent,
+    });
+
+    logger.info("queue-prompt:prompt-queued", {
+      sessionId,
+      boardId: input.boardId,
     });
 
     return {

@@ -8,6 +8,7 @@ function makeMockBridge() {
   return {
     createSession: mock(async () => ({ id: "sess-123" })),
     promptSession: mock(async () => undefined),
+    promptSessionAsync: mock(async () => undefined),
   };
 }
 
@@ -57,7 +58,7 @@ describe("BoardTaskService", () => {
       title: "build feature",
       directory: "/tmp/repo",
     });
-    expect(bridge.promptSession).toHaveBeenCalledWith({
+    expect(bridge.promptSessionAsync).toHaveBeenCalledWith({
       sessionID: "sess-123",
       directory: "/tmp/repo",
       text: "build feature",
@@ -111,7 +112,7 @@ describe("BoardTaskService", () => {
 
     expect(result.createdSession).toBe(false);
     expect(bridge.createSession).toHaveBeenCalledTimes(0);
-    expect(bridge.promptSession).toHaveBeenLastCalledWith({
+    expect(bridge.promptSessionAsync).toHaveBeenLastCalledWith({
       sessionID: "sess-123",
       directory: "/tmp/repo",
       text: "follow up",
