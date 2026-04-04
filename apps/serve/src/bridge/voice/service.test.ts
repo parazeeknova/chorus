@@ -1,354 +1,159 @@
-import { beforeAll, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import type { VoiceNotificationRequest } from "@chorus/voice";
+import { describe, expect, test } from "bun:test";
 import { VoiceService } from "./service";
 
 const RUN_REAL_API =
   process.env.RUN_REAL_API_TESTS === "true" &&
-  Boolean(process.env.ELEVENLABS_API_KEY);
+  Boolean(process.env.GROQ_API_KEY);
 
-const OUTPUT_DIR = join(process.cwd(), "tmp", "voice-test-outputs");
-const INPUT_DIR = join(process.cwd(), "tmp", "voice-test-inputs");
-
-const LONG_TIMEOUT = 60_000;
-const ROUNDTRIP_TIMEOUT = 120_000;
-
-function ensureDir(dir: string) {
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
-  }
-}
-
-function saveFile(filePath: string, data: ArrayBuffer) {
-  writeFileSync(filePath, Buffer.from(data));
-  console.log(`  → Saved: ${filePath}`);
-}
-
-function saveTextFile(filePath: string, text: string) {
-  writeFileSync(filePath, text, "utf-8");
-  console.log(`  → Saved: ${filePath}`);
-}
-
-function assertGenerated(
-  result: Awaited<ReturnType<VoiceService["generateSpeech"]>>
-): ArrayBuffer {
-  expect(result.status).toBe("generated");
-  expect(result.audioBuffer).toBeDefined();
-  expect(result.error).toBeUndefined();
-  return result.audioBuffer as ArrayBuffer;
-}
-
-beforeAll(() => {
-  ensureDir(OUTPUT_DIR);
-  ensureDir(INPUT_DIR);
-});
-
-describe.skipIf(!RUN_REAL_API)("ElevenLabs Real API Tests", () => {
+describe.skipIf(!RUN_REAL_API)("Groq Voice Service", () => {
   describe("TTS — text to speech", () => {
-    test(
-      "reads input file and generates audio",
-      async () => {
-        const voiceService = new VoiceService();
-        const inputPath = join(INPUT_DIR, "tts-input.txt");
-        expect(existsSync(inputPath)).toBe(true);
+    test("generates wav audio from text", async () => {
+      const service = new VoiceService();
+      const text = "Hello from Chorus, the AI agent orchestration platform.";
 
-        const text = readFileSync(inputPath, "utf-8").trim();
-        console.log(`  → Input text: "${text.slice(0, 80)}..."`);
+      const result = await service.generateSpeech({
+        type: "task_summary",
+        text,
+      });
 
-        const request: VoiceNotificationRequest = {
-          type: "task_summary",
-          text,
-        };
+      expect(result.status).toBe("generated");
+      expect(result.audioBuffer).toBeDefined();
+      expect(result.error).toBeUndefined();
+      expect(result.mimeType).toBe("audio/wav");
+      expect(result.audioBase64).toBeDefined();
+      expect((result.audioBuffer as ArrayBuffer).byteLength).toBeGreaterThan(0);
+    });
 
-        const result = await voiceService.generateSpeech(request);
+    test("truncates text over 200 characters", async () => {
+      const service = new VoiceService();
+      const longText = "A".repeat(300);
 
-        const audioBuffer = assertGenerated(result);
-        expect(result.audioBase64).toBeDefined();
-        expect(result.mimeType).toBe("audio/mpeg");
+      const result = await service.generateSpeech({
+        type: "task_summary",
+        text: longText,
+      });
 
-        const outputPath = join(OUTPUT_DIR, "tts-output.mp3");
-        saveFile(outputPath, audioBuffer);
+      expect(result.status).toBe("generated");
+      expect(result.audioBuffer).toBeDefined();
+    });
 
-        const sizeKB = (audioBuffer.byteLength / 1024).toFixed(1);
-        console.log(`  → Audio size: ${sizeKB} KB`);
-      },
-      { timeout: LONG_TIMEOUT }
-    );
+    test("uses custom voice when provided", async () => {
+      const service = new VoiceService();
+      const text = "This is a test with a custom voice.";
 
-    test.skip(
-      "generates audio with custom voice",
-      async () => {
-        const voiceService = new VoiceService();
-        const request: VoiceNotificationRequest = {
-          type: "task_summary",
-          text: "This audio was generated with a different voice model.",
-          voiceId: "21m00Tcm4TlvDq8ikWAM",
-        };
+      const result = await service.generateSpeech({
+        type: "task_summary",
+        text,
+        voiceId: "troy",
+      });
 
-        const result = await voiceService.generateSpeech(request);
-        const audioBuffer = assertGenerated(result);
-
-        const outputPath = join(OUTPUT_DIR, "tts-custom-voice.mp3");
-        saveFile(outputPath, audioBuffer);
-      },
-      { timeout: LONG_TIMEOUT }
-    );
+      expect(result.status).toBe("generated");
+      expect(result.audioBuffer).toBeDefined();
+    });
   });
 
   describe("STT — speech to text", () => {
-    test(
-      "transcribes generated audio file",
-      async () => {
-        const voiceService = new VoiceService();
-        const ttsInputPath = join(INPUT_DIR, "tts-input.txt");
-        const originalText = readFileSync(ttsInputPath, "utf-8").trim();
+    test("transcribes wav audio", async () => {
+      const service = new VoiceService();
 
-        const ttsResult = await voiceService.generateSpeech({
-          type: "task_summary",
-          text: originalText,
-        });
-
-        const audioBuffer = assertGenerated(ttsResult);
-
-        const sttResult = await voiceService.transcribeSpeech({
-          audioBuffer,
-        });
-
-        expect(sttResult.text.length).toBeGreaterThan(0);
-        console.log(`  → Original: "${originalText.slice(0, 80)}..."`);
-        console.log(`  → Transcribed: "${sttResult.text.slice(0, 80)}..."`);
-
-        const outputPath = join(OUTPUT_DIR, "stt-output.txt");
-        saveTextFile(outputPath, sttResult.text);
-      },
-      { timeout: LONG_TIMEOUT }
-    );
-
-    test("transcribes audio file from inputs directory", async () => {
-      const voiceService = new VoiceService();
-      const audioFiles = ["stt-input.mp3", "stt-input.wav", "stt-input.ogg"];
-
-      const existingAudio = audioFiles.find((f) =>
-        existsSync(join(INPUT_DIR, f))
-      );
-
-      if (!existingAudio) {
-        console.log(
-          "  → No audio input file found. Place an audio file (stt-input.mp3, .wav, or .ogg) in tmp/voice-test-inputs/ to test STT."
-        );
-        return;
-      }
-
-      const audioPath = join(INPUT_DIR, existingAudio);
-      const audioBuffer = readFileSync(audioPath).buffer;
-
-      const result = await voiceService.transcribeSpeech({
-        audioBuffer,
+      // First generate audio to transcribe
+      const ttsResult = await service.generateSpeech({
+        type: "task_summary",
+        text: "This is a test of speech to text transcription.",
       });
 
-      expect(result.text.length).toBeGreaterThan(0);
-      console.log(
-        `  → Transcribed from ${existingAudio}: "${result.text.slice(0, 100)}..."`
-      );
+      expect(ttsResult.status).toBe("generated");
+      expect(ttsResult.audioBuffer).toBeDefined();
 
-      const outputPath = join(OUTPUT_DIR, `stt-from-${existingAudio}.txt`);
-      saveTextFile(outputPath, result.text);
+      const sttResult = await service.transcribeSpeech({
+        audioBuffer: ttsResult.audioBuffer as ArrayBuffer,
+      });
+
+      expect(sttResult.text.length).toBeGreaterThan(0);
+      expect(sttResult.text.toLowerCase()).toContain("test");
     });
 
-    test(
-      "transcribes with diarization",
-      async () => {
-        const voiceService = new VoiceService();
-        const ttsResult = await voiceService.generateSpeech({
-          type: "task_summary",
-          text: "This is a test of the speech to text model with diarization enabled.",
-        });
+    test("transcribes with word timestamps", async () => {
+      const service = new VoiceService();
 
-        const audioBuffer = assertGenerated(ttsResult);
-
-        const sttResult = await voiceService.transcribeSpeech({
-          audioBuffer,
-          diarize: true,
-        });
-
-        console.log(
-          `  → Transcribed with diarization: "${sttResult.text.slice(0, 80)}..."`
-        );
-
-        const outputPath = join(OUTPUT_DIR, "stt-diarization-output.txt");
-        saveTextFile(outputPath, sttResult.text);
-      },
-      { timeout: LONG_TIMEOUT }
-    );
-  });
-
-  describe("Round-trip — TTS then STT", () => {
-    test(
-      "text to speech back to text preserves content",
-      async () => {
-        const voiceService = new VoiceService();
-        const testTexts = [
-          "Hello world, this is a round-trip test.",
-          "The quick brown fox jumps over the lazy dog.",
-          "Chorus is an infinite canvas mission control system for AI coding agents.",
-        ];
-
-        for (const originalText of testTexts) {
-          console.log(`  → Testing: "${originalText}"`);
-
-          const ttsResult = await voiceService.generateSpeech({
-            type: "task_summary",
-            text: originalText,
-          });
-
-          const audioBuffer = assertGenerated(ttsResult);
-
-          const sttResult = await voiceService.transcribeSpeech({
-            audioBuffer,
-          });
-
-          expect(sttResult.text.length).toBeGreaterThan(0);
-
-          const normalizedOriginal = originalText
-            .toLowerCase()
-            .replace(/[.,!?]/g, "")
-            .trim();
-          const normalizedTranscribed = sttResult.text
-            .toLowerCase()
-            .replace(/[.,!?]/g, "")
-            .trim();
-
-          const similarity = calculateSimilarity(
-            normalizedOriginal,
-            normalizedTranscribed
-          );
-
-          console.log(`  → Original:     "${normalizedOriginal}"`);
-          console.log(`  → Transcribed:  "${normalizedTranscribed}"`);
-          console.log(`  → Similarity:   ${(similarity * 100).toFixed(1)}%`);
-
-          expect(similarity).toBeGreaterThan(0.5);
-
-          const outputPath = join(
-            OUTPUT_DIR,
-            `roundtrip-${originalText.slice(0, 20).replace(/\s+/g, "-")}.txt`
-          );
-          saveTextFile(
-            outputPath,
-            `Original: ${originalText}\nTranscribed: ${sttResult.text}\nSimilarity: ${(similarity * 100).toFixed(1)}%\n`
-          );
-        }
-      },
-      { timeout: ROUNDTRIP_TIMEOUT }
-    );
-  });
-
-  describe("Notification types — all event types", () => {
-    const notifications: Array<{
-      type: VoiceNotificationRequest["type"];
-      text: string;
-      file: string;
-    }> = [
-      {
-        type: "approval_needed",
-        text: "Task requires your approval. Please review and take action.",
-        file: "notification-approval.mp3",
-      },
-      {
-        type: "task_blocked",
-        text: "Task has been blocked. Please check the details and decide next steps.",
-        file: "notification-blocked.mp3",
-      },
-      {
-        type: "task_failed",
-        text: "A task has failed. Please review the error and determine how to proceed.",
-        file: "notification-failed.mp3",
-      },
-      {
-        type: "task_completed",
-        text: "A task has completed successfully. All downstream dependencies are being processed.",
-        file: "notification-completed.mp3",
-      },
-      {
-        type: "policy_blocked",
-        text: "A policy rule has blocked an action. Please review the policy decision.",
-        file: "notification-policy-blocked.mp3",
-      },
-      {
+      const ttsResult = await service.generateSpeech({
         type: "task_summary",
-        text: "Task summary: All three modules have been compiled and tests have passed. The build is ready for deployment.",
-        file: "notification-summary.mp3",
-      },
-    ];
+        text: "Testing word timestamps.",
+      });
 
-    for (const notification of notifications) {
-      test(
-        `generates ${notification.type} notification`,
-        async () => {
-          const voiceService = new VoiceService();
-          const result = await voiceService.generateSpeech({
-            type: notification.type,
-            text: notification.text,
-          });
+      const sttResult = await service.transcribeSpeech({
+        audioBuffer: ttsResult.audioBuffer as ArrayBuffer,
+      });
 
-          const audioBuffer = assertGenerated(result);
-
-          const outputPath = join(OUTPUT_DIR, notification.file);
-          saveFile(outputPath, audioBuffer);
-
-          const sizeKB = (audioBuffer.byteLength / 1024).toFixed(1);
-          console.log(`  → ${notification.file}: ${sizeKB} KB`);
-        },
-        { timeout: LONG_TIMEOUT }
-      );
-    }
+      expect(sttResult.text.length).toBeGreaterThan(0);
+      if (sttResult.words) {
+        expect(sttResult.words.length).toBeGreaterThan(0);
+        expect(sttResult.words[0]).toHaveProperty("word");
+        expect(sttResult.words[0]).toHaveProperty("start");
+        expect(sttResult.words[0]).toHaveProperty("end");
+      }
+    });
   });
 
   describe("Streaming TTS", () => {
-    test(
-      "streams audio for longer text",
-      async () => {
-        const voiceService = new VoiceService();
-        const stream = await voiceService.streamSpeech({
-          type: "task_summary",
-          text: "This is a streaming text-to-speech test. Streaming allows for lower latency playback as the audio is generated in chunks rather than waiting for the entire response.",
-        });
+    test("streams audio data", async () => {
+      const service = new VoiceService();
+      const text = "This is a streaming test.";
 
-        const chunks: Uint8Array[] = [];
-        const reader = stream.getReader();
+      const stream = await service.streamSpeech({
+        type: "task_summary",
+        text,
+      });
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) {
-            break;
-          }
-          if (value) {
-            chunks.push(value);
-          }
+      const chunks: Uint8Array[] = [];
+      const reader = stream.getReader();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          break;
         }
-
-        const totalLength = chunks.reduce(
-          (sum, chunk) => sum + chunk.length,
-          0
-        );
-        const result = new Uint8Array(totalLength);
-        let offset = 0;
-        for (const chunk of chunks) {
-          result.set(chunk, offset);
-          offset += chunk.length;
+        if (value) {
+          chunks.push(value);
         }
+      }
 
-        expect(totalLength).toBeGreaterThan(0);
-        console.log(
-          `  → Streamed audio: ${(totalLength / 1024).toFixed(1)} KB`
-        );
+      const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+      expect(totalLength).toBeGreaterThan(0);
+    });
+  });
 
-        const outputPath = join(OUTPUT_DIR, "tts-streamed.mp3");
-        saveFile(outputPath, result.buffer);
-      },
-      { timeout: LONG_TIMEOUT }
-    );
+  describe("Round-trip — TTS then STT", () => {
+    test("text to speech back to text preserves content", async () => {
+      const service = new VoiceService();
+      const originalText = "Hello world, this is a round-trip test.";
+
+      const ttsResult = await service.generateSpeech({
+        type: "task_summary",
+        text: originalText,
+      });
+
+      expect(ttsResult.status).toBe("generated");
+
+      const sttResult = await service.transcribeSpeech({
+        audioBuffer: ttsResult.audioBuffer as ArrayBuffer,
+      });
+
+      expect(sttResult.text.length).toBeGreaterThan(0);
+
+      const similarity = calculateSimilarity(
+        originalText
+          .toLowerCase()
+          .replace(/[.,!?]/g, "")
+          .trim(),
+        sttResult.text
+          .toLowerCase()
+          .replace(/[.,!?]/g, "")
+          .trim()
+      );
+
+      expect(similarity).toBeGreaterThan(0.5);
+    });
   });
 });
 

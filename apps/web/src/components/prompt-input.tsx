@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowUp, Mic, MoreHorizontal, XIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -13,6 +13,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useWorkspace } from "@/features/workspace/workspace-context";
 import { useVoiceRecording } from "@/hooks/use-voice-recording";
+import { fetchVoiceConfig, type GroqVoice } from "@/lib/voice-api";
 
 const MODEL_OPTIONS = {
   default: undefined,
@@ -34,6 +35,9 @@ export function PromptInput() {
   const [prompt, setPrompt] = useState("");
   const [selectedModel, setSelectedModel] =
     useState<keyof typeof MODEL_OPTIONS>("default");
+  const [selectedVoice, setSelectedVoice] = useState("hannah");
+  const [voices, setVoices] = useState<GroqVoice[]>([]);
+
   const {
     boards,
     dismissComposerHint,
@@ -43,6 +47,17 @@ export function PromptInput() {
     selectedBoard,
     selectBoard,
   } = useWorkspace();
+
+  useEffect(() => {
+    fetchVoiceConfig()
+      .then((config) => {
+        setVoices(config.voices);
+        setSelectedVoice(config.defaultVoice);
+      })
+      .catch(() => {
+        // Silently fail - voice config is optional
+      });
+  }, []);
 
   const isBusy =
     isQueueingPrompt || selectedBoard?.session.state === "starting";
@@ -154,6 +169,25 @@ export function PromptInput() {
                       <SelectItem value="gemini">Gemini 2.5 Pro</SelectItem>
                     </SelectContent>
                   </Select>
+                  {voices.length > 0 && (
+                    <Select
+                      onValueChange={(value) =>
+                        value && setSelectedVoice(value)
+                      }
+                      value={selectedVoice}
+                    >
+                      <SelectTrigger className="h-7 w-auto gap-1 rounded-md border-0 bg-white/5 px-2.5 py-1 font-medium text-white/60 text-xs shadow-none hover:bg-white/10 hover:text-white/80 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 data-[state=open]:bg-white/10 data-[state=open]:text-white dark:bg-white/5 dark:data-[state=open]:bg-white/10 dark:data-[state=open]:text-white dark:hover:bg-white/10">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="border-white/10 bg-[#161616] text-white/90">
+                        {voices.map((voice) => (
+                          <SelectItem key={voice.id} value={voice.id}>
+                            {voice.name} ({voice.gender})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <Select
