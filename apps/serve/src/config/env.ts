@@ -3,17 +3,13 @@ import { z } from "zod";
 
 export const env = createEnv({
   server: {
-    ELEVENLABS_API_KEY: z.string().optional(),
-    ELEVENLABS_DEFAULT_VOICE_ID: z
+    GROQ_API_KEY: z.string().optional(),
+    GROQ_TTS_DEFAULT_MODEL_ID: z
       .string()
       .min(1)
-      .default("Xb7hH8MSUJpSbSDYk0k2"),
-    ELEVENLABS_DEFAULT_MODEL_ID: z
-      .string()
-      .min(1)
-      .default("eleven_multilingual_v2"),
-    ELEVENLABS_OUTPUT_FORMAT: z.string().min(1).default("mp3_44100_128"),
-    ELEVENLABS_STT_MODEL_ID: z.string().min(1).default("scribe_v1"),
+      .default("canopylabs/orpheus-v1-english"),
+    GROQ_TTS_DEFAULT_VOICE: z.string().min(1).default("hannah"),
+    GROQ_STT_MODEL_ID: z.string().min(1).default("whisper-large-v3-turbo"),
 
     ARMORIQ_API_KEY: z.string().optional(),
     ARMORIQ_USER_ID: z.string().min(1).default("chorus-dev-user"),

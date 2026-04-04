@@ -1,5 +1,6 @@
 import path from "node:path";
 import { createLogger } from "@chorus/logger";
+import { cors } from "@elysiajs/cors";
 import { Elysia } from "elysia";
 import { OpenCodeBridge } from "./bridge/opencode/bridge";
 import { loadConfig } from "./config";
@@ -66,6 +67,7 @@ bridge.subscribe((event) => {
 });
 
 const app = new Elysia()
+  .use(cors())
   .onStart(() => {
     logger.info("server-starting", { port: config.port });
   })
