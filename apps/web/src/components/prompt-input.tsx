@@ -2,6 +2,11 @@
 
 import { ArrowUp, Mic, MoreHorizontal, XIcon } from "lucide-react";
 import { useEffect, useState } from "react";
+import {
+  MODEL_OPTIONS,
+  type ModelOptionKey,
+  ModelPicker,
+} from "@/components/model-picker";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -16,22 +21,6 @@ import { useVoiceRecording } from "@/hooks/use-voice-recording";
 import { cn } from "@/lib/utils";
 import { fetchVoiceConfig, type GroqVoice } from "@/lib/voice-api";
 
-const MODEL_OPTIONS = {
-  default: undefined,
-  claude: {
-    providerID: "anthropic",
-    modelID: "claude-sonnet-4-5",
-  },
-  gpt4_1: {
-    providerID: "openai",
-    modelID: "gpt-4.1",
-  },
-  gemini: {
-    providerID: "google",
-    modelID: "gemini-2.5-pro",
-  },
-} as const;
-
 const composerSelectTriggerClass =
   "h-7 min-w-0 gap-1.5 rounded-xs border border-white/8 bg-white/[0.04] px-2.5 py-1 font-medium text-[11px] text-white/72 shadow-none transition-colors hover:border-white/14 hover:bg-white/[0.07] hover:text-white/90 focus-visible:border-white/16 focus-visible:bg-white/[0.08] focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 disabled:opacity-40 dark:border-white/8 dark:bg-white/[0.04] dark:hover:bg-white/[0.07]";
 
@@ -43,8 +32,7 @@ const composerSelectItemClass =
 
 export function PromptInput() {
   const [prompt, setPrompt] = useState("");
-  const [selectedModel, setSelectedModel] =
-    useState<keyof typeof MODEL_OPTIONS>("default");
+  const [selectedModel, setSelectedModel] = useState<ModelOptionKey>("default");
   const [selectedVoice, setSelectedVoice] = useState("hannah");
   const [voices, setVoices] = useState<GroqVoice[]>([]);
 
@@ -165,46 +153,11 @@ export function PromptInput() {
               />
               <div className="flex items-center justify-between opacity-80 transition-opacity focus-within:opacity-100">
                 <div className="flex items-center gap-2">
-                  <Select
-                    onValueChange={(value) => value && setSelectedModel(value)}
+                  <ModelPicker
+                    className={composerSelectTriggerClass}
+                    onValueChange={setSelectedModel}
                     value={selectedModel}
-                  >
-                    <SelectTrigger
-                      className={composerSelectTriggerClass}
-                      size="sm"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent
-                      align="start"
-                      className={cn("min-w-48", composerSelectContentClass)}
-                    >
-                      <SelectItem
-                        className={composerSelectItemClass}
-                        value="default"
-                      >
-                        OpenCode Default
-                      </SelectItem>
-                      <SelectItem
-                        className={composerSelectItemClass}
-                        value="claude"
-                      >
-                        Claude Sonnet 4.5
-                      </SelectItem>
-                      <SelectItem
-                        className={composerSelectItemClass}
-                        value="gpt4_1"
-                      >
-                        GPT-4.1
-                      </SelectItem>
-                      <SelectItem
-                        className={composerSelectItemClass}
-                        value="gemini"
-                      >
-                        Gemini 2.5 Pro
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                  />
                   {voices.length > 0 && (
                     <Select
                       onValueChange={(value) =>
