@@ -1,4 +1,8 @@
-import type { BoardSeed, ProjectListResponse } from "@chorus/contracts";
+import type {
+  BoardSeed,
+  OpencodeModelCatalog,
+  ProjectListResponse,
+} from "@chorus/contracts";
 import { OpenCodeAdapter } from "@chorus/oc-adapter";
 import type { FolderPicker } from "./folder-picker";
 
@@ -53,6 +57,39 @@ export class ProjectService {
         sandboxes: project.sandboxes,
       })),
     };
+  }
+
+  listModels(): Promise<OpencodeModelCatalog> {
+    return this.listModelsForDirectory(this.#defaultDirectory);
+  }
+
+  listModelsForDirectory(directory: string): Promise<OpencodeModelCatalog> {
+    const adapter = OpenCodeAdapter.from({
+      baseUrl: this.#baseUrl,
+      directory,
+    });
+
+    return adapter.providers.listModels({
+      directory,
+    });
+  }
+
+  openModels(directory: string): Promise<boolean> {
+    const adapter = OpenCodeAdapter.from({
+      baseUrl: this.#baseUrl,
+      directory,
+    });
+
+    return adapter.tui.openModels({ directory });
+  }
+
+  runConnect(directory: string): Promise<boolean> {
+    const adapter = OpenCodeAdapter.from({
+      baseUrl: this.#baseUrl,
+      directory,
+    });
+
+    return adapter.tui.runConnect({ directory });
   }
 
   inspectDirectory(directory: string) {

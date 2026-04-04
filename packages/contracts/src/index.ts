@@ -26,6 +26,27 @@ export const modelSelectionSchema = z.object({
   modelID: z.string().min(1),
 });
 
+export const opencodeModelSummarySchema = z.object({
+  attachment: z.boolean(),
+  connected: z.boolean(),
+  modelID: z.string().min(1),
+  name: z.string().min(1),
+  providerID: z.string().min(1),
+  providerName: z.string().min(1),
+  reasoning: z.boolean(),
+  releaseDate: z.string().min(1),
+  status: z
+    .union([z.literal("alpha"), z.literal("beta"), z.literal("deprecated")])
+    .optional(),
+  temperature: z.boolean(),
+  toolCall: z.boolean(),
+});
+
+export const opencodeModelCatalogSchema = z.object({
+  defaultModel: modelSelectionSchema.optional(),
+  models: z.array(opencodeModelSummarySchema),
+});
+
 export const agentStepKindSchema = z.union([
   z.literal("thinking"),
   z.literal("response"),
@@ -206,6 +227,8 @@ export type RepoContext = z.infer<typeof repoContextSchema>;
 export type BoardSeed = z.infer<typeof boardSeedSchema>;
 export type ProjectListResponse = z.infer<typeof projectListResponseSchema>;
 export type ModelSelection = z.infer<typeof modelSelectionSchema>;
+export type OpencodeModelSummary = z.infer<typeof opencodeModelSummarySchema>;
+export type OpencodeModelCatalog = z.infer<typeof opencodeModelCatalogSchema>;
 export type AgentStep = z.infer<typeof agentStepSchema>;
 export type AgentRunContext = z.infer<typeof agentRunContextSchema>;
 export type Task = z.infer<typeof taskSchema>;

@@ -1,7 +1,12 @@
 "use client";
 
+import {
+  type ModelSelection,
+  type OpencodeModelSummary,
+  opencodeModelCatalogSchema,
+} from "@chorus/contracts";
 import { ArrowUp, Mic, MoreHorizontal, XIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -14,26 +19,21 @@ import { Textarea } from "@/components/ui/textarea";
 import { useWorkspace } from "@/features/workspace/workspace-context";
 import { useVoiceRecording } from "@/hooks/use-voice-recording";
 
-const MODEL_OPTIONS = {
-  default: undefined,
-  claude: {
-    providerID: "anthropic",
-    modelID: "claude-sonnet-4-5",
-  },
-  gpt4_1: {
-    providerID: "openai",
-    modelID: "gpt-4.1",
-  },
-  gemini: {
-    providerID: "google",
-    modelID: "gemini-2.5-pro",
-  },
-} as const;
+const DEFAULT_MODEL_KEY = "default";
+
+function createModelKey(model: ModelSelection) {
+  return `${model.providerID}/${model.modelID}`;
+}
 
 export function PromptInput() {
   const [prompt, setPrompt] = useState("");
-  const [selectedModel, setSelectedModel] =
-    useState<keyof typeof MODEL_OPTIONS>("default");
+  const [selectedModelKey, setSelectedModelKey] = useState(DEFAULT_MODEL_KEY);
+  const [availableModels, setAvailableModels] = useState<
+    OpencodeModelSummary[]
+  >([]);
+  const [defaultModel, setDefaultModel] = useState<
+    ModelSelection | undefined
+  >();
   const {
     boards,
     dismissComposerHint,
@@ -47,6 +47,7 @@ export function PromptInput() {
   const isBusy =
     isQueueingPrompt || selectedBoard?.session.state === "starting";
   const hasActiveRun = selectedBoard?.session.currentTaskId !== undefined;
+  const selectedDirectory = selectedBoard?.repo.directory ?? null;
   let sessionMessage = "First prompt will start a new OpenCode session.";
 
   if (hasActiveRun) {
@@ -63,6 +64,87 @@ export function PromptInput() {
 
   const { isRecording, isTranscribing, startRecording, stopRecording } =
     useVoiceRecording(handleTranscriptionComplete);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function loadModels() {
+      try {
+        const query = selectedDirectory
+          ? `?directory=${encodeURIComponent(selectedDirectory)}`
+          : "";
+        const response = await fetch(`/api/models${query}`, {
+          cache: "no-store",
+        });
+
+        if (!response.ok || isCancelled) {
+          return;
+        }
+
+        const payload = opencodeModelCatalogSchema.parse(await response.json());
+        if (isCancelled) {
+          return;
+        }
+
+        setAvailableModels(payload.models);
+        setDefaultModel(payload.defaultModel);
+        setSelectedModelKey(DEFAULT_MODEL_KEY);
+      } catch (error) {
+        console.error("Failed to load OpenCode models", error);
+      }
+    }
+
+    loadModels().catch((error) => {
+      console.error("Failed to load OpenCode models", error);
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [selectedDirectory]);
+
+  const selectedModel = useMemo(() => {
+    if (selectedModelKey === DEFAULT_MODEL_KEY) {
+      return undefined;
+    }
+
+    const [providerID, modelID] = selectedModelKey.split("/");
+    if (!(providerID && modelID)) {
+      return undefined;
+    }
+
+    return {
+      providerID,
+      modelID,
+    } satisfies ModelSelection;
+  }, [selectedModelKey]);
+
+  const defaultModelSummary = useMemo(() => {
+    if (!defaultModel) {
+      return null;
+    }
+
+    return (
+      availableModels.find(
+        (model) =>
+          model.providerID === defaultModel.providerID &&
+          model.modelID === defaultModel.modelID
+      ) ?? null
+    );
+  }, [availableModels, defaultModel]);
+  let defaultModelTitle = "Auto · OpenCode selection";
+  let defaultModelDescription = "Uses OpenCode's current model resolution";
+
+  if (availableModels.length === 0) {
+    defaultModelTitle = "No OpenCode models available";
+    defaultModelDescription = "Use Settings -> OpenCode to connect a provider";
+  } else if (defaultModelSummary) {
+    defaultModelTitle = `Auto · ${defaultModelSummary.name}`;
+  }
+
+  if (availableModels.length > 0 && defaultModel) {
+    defaultModelDescription = `${defaultModel.providerID}/${defaultModel.modelID}`;
+  }
 
   const handleVoiceButtonClick = async () => {
     if (isRecording) {
@@ -81,7 +163,7 @@ export function PromptInput() {
 
     const result = await queuePrompt({
       text: prompt.trim(),
-      model: MODEL_OPTIONS[selectedModel],
+      model: selectedModel,
     });
 
     if (result) {
@@ -141,17 +223,37 @@ export function PromptInput() {
               <div className="flex items-center justify-between opacity-80 transition-opacity focus-within:opacity-100">
                 <div className="flex items-center gap-2">
                   <Select
-                    onValueChange={(value) => value && setSelectedModel(value)}
-                    value={selectedModel}
+                    onValueChange={(value) =>
+                      value && setSelectedModelKey(value)
+                    }
+                    value={selectedModelKey}
                   >
                     <SelectTrigger className="h-7 w-auto gap-1 rounded-md border-0 bg-white/5 px-2.5 py-1 font-semibold text-white/70 text-xs shadow-none hover:bg-white/10 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 data-[state=open]:bg-white/10 data-[state=open]:text-white dark:bg-white/5 dark:data-[state=open]:bg-white/10 dark:data-[state=open]:text-white dark:hover:bg-white/10">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="border-white/10 bg-[#161616] text-white/90">
-                      <SelectItem value="default">OpenCode Default</SelectItem>
-                      <SelectItem value="claude">Claude Sonnet 4.5</SelectItem>
-                      <SelectItem value="gpt4_1">GPT-4.1</SelectItem>
-                      <SelectItem value="gemini">Gemini 2.5 Pro</SelectItem>
+                      <SelectItem value={DEFAULT_MODEL_KEY}>
+                        <span className="flex min-w-0 flex-col">
+                          <span className="truncate">{defaultModelTitle}</span>
+                          <span className="truncate text-[11px] text-white/40">
+                            {defaultModelDescription}
+                          </span>
+                        </span>
+                      </SelectItem>
+                      {availableModels.map((model) => (
+                        <SelectItem
+                          key={`${model.providerID}/${model.modelID}`}
+                          value={createModelKey(model)}
+                        >
+                          <span className="flex min-w-0 flex-col">
+                            <span className="truncate">{model.name}</span>
+                            <span className="truncate text-[11px] text-white/40">
+                              {model.providerName} · {model.providerID}/
+                              {model.modelID}
+                            </span>
+                          </span>
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

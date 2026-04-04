@@ -3,8 +3,10 @@ import { createOpencodeClient as createSDKClient } from "@opencode-ai/sdk/v2";
 import { EventStream, normalizeEvent } from "./features/events/event-stream";
 import { PermissionHandler } from "./features/permissions/permission-handler";
 import { ProjectManager } from "./features/projects/project-manager";
+import { ProviderManager } from "./features/providers/provider-manager";
 import { RaceManager } from "./features/race/race-manager";
 import { SessionManager } from "./features/session/session-manager";
+import { TuiManager } from "./features/tui/tui-manager";
 
 export type {
   Event,
@@ -32,6 +34,10 @@ export type {
   RepoProject,
   RepoWorktree,
 } from "./features/projects/project-manager";
+export type {
+  OpencodeModelCatalog,
+  OpencodeModelSummary,
+} from "./features/providers/provider-manager";
 export type { RaceConfig, RaceResult } from "./features/race/race-manager";
 export type {
   SessionCommandInput,
@@ -40,6 +46,7 @@ export type {
   SessionPromptAsyncInput,
   SessionPromptInput,
 } from "./features/session/session-manager";
+export type { TuiLookupInput } from "./features/tui/tui-manager";
 
 export function createClient(
   options?: import("./features/client/client").ClientOptions
@@ -59,7 +66,9 @@ export class OpenCodeAdapter {
   readonly events: EventStream;
   readonly permissions: PermissionHandler;
   readonly projects: ProjectManager;
+  readonly providers: ProviderManager;
   readonly races: RaceManager;
+  readonly tui: TuiManager;
 
   constructor(client: OpencodeClient) {
     this.client = client;
@@ -67,7 +76,9 @@ export class OpenCodeAdapter {
     this.events = new EventStream(client);
     this.permissions = new PermissionHandler(client);
     this.projects = new ProjectManager(client);
+    this.providers = new ProviderManager(client);
     this.races = new RaceManager(client);
+    this.tui = new TuiManager(client);
   }
 
   static from(options?: {

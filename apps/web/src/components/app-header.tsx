@@ -3,9 +3,11 @@
 import {
   BellIcon,
   CheckCircle2Icon,
+  CpuIcon,
   EyeIcon,
   FolderOpenIcon,
   HelpCircleIcon,
+  PlugZapIcon,
   Settings,
   TriangleAlertIcon,
   XIcon,
@@ -242,6 +244,7 @@ export function AppHeader() {
     openFolder,
     previousWorkspaces,
     recentProjects,
+    selectedBoard,
   } = useWorkspace();
 
   // Close pane on outside click
@@ -259,6 +262,46 @@ export function AppHeader() {
   }, [notifOpen]);
 
   const unreadCount = INITIAL_NOTIFICATIONS.filter((n) => !n.read).length;
+
+  async function openOpencodeModels() {
+    if (!selectedBoard) {
+      return;
+    }
+
+    const response = await fetch("/api/opencode/models", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        directory: selectedBoard.repo.directory,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to open OpenCode model selector");
+    }
+  }
+
+  async function openOpencodeConnect() {
+    if (!selectedBoard) {
+      return;
+    }
+
+    const response = await fetch("/api/opencode/connect", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        directory: selectedBoard.repo.directory,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to run OpenCode /connect");
+    }
+  }
 
   return (
     <header className="pointer-events-none fixed inset-x-0 top-0 z-50 px-3 pt-3 sm:px-4">
@@ -452,14 +495,63 @@ export function AppHeader() {
             </div>
 
             {/* Settings button */}
-            <button
-              aria-label="Settings"
-              className="group relative flex h-12 w-12 items-center justify-center text-zinc-300 transition duration-300 hover:text-white"
-              type="button"
-            >
-              <div className="absolute inset-[5px] rounded-[1rem] border border-white/8 bg-zinc-900/80 transition duration-300 group-hover:border-cyan-300/18 group-hover:bg-zinc-900" />
-              <Settings className="relative z-10 h-4 w-4 transition duration-300 group-hover:rotate-45" />
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                aria-label="Settings"
+                className="group relative flex h-12 w-12 items-center justify-center text-zinc-300 transition duration-300 hover:text-white"
+              >
+                <div className="absolute inset-[5px] rounded-[1rem] border border-white/8 bg-zinc-900/80 transition duration-300 group-hover:border-cyan-300/18 group-hover:bg-zinc-900" />
+                <Settings className="relative z-10 h-4 w-4 transition duration-300 group-hover:rotate-45" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                className="min-w-72 rounded-2xl border border-white/10 bg-[#111111]/96 p-1.5 text-white shadow-2xl backdrop-blur-xl"
+              >
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel className="text-white/40">
+                    OpenCode
+                  </DropdownMenuLabel>
+                  <DropdownMenuItem
+                    className="cursor-pointer rounded-lg px-3 py-2 text-sm text-white/85 focus:bg-white/10 focus:text-white data-disabled:pointer-events-none data-disabled:opacity-40"
+                    disabled={!selectedBoard}
+                    onClick={() => {
+                      openOpencodeModels().catch((error) => {
+                        console.error("Failed to open OpenCode models", error);
+                      });
+                    }}
+                  >
+                    <CpuIcon className="size-4" />
+                    <div className="flex min-w-0 flex-col">
+                      <span>Open model selector</span>
+                      <span className="truncate text-[11px] text-white/40">
+                        {selectedBoard
+                          ? selectedBoard.repo.directory
+                          : "Select a board first"}
+                      </span>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="cursor-pointer rounded-lg px-3 py-2 text-sm text-white/85 focus:bg-white/10 focus:text-white data-disabled:pointer-events-none data-disabled:opacity-40"
+                    disabled={!selectedBoard}
+                    onClick={() => {
+                      openOpencodeConnect().catch((error) => {
+                        console.error("Failed to run OpenCode connect", error);
+                      });
+                    }}
+                  >
+                    <PlugZapIcon className="size-4" />
+                    <div className="flex min-w-0 flex-col">
+                      <span>Run /connect</span>
+                      <span className="truncate text-[11px] text-white/40">
+                        {selectedBoard
+                          ? "Connect providers for the selected board"
+                          : "Select a board first"}
+                      </span>
+                    </div>
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>
