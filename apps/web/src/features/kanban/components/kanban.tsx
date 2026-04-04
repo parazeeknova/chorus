@@ -60,7 +60,15 @@ import {
 } from "@/features/kanban/components/agent-output-card";
 import { cn } from "@/lib/utils";
 
+export interface ChangedFile {
+  added: number;
+  path: string;
+  removed: number;
+}
+
 export interface Task {
+  /** Files changed by the agent — shown in review cards */
+  changedFiles?: ChangedFile[];
   id: string;
   label: string;
   labelVariant:
@@ -79,6 +87,8 @@ export interface Task {
   runId?: string;
   /** Short paragraph describing what the agent did — shown in done cards */
   summary?: string;
+  /** Files tagged/referenced by this task — shown in queue cards */
+  taggedFiles?: string[];
   title: string;
 }
 
@@ -503,6 +513,48 @@ function ColumnEmptyState({
   );
 }
 
+function FilePill({ path }: { path: string }) {
+  // Show only the last two path segments for brevity
+  const parts = path.replace(/\\/g, "/").split("/");
+  const label = parts.length > 2 ? `…/${parts.slice(-2).join("/")}` : path;
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-sm bg-white/4 px-1.5 py-0.5 font-mono text-[0.6rem] text-white/35 ring-1 ring-white/6 ring-inset transition-colors hover:bg-white/7 hover:text-white/55"
+      title={path}
+    >
+      <span className="opacity-50">#</span>
+      {label}
+    </span>
+  );
+}
+
+function ChangedFileRow({ file }: { file: ChangedFile }) {
+  const parts = file.path.replace(/\\/g, "/").split("/");
+  const label = parts.length > 2 ? `…/${parts.slice(-2).join("/")}` : file.path;
+  return (
+    <div className="flex min-w-0 items-center gap-1.5">
+      <span
+        className="flex-1 truncate font-mono text-[0.62rem] text-white/40"
+        title={file.path}
+      >
+        {label}
+      </span>
+      <div className="flex shrink-0 items-center gap-1">
+        {file.added > 0 && (
+          <span className="inline-flex items-center rounded-sm bg-emerald-500/10 px-1 py-0 font-mono text-[0.58rem] text-emerald-400/75">
+            +{file.added}
+          </span>
+        )}
+        {file.removed > 0 && (
+          <span className="inline-flex items-center rounded-sm bg-red-500/10 px-1 py-0 font-mono text-[0.58rem] text-red-400/65">
+            -{file.removed}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 interface TaskCardProps {
   asHandle?: boolean;
   cardGlow?: string;
@@ -566,6 +618,14 @@ function TaskCard({
         </div>
       )}
 
+      {showPlay && task.taggedFiles && task.taggedFiles.length > 0 && (
+        <div className="flex flex-wrap gap-1 pt-0.5">
+          {task.taggedFiles.map((f) => (
+            <FilePill key={f} path={f} />
+          ))}
+        </div>
+      )}
+
       {showPlay && (
         <div className="flex items-center justify-end pt-0.5">
           <button
@@ -584,6 +644,16 @@ function TaskCard({
           </button>
         </div>
       )}
+
+      {showApprovalControls &&
+        task.changedFiles &&
+        task.changedFiles.length > 0 && (
+          <div className="flex flex-col gap-1 border-white/5 border-t pt-2.5">
+            {task.changedFiles.map((f) => (
+              <ChangedFileRow file={f} key={f.path} />
+            ))}
+          </div>
+        )}
 
       {showApprovalControls && (
         <div className="flex items-center justify-end gap-1.5 pt-0.5">
@@ -681,6 +751,11 @@ function defaultColumns(boardId = "board"): Columns {
           "Refactor the auth middleware to use JWT RS256 and add refresh token rotation",
         label: "Backend",
         labelVariant: "primary-light",
+        taggedFiles: [
+          "apps/serve/src/middleware/auth.ts",
+          "apps/serve/src/lib/jwt.ts",
+          "apps/serve/src/routes/session.ts",
+        ],
       },
       {
         id: `${boardId}-queue-landing-page`,
@@ -688,6 +763,7 @@ function defaultColumns(boardId = "board"): Columns {
           "Design a dark-mode landing page with hero section and pricing table",
         label: "Design",
         labelVariant: "info-light",
+        taggedFiles: ["apps/web/src/app/page.tsx"],
       },
       {
         id: `${boardId}-queue-cicd`,
@@ -695,6 +771,7 @@ function defaultColumns(boardId = "board"): Columns {
           "Set up GitHub Actions CI/CD pipeline with Turbo cache and preview deploys",
         label: "DevOps",
         labelVariant: "warning-light",
+        taggedFiles: [".github/workflows/ci.yml", "turbo.json"],
       },
     ],
     in_progress: [
@@ -712,6 +789,15 @@ function defaultColumns(boardId = "board"): Columns {
         title: "Update color palette for dark mode compatibility",
         label: "Design",
         labelVariant: "info-light",
+        changedFiles: [
+          { path: "apps/web/src/styles/tokens.css", added: 47, removed: 12 },
+          {
+            path: "apps/web/src/components/ui/button.tsx",
+            added: 8,
+            removed: 5,
+          },
+          { path: "apps/web/tailwind.config.ts", added: 23, removed: 9 },
+        ],
       },
     ],
     done: [
