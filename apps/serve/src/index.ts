@@ -1,3 +1,5 @@
+import { access, copyFile, mkdir, rm } from "node:fs/promises";
+import { homedir } from "node:os";
 import path from "node:path";
 import { createLogger } from "@chorus/logger";
 import { cors } from "@elysiajs/cors";
@@ -29,9 +31,41 @@ const bridge = new OpenCodeBridge(
   config.opencodeDirectory
 );
 const wsManager = createWsClientManager();
-const workspaceStore = new WorkspaceStore(
-  path.join(process.cwd(), ".chorus", "workspace.json")
-);
+
+async function resolveWorkspaceSnapshotPath() {
+  const homeWorkspaceDir = path.join(homedir(), ".chorus");
+  const homeWorkspacePath = path.join(homeWorkspaceDir, "workspace.json");
+  const legacyWorkspacePath = path.join(
+    process.cwd(),
+    ".chorus",
+    "workspace.json"
+  );
+
+  await mkdir(homeWorkspaceDir, { recursive: true });
+
+  try {
+    await access(homeWorkspacePath);
+    return homeWorkspacePath;
+  } catch {
+    // No home snapshot yet. Fall through to migration check.
+  }
+
+  try {
+    await access(legacyWorkspacePath);
+    await copyFile(legacyWorkspacePath, homeWorkspacePath);
+    await rm(legacyWorkspacePath, { force: true });
+    logger.info("workspace-snapshot-migrated", {
+      from: legacyWorkspacePath,
+      to: homeWorkspacePath,
+    });
+  } catch {
+    // No legacy snapshot to migrate.
+  }
+
+  return homeWorkspacePath;
+}
+
+const workspaceStore = new WorkspaceStore(await resolveWorkspaceSnapshotPath());
 await workspaceStore.load();
 const boardTasks = new BoardTaskService(bridge, workspaceStore);
 const projectService = new ProjectService(

@@ -11,11 +11,18 @@ import {
   type Node,
   Panel,
   ReactFlow,
+  type ReactFlowInstance,
   useReactFlow,
   type Viewport,
 } from "@xyflow/react";
 import { KeyboardIcon, MinusIcon, PlusIcon, XIcon } from "lucide-react";
-import { useCallback, useEffect, useEffectEvent, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import type { Columns } from "@/features/kanban/components/kanban";
 import {
@@ -58,6 +65,9 @@ export const CANVAS_SHORTCUTS = [
   {
     group: "Canvas",
     shortcuts: [
+      { keys: ["Scroll"], label: "Pan canvas" },
+      { keys: ["Ctrl", "Scroll"], label: "Zoom in/out" },
+      { keys: ["Shift", "Scroll"], label: "Toggle pan direction + pan" },
       { keys: ["+", "="], label: "Zoom in" },
       { keys: ["-"], label: "Zoom out" },
       { keys: ["0"], label: "Reset view" },
@@ -186,13 +196,13 @@ function CanvasControls() {
 
   return (
     <Panel
-      className="flex flex-col items-center gap-1 rounded-xl border border-white/10 bg-[#020617]/80 p-1.5 shadow-[0_4px_20px_rgba(0,0,0,0.5)] backdrop-blur-xl"
+      className="flex flex-col items-center gap-1 rounded-sm border border-white/10 bg-[#020617]/80 p-1.5 shadow-[0_4px_20px_rgba(0,0,0,0.5)] backdrop-blur-xl"
       position="bottom-right"
       style={{ margin: 0, bottom: "4.25rem", right: "1rem" }}
     >
       <button
         aria-label="Zoom in"
-        className="flex size-8 items-center justify-center rounded-lg text-white/35 transition-all duration-150 hover:bg-white/10 hover:text-white/60 active:scale-95"
+        className="flex size-8 items-center justify-center rounded-xs text-white/35 transition-all duration-150 hover:bg-white/10 hover:text-white/60 active:scale-95"
         onClick={() => zoomIn({ duration: 140 })}
         title="Zoom in (+)"
         type="button"
@@ -201,7 +211,7 @@ function CanvasControls() {
       </button>
       <button
         aria-label="Zoom out"
-        className="flex size-8 items-center justify-center rounded-lg text-white/35 transition-all duration-150 hover:bg-white/10 hover:text-white/60 active:scale-95"
+        className="flex size-8 items-center justify-center rounded-xs text-white/35 transition-all duration-150 hover:bg-white/10 hover:text-white/60 active:scale-95"
         onClick={() => zoomOut({ duration: 140 })}
         title="Zoom out (-)"
         type="button"
@@ -211,7 +221,7 @@ function CanvasControls() {
       <div className="mx-1 my-0.5 h-px w-6 bg-white/10" />
       <button
         aria-label="Fit view"
-        className="flex size-8 items-center justify-center rounded-lg text-white/35 transition-all duration-150 hover:bg-white/10 hover:text-white/60 active:scale-95"
+        className="flex size-8 items-center justify-center rounded-xs text-white/35 transition-all duration-150 hover:bg-white/10 hover:text-white/60 active:scale-95"
         onClick={() => fitView({ duration: 300, padding: 0.1 })}
         title="Fit view (F)"
         type="button"
@@ -240,7 +250,7 @@ function CanvasControls() {
 
 function Kbd({ children }: { children: React.ReactNode }) {
   return (
-    <kbd className="inline-flex min-w-6 items-center justify-center rounded border border-white/15 bg-white/8 px-1 py-0.5 font-mono text-[0.6rem] text-white/60 leading-none">
+    <kbd className="inline-flex min-w-6 items-center justify-center rounded-xs border border-white/15 bg-white/8 px-1 py-0.5 font-mono text-[0.6rem] text-white/60 leading-none">
       {children}
     </kbd>
   );
@@ -249,7 +259,7 @@ function Kbd({ children }: { children: React.ReactNode }) {
 function KeyboardHelpPanel({ onClose }: { onClose: () => void }) {
   return (
     <div
-      className="fade-in slide-in-from-bottom-2 pointer-events-auto w-64 animate-in rounded-2xl border border-white/10 bg-[#020617]/88 p-4 shadow-[0_24px_60px_rgba(0,0,0,0.6)] backdrop-blur-2xl duration-200"
+      className="fade-in slide-in-from-bottom-2 pointer-events-auto w-64 animate-in rounded-sm border border-white/10 bg-[#020617]/88 p-4 shadow-[0_24px_60px_rgba(0,0,0,0.6)] backdrop-blur-2xl duration-200"
       style={{ backdropFilter: "blur(20px)" }}
     >
       {/* Header */}
@@ -260,7 +270,7 @@ function KeyboardHelpPanel({ onClose }: { onClose: () => void }) {
         </span>
         <button
           aria-label="Close shortcuts panel"
-          className="rounded-md p-0.5 text-white/25 transition-colors hover:bg-white/8 hover:text-white/60"
+          className="rounded-xs p-0.5 text-white/25 transition-colors hover:bg-white/8 hover:text-white/60"
           onClick={onClose}
           type="button"
         >
@@ -389,9 +399,71 @@ export function BackgroundCanvas() {
   const [edges, setEdges] = useState<Edge[]>([]);
   const [showHelp, setShowHelp] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const rfInstanceRef = useRef<ReactFlowInstance<
+    Node<KanbanCardNodeData>,
+    Edge
+  > | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
+  }, []);
+
+  const handleWheel = useEffectEvent((event: WheelEvent) => {
+    // Let Kanban columns and other scrollable children handle their own scroll.
+    if (
+      event.target instanceof HTMLElement &&
+      event.target.closest(".nowheel")
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const rf = rfInstanceRef.current;
+    if (!rf) {
+      return;
+    }
+
+    const current = rf.getViewport();
+
+    if (event.ctrlKey || event.metaKey) {
+      // ── Pinch-to-zoom / Ctrl+scroll ─────────────────────────────────────
+      // Use a small factor so the zoom feels natural.
+      const zoomFactor = 0.002;
+      const newZoom = Math.max(
+        0.15,
+        Math.min(4, current.zoom * (1 - event.deltaY * zoomFactor))
+      );
+      rf.setViewport({ x: current.x, y: current.y, zoom: newZoom });
+    } else {
+      // ── Two-finger pan / scroll-wheel pan ────────────────────────────────
+      // Consume both axes so touchpad diagonal swipes work correctly.
+      // Shift+scroll remaps deltaY → horizontal (common browser convention).
+      const panFactor = 1.2;
+      const dx = event.shiftKey
+        ? -event.deltaY * panFactor
+        : -event.deltaX * panFactor;
+      const dy = event.shiftKey ? 0 : -event.deltaY * panFactor;
+
+      rf.setViewport({
+        x: current.x + dx,
+        y: current.y + dy,
+        zoom: current.zoom,
+      });
+    }
+  });
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) {
+      return;
+    }
+
+    container.addEventListener("wheel", handleWheel, { passive: false });
+    return () => {
+      container.removeEventListener("wheel", handleWheel);
+    };
   }, []);
 
   const handleUpdateColumns = useCallback(
@@ -459,7 +531,7 @@ export function BackgroundCanvas() {
   }, [boards, handleRemoveBoard, handleUpdateColumns, selectedBoardId]);
 
   return (
-    <div className="h-full w-full">
+    <div className="h-full w-full" ref={containerRef}>
       <ReactFlow
         className="background-flow dark"
         defaultViewport={DEFAULT_VIEWPORT}
@@ -475,6 +547,9 @@ export function BackgroundCanvas() {
         nodesFocusable={true}
         nodeTypes={nodeTypes}
         onConnect={onConnect}
+        onInit={(instance) => {
+          rfInstanceRef.current = instance;
+        }}
         onlyRenderVisibleElements
         onNodeClick={(_, node) => {
           selectBoard(node.id);
@@ -498,7 +573,7 @@ export function BackgroundCanvas() {
         translateExtent={WORLD_EXTENT}
         zoomOnDoubleClick={false}
         zoomOnPinch
-        zoomOnScroll
+        zoomOnScroll={false}
       >
         <KeyboardShortcuts
           onApproveSelected={handleApproveSelected}
@@ -529,7 +604,7 @@ export function BackgroundCanvas() {
             <button
               aria-label="Keyboard shortcuts"
               className={[
-                "flex size-11 items-center justify-center rounded-xl border transition-all duration-150",
+                "flex size-11 items-center justify-center rounded-sm border transition-all duration-150",
                 "shadow-[0_4px_20px_rgba(0,0,0,0.5)] backdrop-blur-xl",
                 showHelp
                   ? "border-white/20 bg-white/15 text-white/80"

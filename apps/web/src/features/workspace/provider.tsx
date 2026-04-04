@@ -233,7 +233,9 @@ export function ChorusWorkspaceProvider({
         throw new Error("Failed to open folder");
       }
 
-      const payload = await response.json();
+      const responseText = await response.text();
+      const payload =
+        responseText.trim().length === 0 ? null : JSON.parse(responseText);
       if (payload === null) {
         return;
       }

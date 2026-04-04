@@ -118,7 +118,7 @@ function useKanbanContext() {
 }
 
 const badgeVariants = cva(
-  "inline-flex items-center rounded-full font-medium text-xs transition-colors",
+  "inline-flex items-center rounded-xs font-medium text-xs transition-colors",
   {
     variants: {
       variant: {
@@ -314,7 +314,7 @@ export function Kanban({
               <DragOverlay>
                 {activeTask ? (
                   <div className="rotate-2 scale-105 opacity-90">
-                    <div className="rounded-lg border border-border/50 bg-card p-3 text-[14px] shadow-xl dark:border-white/10 dark:bg-[#1e1e1e] dark:shadow-2xl">
+                    <div className="rounded-xs border border-border/50 bg-card p-3 text-[14px] shadow-xl dark:border-white/10 dark:bg-[#1e1e1e] dark:shadow-2xl">
                       <span className="font-medium text-foreground text-sm dark:text-white/90">
                         {activeTask.title}
                       </span>
@@ -434,10 +434,7 @@ const COLUMNS: Record<
   {
     title: string;
     icon: React.ReactNode;
-    bg: string;
-    border: string;
-    badge: string;
-    cardGlow: string;
+    accent: string;
     emptyIcon: React.ComponentType<{ className?: string }>;
     emptyHeadline: string;
     emptyHint: string;
@@ -446,11 +443,7 @@ const COLUMNS: Record<
   queue: {
     title: "Queue",
     icon: <ListTodoIcon className="size-4.5 text-white/35" />,
-    bg: "dark:bg-white/[0.015]",
-    border: "dark:border-white/[0.04]",
-    badge: "dark:bg-white/6 dark:text-white/45",
-    cardGlow:
-      "dark:hover:border-white/14 dark:hover:shadow-[0_4px_20px_rgba(255,255,255,0.03)]",
+    accent: "bg-white/24",
     emptyIcon: ListTodoIcon,
     emptyHeadline: "Nothing lined up yet",
     emptyHint: 'Hit "Create Task" to give the agents something to chew on.',
@@ -458,11 +451,7 @@ const COLUMNS: Record<
   in_progress: {
     title: "In Progress",
     icon: <LoaderIcon className="size-4.5 text-sky-400/60" />,
-    bg: "dark:bg-sky-950/10",
-    border: "dark:border-sky-500/[0.07]",
-    badge: "dark:bg-sky-500/10 dark:text-sky-300/60",
-    cardGlow:
-      "dark:hover:border-sky-500/15 dark:hover:shadow-[0_4px_20px_rgba(14,165,233,0.04)]",
+    accent: "bg-sky-400/55",
     emptyIcon: CogIcon,
     emptyHeadline: "All quiet on the agent front",
     emptyHint: "Agents will appear here once a task is running.",
@@ -470,11 +459,7 @@ const COLUMNS: Record<
   approve: {
     title: "Review",
     icon: <EyeIcon className="size-4.5 text-amber-400/60" />,
-    bg: "dark:bg-amber-950/8",
-    border: "dark:border-amber-500/[0.06]",
-    badge: "dark:bg-amber-500/10 dark:text-amber-300/55",
-    cardGlow:
-      "dark:hover:border-amber-500/14 dark:hover:shadow-[0_4px_20px_rgba(245,158,11,0.04)]",
+    accent: "bg-amber-400/55",
     emptyIcon: SearchCheckIcon,
     emptyHeadline: "Nothing needs your eyes",
     emptyHint: "Completed tasks awaiting a human call will land here.",
@@ -482,11 +467,7 @@ const COLUMNS: Record<
   done: {
     title: "Done",
     icon: <CheckCircle2Icon className="size-4.5 text-emerald-400/60" />,
-    bg: "dark:bg-emerald-950/8",
-    border: "dark:border-emerald-500/[0.06]",
-    badge: "dark:bg-emerald-500/10 dark:text-emerald-300/55",
-    cardGlow:
-      "dark:hover:border-emerald-500/14 dark:hover:shadow-[0_4px_20px_rgba(52,211,153,0.04)]",
+    accent: "bg-emerald-400/55",
     emptyIcon: ArchiveIcon,
     emptyHeadline: "The slate is clean",
     emptyHint: "Shipped work stacks up here. Start something great.",
@@ -519,7 +500,7 @@ function FilePill({ path }: { path: string }) {
   const label = parts.length > 2 ? `…/${parts.slice(-2).join("/")}` : path;
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-sm bg-white/4 px-1.5 py-0.5 font-mono text-[0.6rem] text-white/35 ring-1 ring-white/6 ring-inset transition-colors hover:bg-white/7 hover:text-white/55"
+      className="inline-flex items-center gap-1 rounded-xs bg-white/4 px-1.5 py-0.5 font-mono text-[0.6rem] text-white/35 ring-1 ring-white/6 ring-inset transition-colors hover:bg-white/7 hover:text-white/55"
       title={path}
     >
       <span className="opacity-50">#</span>
@@ -541,12 +522,12 @@ function ChangedFileRow({ file }: { file: ChangedFile }) {
       </span>
       <div className="flex shrink-0 items-center gap-1">
         {file.added > 0 && (
-          <span className="inline-flex items-center rounded-sm bg-emerald-500/10 px-1 py-0 font-mono text-[0.58rem] text-emerald-400/75">
+          <span className="inline-flex items-center rounded-xs bg-emerald-500/10 px-1 py-0 font-mono text-[0.58rem] text-emerald-400/75">
             +{file.added}
           </span>
         )}
         {file.removed > 0 && (
-          <span className="inline-flex items-center rounded-sm bg-red-500/10 px-1 py-0 font-mono text-[0.58rem] text-red-400/65">
+          <span className="inline-flex items-center rounded-xs bg-red-500/10 px-1 py-0 font-mono text-[0.58rem] text-red-400/65">
             -{file.removed}
           </span>
         )}
@@ -557,7 +538,6 @@ function ChangedFileRow({ file }: { file: ChangedFile }) {
 
 interface TaskCardProps {
   asHandle?: boolean;
-  cardGlow?: string;
   draggable?: boolean;
   showApprovalControls?: boolean;
   showDone?: boolean;
@@ -569,7 +549,6 @@ interface TaskCardProps {
 function TaskCard({
   task,
   asHandle,
-  cardGlow = "",
   draggable,
   showOutput,
   showDone,
@@ -579,10 +558,9 @@ function TaskCard({
   const content = (
     <div
       className={cn(
-        "group flex flex-col gap-3 rounded-xl border border-border/50 bg-card p-3.5 shadow-sm",
+        "group flex flex-col gap-3 rounded-sm border border-border/50 bg-card p-3.5 shadow-sm",
         "transition-all duration-200 hover:border-border hover:shadow-md",
-        "dark:border-white/8 dark:bg-white/2.5",
-        cardGlow
+        "dark:border-white/8 dark:bg-white/2.5"
       )}
     >
       <span className="font-medium text-[0.85rem] text-foreground leading-snug dark:text-white/85">
@@ -601,12 +579,12 @@ function TaskCard({
             task.linesRemoved !== undefined) && (
             <div className="flex items-center gap-1.5">
               {task.linesAdded !== undefined && task.linesAdded > 0 && (
-                <span className="inline-flex items-center rounded-sm bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[0.62rem] text-emerald-400/80">
+                <span className="inline-flex items-center rounded-xs bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[0.62rem] text-emerald-400/80">
                   +{task.linesAdded}
                 </span>
               )}
               {task.linesRemoved !== undefined && task.linesRemoved > 0 && (
-                <span className="inline-flex items-center rounded-sm bg-red-500/10 px-1.5 py-0.5 font-mono text-[0.62rem] text-red-400/70">
+                <span className="inline-flex items-center rounded-xs bg-red-500/10 px-1.5 py-0.5 font-mono text-[0.62rem] text-red-400/70">
                   -{task.linesRemoved}
                 </span>
               )}
@@ -630,7 +608,7 @@ function TaskCard({
         <div className="flex items-center justify-end pt-0.5">
           <button
             className={cn(
-              "flex items-center gap-1.5 rounded-lg border border-white/6 bg-white/6 px-2.5 py-1.5",
+              "flex items-center gap-1.5 rounded-xs border border-white/6 bg-white/6 px-2.5 py-1.5",
               "font-medium text-[0.7rem] text-white/50",
               "transition-all duration-150",
               "hover:border-emerald-500/20 hover:bg-emerald-500/12 hover:text-emerald-400",
@@ -659,7 +637,7 @@ function TaskCard({
         <div className="flex items-center justify-end gap-1.5 pt-0.5">
           <button
             className={cn(
-              "flex items-center gap-1 rounded-lg border border-emerald-500/15 bg-emerald-500/10 px-2.5 py-1.5",
+              "flex items-center gap-1 rounded-xs border border-emerald-500/15 bg-emerald-500/10 px-2.5 py-1.5",
               "font-medium text-[0.7rem] text-emerald-400",
               "transition-all duration-150 hover:border-emerald-500/30 hover:bg-emerald-500/20",
               "active:scale-[0.97]"
@@ -671,7 +649,7 @@ function TaskCard({
           </button>
           <button
             className={cn(
-              "flex items-center gap-1 rounded-lg border border-rose-500/15 bg-rose-500/10 px-2.5 py-1.5",
+              "flex items-center gap-1 rounded-xs border border-rose-500/15 bg-rose-500/10 px-2.5 py-1.5",
               "font-medium text-[0.7rem] text-rose-400",
               "transition-all duration-150 hover:border-rose-500/30 hover:bg-rose-500/20",
               "active:scale-[0.97]"
@@ -688,7 +666,7 @@ function TaskCard({
         <div className="flex items-center justify-end pt-0.5">
           <button
             className={cn(
-              "flex items-center gap-1.5 rounded-lg border border-white/6 bg-white/4 px-2.5 py-1.5",
+              "flex items-center gap-1.5 rounded-xs border border-white/6 bg-white/4 px-2.5 py-1.5",
               "font-medium text-[0.7rem] text-white/30",
               "transition-all duration-150 hover:border-white/10 hover:bg-white/8 hover:text-white/55",
               "active:scale-[0.97]"
@@ -825,7 +803,7 @@ function AutoAcceptToggle({
 }) {
   return (
     <button
-      className="flex items-center gap-1.5 rounded-md px-1.5 py-0.5 transition-colors hover:bg-white/5"
+      className="flex items-center gap-1.5 rounded-xs px-1.5 py-0.5 transition-colors hover:bg-white/5"
       onClick={onToggle}
       title={autoAccept ? "Switch to manual review" : "Switch to auto-accept"}
       type="button"
@@ -879,12 +857,7 @@ function ColumnHeader({
       <h3 className="truncate font-semibold text-[0.7rem] text-muted-foreground uppercase tracking-widest dark:text-white/40">
         {col.title}
       </h3>
-      <div
-        className={cn(
-          "ml-auto flex size-5 shrink-0 items-center justify-center rounded-full font-semibold text-[10px]",
-          col.badge
-        )}
-      >
+      <div className="ml-auto flex size-5 shrink-0 items-center justify-center rounded-full bg-white/6 font-semibold text-[10px] text-white/45">
         {tasks.length}
       </div>
       {isReview && (
@@ -901,17 +874,14 @@ function TaskList({
   columnId,
   tasks,
   autoAccept,
-  col,
 }: {
   columnId: string;
   tasks: Task[];
   autoAccept: boolean;
-  col: (typeof COLUMNS)[string];
 }) {
   return tasks.map((task) => (
     <TaskCard
       asHandle
-      cardGlow={col.cardGlow}
       draggable={columnId === "queue"}
       key={task.id}
       showApprovalControls={columnId === "approve" && !autoAccept}
@@ -943,16 +913,16 @@ function KanbanColumnRenderer({
       defaultSize={25}
       minSize={15}
     >
-      <div className="flex h-full min-w-0 flex-col px-1.5">
+      <div className="flex h-full min-w-0 flex-col p-1.5">
         <KanbanColumn value={columnId}>
-          <div
-            className={cn(
-              "flex h-full min-w-0 flex-col gap-2.5 rounded-xl border p-3",
-              "border-transparent bg-muted/30",
-              col.bg,
-              col.border
-            )}
-          >
+          <div className="relative flex h-full min-w-0 flex-col gap-2.5 overflow-hidden rounded-sm border border-white/[0.04] bg-white/[0.015] p-3">
+            <div
+              aria-hidden="true"
+              className={cn(
+                "pointer-events-none absolute top-0 right-3 left-3 h-px rounded-full opacity-70",
+                col.accent
+              )}
+            />
             <ColumnHeader
               autoAccept={autoAccept}
               columnId={columnId}
@@ -963,7 +933,7 @@ function KanbanColumnRenderer({
             {isQueue && (
               <button
                 className={cn(
-                  "flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2.5",
+                  "flex w-full items-center justify-center gap-2 rounded-xs px-3 py-2.5",
                   "bg-white font-semibold text-[0.8rem] text-black",
                   "shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_2px_12px_rgba(255,255,255,0.08)]",
                   "transition-all duration-150",
@@ -990,7 +960,6 @@ function KanbanColumnRenderer({
               ) : (
                 <TaskList
                   autoAccept={autoAccept}
-                  col={col}
                   columnId={columnId}
                   tasks={tasks}
                 />

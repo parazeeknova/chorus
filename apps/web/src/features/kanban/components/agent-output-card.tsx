@@ -200,7 +200,7 @@ function StepRow({ step }: { step: AgentStep }) {
 
         {showExpandable && (
           <button
-            className="shrink-0 rounded p-0.5 transition-colors hover:bg-white/10"
+            className="shrink-0 rounded-xs p-0.5 transition-colors hover:bg-white/10"
             onClick={() => setExpanded(!expanded)}
             type="button"
           >
@@ -217,7 +217,7 @@ function StepRow({ step }: { step: AgentStep }) {
         (step.status === "running" ||
           step.kind === "response" ||
           step.kind === "thinking") && (
-          <div className="ml-5 rounded-md border border-white/5 bg-white/2 px-3 py-2">
+          <div className="ml-5 rounded-xs border border-white/5 bg-white/2 px-3 py-2">
             <p className="text-[0.72rem] text-white/50 leading-relaxed">
               {step.content}
             </p>
@@ -225,7 +225,7 @@ function StepRow({ step }: { step: AgentStep }) {
         )}
 
       {expanded && step.kind === "file_edit" && step.filePath && (
-        <div className="ml-5 overflow-hidden rounded-md border border-white/5 bg-[#0d0d0d]">
+        <div className="ml-5 overflow-hidden rounded-xs border border-white/5 bg-[#0d0d0d]">
           <BorderlessFileView
             filePath={step.filePath}
             height="200px"
@@ -258,7 +258,7 @@ export function AgentOutputCard({
   return (
     <div
       className={cn(
-        "flex flex-col gap-0 overflow-hidden rounded-xl border border-white/10 bg-white/2",
+        "flex flex-col gap-0 overflow-hidden rounded-sm border border-white/10 bg-white/2",
         className
       )}
     >
@@ -279,7 +279,7 @@ export function AgentOutputCard({
           {run.taskTitle}
         </span>
 
-        <span className="shrink-0 rounded-md border border-white/8 bg-white/5 px-1.5 py-0.5 font-mono text-[0.6rem] text-white/40">
+        <span className="shrink-0 rounded-xs border border-white/8 bg-white/5 px-1.5 py-0.5 font-mono text-[0.6rem] text-white/40">
           {run.model}
         </span>
       </div>

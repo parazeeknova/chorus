@@ -1,7 +1,12 @@
 "use client";
 
+import {
+  type ModelSelection,
+  type OpencodeModelSummary,
+  opencodeModelCatalogSchema,
+} from "@chorus/contracts";
 import { ArrowUp, Mic, MoreHorizontal, XIcon } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CommandPalette } from "@/components/command-palette";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,28 +23,33 @@ import {
   useAutocomplete,
 } from "@/hooks/use-autocomplete";
 import { useVoiceRecording } from "@/hooks/use-voice-recording";
+import { cn } from "@/lib/utils";
 import { fetchVoiceConfig, type GroqVoice } from "@/lib/voice-api";
 
-const MODEL_OPTIONS = {
-  default: undefined,
-  claude: {
-    providerID: "anthropic",
-    modelID: "claude-sonnet-4-5",
-  },
-  gpt4_1: {
-    providerID: "openai",
-    modelID: "gpt-4.1",
-  },
-  gemini: {
-    providerID: "google",
-    modelID: "gemini-2.5-pro",
-  },
-} as const;
+const composerSelectTriggerClass =
+  "h-7 min-w-0 gap-1.5 rounded-xs border border-white/8 bg-white/[0.04] px-2.5 py-1 font-medium text-[11px] text-white/72 shadow-none transition-colors hover:border-white/14 hover:bg-white/[0.07] hover:text-white/90 focus-visible:border-white/16 focus-visible:bg-white/[0.08] focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 disabled:opacity-40 dark:border-white/8 dark:bg-white/[0.04] dark:hover:bg-white/[0.07]";
+
+const composerSelectContentClass =
+  "border-white/10 bg-[#151515]/96 p-1 text-white/92 shadow-[0_18px_44px_rgba(0,0,0,0.45)] backdrop-blur-xl";
+
+const composerSelectItemClass =
+  "min-h-8 rounded-xs px-2.5 py-1.5 text-[12px] text-white/78 focus:bg-white/7 focus:!text-white/86 focus:**:!text-white/86 aria-selected:bg-white/10 aria-selected:!text-white aria-selected:**:!text-white data-[highlighted]:bg-white/7 data-[highlighted]:!text-white/86 data-[highlighted]:**:!text-white/86";
+
+const DEFAULT_MODEL_KEY = "default";
+
+function createModelKey(model: ModelSelection) {
+  return `${model.providerID}/${model.modelID}`;
+}
 
 export function PromptInput() {
   const [prompt, setPrompt] = useState("");
-  const [selectedModel, setSelectedModel] =
-    useState<keyof typeof MODEL_OPTIONS>("default");
+  const [selectedModelKey, setSelectedModelKey] = useState(DEFAULT_MODEL_KEY);
+  const [availableModels, setAvailableModels] = useState<
+    OpencodeModelSummary[]
+  >([]);
+  const [defaultModel, setDefaultModel] = useState<
+    ModelSelection | undefined
+  >();
   const [selectedVoice, setSelectedVoice] = useState("hannah");
   const [voices, setVoices] = useState<GroqVoice[]>([]);
   const [textareaRect, setTextareaRect] = useState<{
@@ -77,6 +87,7 @@ export function PromptInput() {
   const isBusy =
     isQueueingPrompt || selectedBoard?.session.state === "starting";
   const hasActiveRun = selectedBoard?.session.currentTaskId !== undefined;
+  const selectedDirectory = selectedBoard?.repo.directory ?? null;
   let sessionMessage = "First prompt will start a new OpenCode session.";
 
   if (hasActiveRun) {
@@ -93,6 +104,88 @@ export function PromptInput() {
 
   const { isRecording, isTranscribing, startRecording, stopRecording } =
     useVoiceRecording(handleTranscriptionComplete);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function loadModels() {
+      try {
+        const query = selectedDirectory
+          ? `?directory=${encodeURIComponent(selectedDirectory)}`
+          : "";
+        const response = await fetch(`/api/models${query}`, {
+          cache: "no-store",
+        });
+
+        if (!response.ok || isCancelled) {
+          return;
+        }
+
+        const payload = opencodeModelCatalogSchema.parse(await response.json());
+        if (isCancelled) {
+          return;
+        }
+
+        setAvailableModels(payload.models);
+        setDefaultModel(payload.defaultModel);
+        setSelectedModelKey(DEFAULT_MODEL_KEY);
+      } catch (error) {
+        console.error("Failed to load OpenCode models", error);
+      }
+    }
+
+    loadModels().catch((error) => {
+      console.error("Failed to load OpenCode models", error);
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [selectedDirectory]);
+
+  const selectedModel = useMemo(() => {
+    if (selectedModelKey === DEFAULT_MODEL_KEY) {
+      return undefined;
+    }
+
+    const [providerID, modelID] = selectedModelKey.split("/");
+    if (!(providerID && modelID)) {
+      return undefined;
+    }
+
+    return {
+      providerID,
+      modelID,
+    } satisfies ModelSelection;
+  }, [selectedModelKey]);
+
+  const defaultModelSummary = useMemo(() => {
+    if (!defaultModel) {
+      return null;
+    }
+
+    return (
+      availableModels.find(
+        (model) =>
+          model.providerID === defaultModel.providerID &&
+          model.modelID === defaultModel.modelID
+      ) ?? null
+    );
+  }, [availableModels, defaultModel]);
+  let defaultModelTitle = "Auto · OpenCode selection";
+  let defaultModelDescription = "Uses OpenCode's current model resolution";
+
+  if (availableModels.length === 0) {
+    defaultModelTitle = "No OpenCode models available";
+    defaultModelDescription =
+      "Use Settings -> OpenCode to enable a global provider";
+  } else if (defaultModelSummary) {
+    defaultModelTitle = `Auto · ${defaultModelSummary.name}`;
+  }
+
+  if (availableModels.length > 0 && defaultModel) {
+    defaultModelDescription = `${defaultModel.providerID}/${defaultModel.modelID}`;
+  }
 
   const handleVoiceButtonClick = async () => {
     if (isRecording) {
@@ -111,7 +204,7 @@ export function PromptInput() {
 
     const result = await queuePrompt({
       text: prompt.trim(),
-      model: MODEL_OPTIONS[selectedModel],
+      model: selectedModel,
     });
 
     if (result) {
@@ -199,7 +292,7 @@ export function PromptInput() {
     <div className="fixed right-0 bottom-8 left-0 z-40 flex justify-center px-4">
       <div className="w-full max-w-3xl">
         {!preferences.composerHintDismissed && (
-          <div className="mb-2 flex items-start justify-between gap-3 rounded-lg border border-white/10 bg-black/45 px-3 py-2 text-[11px] text-white/70 leading-4 shadow-lg backdrop-blur-md">
+          <div className="mb-2 flex items-start justify-between gap-3 rounded-xs border border-white/10 bg-black/45 px-3 py-2 text-[11px] text-white/70 leading-4 shadow-lg backdrop-blur-md">
             <span>
               Boards persist across browsers on this machine.{" "}
               {selectedBoard
@@ -208,7 +301,7 @@ export function PromptInput() {
             </span>
             <button
               aria-label="Dismiss composer hint"
-              className="rounded-md p-0.5 text-white/35 transition-colors hover:bg-white/8 hover:text-white/70"
+              className="rounded-xs p-0.5 text-white/35 transition-colors hover:bg-white/8 hover:text-white/70"
               onClick={dismissComposerHint}
               type="button"
             >
@@ -217,7 +310,7 @@ export function PromptInput() {
           </div>
         )}
         <form className="relative" onSubmit={handleSubmit}>
-          <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#0f0f0f]/90 p-2 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.8)] backdrop-blur-2xl transition-colors focus-within:border-white/20 focus-within:bg-[#161616]/95">
+          <div className="overflow-hidden rounded-sm border border-white/10 bg-[#0f0f0f]/90 p-2 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.8)] backdrop-blur-2xl transition-colors focus-within:border-white/20 focus-within:bg-[#161616]/95">
             <div className="flex flex-col gap-2 px-3 py-2">
               <Textarea
                 className="max-h-[160px] min-h-8 w-full resize-none overflow-y-auto rounded-none border-0 bg-transparent p-0 font-medium text-[15px] text-white/90 shadow-none placeholder:text-white/40 focus-visible:ring-0 focus-visible:ring-offset-0 dark:bg-transparent"
@@ -231,17 +324,44 @@ export function PromptInput() {
               <div className="flex items-center justify-between opacity-80 transition-opacity focus-within:opacity-100">
                 <div className="flex items-center gap-2">
                   <Select
-                    onValueChange={(value) => value && setSelectedModel(value)}
-                    value={selectedModel}
+                    onValueChange={(value) =>
+                      value && setSelectedModelKey(value)
+                    }
+                    value={selectedModelKey}
                   >
-                    <SelectTrigger className="h-7 w-auto gap-1 rounded-md border-0 bg-white/5 px-2.5 py-1 font-semibold text-white/70 text-xs shadow-none hover:bg-white/10 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 data-[state=open]:bg-white/10 data-[state=open]:text-white dark:bg-white/5 dark:data-[state=open]:bg-white/10 dark:data-[state=open]:text-white dark:hover:bg-white/10">
+                    <SelectTrigger className={composerSelectTriggerClass}>
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="border-white/10 bg-[#161616] text-white/90">
-                      <SelectItem value="default">OpenCode Default</SelectItem>
-                      <SelectItem value="claude">Claude Sonnet 4.5</SelectItem>
-                      <SelectItem value="gpt4_1">GPT-4.1</SelectItem>
-                      <SelectItem value="gemini">Gemini 2.5 Pro</SelectItem>
+                    <SelectContent
+                      align="start"
+                      className={cn("min-w-56", composerSelectContentClass)}
+                    >
+                      <SelectItem
+                        className={composerSelectItemClass}
+                        value={DEFAULT_MODEL_KEY}
+                      >
+                        <span className="flex min-w-0 flex-col">
+                          <span className="truncate">{defaultModelTitle}</span>
+                          <span className="truncate text-[11px] text-white/40">
+                            {defaultModelDescription}
+                          </span>
+                        </span>
+                      </SelectItem>
+                      {availableModels.map((model) => (
+                        <SelectItem
+                          className={composerSelectItemClass}
+                          key={`${model.providerID}/${model.modelID}`}
+                          value={createModelKey(model)}
+                        >
+                          <span className="flex min-w-0 flex-col">
+                            <span className="truncate">{model.name}</span>
+                            <span className="truncate text-[11px] text-white/40">
+                              {model.providerName} · {model.providerID}/
+                              {model.modelID}
+                            </span>
+                          </span>
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   {voices.length > 0 && (
@@ -251,12 +371,25 @@ export function PromptInput() {
                       }
                       value={selectedVoice}
                     >
-                      <SelectTrigger className="h-7 w-auto gap-1 rounded-md border-0 bg-white/5 px-2.5 py-1 font-medium text-white/60 text-xs shadow-none hover:bg-white/10 hover:text-white/80 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 data-[state=open]:bg-white/10 data-[state=open]:text-white dark:bg-white/5 dark:data-[state=open]:bg-white/10 dark:data-[state=open]:text-white dark:hover:bg-white/10">
+                      <SelectTrigger
+                        className={cn(
+                          composerSelectTriggerClass,
+                          "text-white/64"
+                        )}
+                        size="sm"
+                      >
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="border-white/10 bg-[#161616] text-white/90">
+                      <SelectContent
+                        align="start"
+                        className={cn("min-w-52", composerSelectContentClass)}
+                      >
                         {voices.map((voice) => (
-                          <SelectItem key={voice.id} value={voice.id}>
+                          <SelectItem
+                            className={composerSelectItemClass}
+                            key={voice.id}
+                            value={voice.id}
+                          >
                             {voice.name} ({voice.gender})
                           </SelectItem>
                         ))}
@@ -269,16 +402,29 @@ export function PromptInput() {
                     onValueChange={(value) => value && selectBoard(value)}
                     value={selectedBoard?.boardId ?? null}
                   >
-                    <SelectTrigger className="h-7 w-auto gap-1 rounded-md border-0 bg-transparent px-2.5 py-1 font-medium text-white/50 text-xs shadow-none hover:bg-white/10 hover:text-white/80 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 data-[state=open]:bg-white/10 data-[state=open]:text-white dark:bg-transparent dark:data-[state=open]:bg-white/10 dark:data-[state=open]:text-white dark:hover:bg-white/10">
+                    <SelectTrigger
+                      className={cn(
+                        composerSelectTriggerClass,
+                        "bg-transparent text-white/58"
+                      )}
+                      size="sm"
+                    >
                       <SelectValue placeholder="Select a board" />
                     </SelectTrigger>
-                    <SelectContent className="border-white/10 bg-[#161616] text-white/90">
+                    <SelectContent
+                      align="end"
+                      className={cn("min-w-64", composerSelectContentClass)}
+                    >
                       {boards.map((board) => (
-                        <SelectItem key={board.boardId} value={board.boardId}>
+                        <SelectItem
+                          className={composerSelectItemClass}
+                          key={board.boardId}
+                          value={board.boardId}
+                        >
                           <span className="flex min-w-0 flex-col">
                             <span className="truncate">{board.title}</span>
                             <span className="truncate text-[11px] text-white/40">
-                              {board.repo.directory}
+                              {board.repo.branch ?? board.repo.directory}
                             </span>
                           </span>
                         </SelectItem>
@@ -286,7 +432,7 @@ export function PromptInput() {
                     </SelectContent>
                   </Select>
                   <Button
-                    className={`h-7 w-7 rounded-md hover:text-white/90 dark:hover:text-white/90 ${
+                    className={`h-7 w-7 rounded-xs hover:text-white/90 dark:hover:text-white/90 ${
                       isRecording
                         ? "bg-red-500/20 text-red-400 hover:bg-red-500/30 dark:bg-red-500/20 dark:text-red-400 dark:hover:bg-red-500/30"
                         : "text-white/50 hover:bg-white/10 dark:text-white/50 dark:hover:bg-white/10"
@@ -302,7 +448,7 @@ export function PromptInput() {
                     />
                   </Button>
                   <Button
-                    className="h-7 w-7 rounded-md text-white/50 hover:bg-white/10 hover:text-white/90 dark:text-white/50 dark:hover:bg-white/10 dark:hover:text-white/90"
+                    className="h-7 w-7 rounded-xs text-white/50 hover:bg-white/10 hover:text-white/90 dark:text-white/50 dark:hover:bg-white/10 dark:hover:text-white/90"
                     size="icon"
                     type="button"
                     variant="ghost"
@@ -310,7 +456,7 @@ export function PromptInput() {
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
                   <Button
-                    className="h-7 w-7 rounded-md bg-white text-black shadow-none transition-transform hover:bg-white/90 focus:ring-0 active:scale-95 disabled:scale-100 disabled:opacity-30 disabled:hover:bg-white dark:bg-white dark:text-black dark:hover:bg-white/90"
+                    className="h-7 w-7 rounded-xs bg-white text-black shadow-none transition-transform hover:bg-white/90 focus:ring-0 active:scale-95 disabled:scale-100 disabled:opacity-30 disabled:hover:bg-white dark:bg-white dark:text-black dark:hover:bg-white/90"
                     disabled={
                       !(prompt.trim() && selectedBoard) ||
                       isBusy ||

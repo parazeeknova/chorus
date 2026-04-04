@@ -1,5 +1,4 @@
-import MonacoEditor from "@monaco-editor/react";
-import type * as monaco from "monaco-editor";
+import MonacoEditor, { type OnMount } from "@monaco-editor/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChorusMonacoProps } from "../types";
 import { DiffFloatingWindow } from "./diff-floating-window";
@@ -9,7 +8,7 @@ interface LspClientWrapper {
   start(): Promise<void>;
 }
 
-const CHORUS_THEME: monaco.editor.IStandaloneThemeData = {
+const CHORUS_THEME = {
   base: "vs-dark",
   inherit: true,
   rules: [],
@@ -29,8 +28,21 @@ const CHORUS_THEME: monaco.editor.IStandaloneThemeData = {
     "scrollbarSlider.background": "#55555580",
     "scrollbarSlider.hoverBackground": "#77777780",
     "scrollbarSlider.activeBackground": "#99999980",
+    "editorBracketMatch.background": "#264f7840",
+    "editorBracketMatch.border": "#888",
+    "editorSuggestWidget.background": "#1a1a1a",
+    "editorSuggestWidget.border": "#333",
+    "editorSuggestWidget.selectedBackground": "#264f78",
+    "editorWidget.background": "#1a1a1a",
+    "editorWidget.border": "#333",
+    "input.background": "#222",
+    "input.border": "#444",
+    "list.activeSelectionBackground": "#264f78",
+    "list.hoverBackground": "#1a1a1a",
   },
 };
+
+let themeInitialized = false;
 
 export function ChorusMonaco({
   value,
@@ -45,8 +57,8 @@ export function ChorusMonaco({
   height = "100%",
   width = "100%",
 }: ChorusMonacoProps) {
-  const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
-  const monacoRef = useRef<typeof monaco | null>(null);
+  const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
+  const monacoRef = useRef<Parameters<OnMount>[1] | null>(null);
   const lcWrapperRef = useRef<LspClientWrapper | null>(null);
   const [lspError, setLspError] = useState<string | null>(null);
   const lspConfigRef = useRef(lspConfig);
@@ -103,15 +115,17 @@ export function ChorusMonaco({
     };
   }, [startLsp]);
 
-  function handleEditorMount(
-    editor: monaco.editor.IStandaloneCodeEditor,
-    monacoInstance: typeof monaco
-  ) {
+  const handleEditorMount: OnMount = (editor, monacoInstance) => {
     editorRef.current = editor;
     monacoRef.current = monacoInstance;
 
-    monacoInstance.editor.defineTheme("chorus-dark", CHORUS_THEME);
-    monacoInstance.editor.setTheme("chorus-dark");
+    if (themeInitialized) {
+      monacoInstance.editor.setTheme("chorus-dark");
+    } else {
+      monacoInstance.editor.defineTheme("chorus-dark", CHORUS_THEME as never);
+      monacoInstance.editor.setTheme("chorus-dark");
+      themeInitialized = true;
+    }
 
     // biome-ignore lint: monaco uses bitwise for key combos
     const saveKey = monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.KeyS;
@@ -122,7 +136,7 @@ export function ChorusMonaco({
     if (lspConfigRef.current?.wsUrl) {
       startLsp();
     }
-  }
+  };
 
   function handleChange(val: string | undefined) {
     if (val !== undefined) {
@@ -130,16 +144,16 @@ export function ChorusMonaco({
     }
   }
 
-  const editorOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
+  const editorOptions = {
     minimap: { enabled: false },
     fontSize: 14,
     fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
-    wordWrap: "on",
+    wordWrap: "on" as const,
     automaticLayout: true,
     scrollBeyondLastLine: false,
     readOnly,
-    lineNumbers: "on",
-    renderWhitespace: "selection",
+    lineNumbers: "on" as const,
+    renderWhitespace: "selection" as const,
     bracketPairColorization: { enabled: true },
     guides: {
       bracketPairs: true,
@@ -147,8 +161,8 @@ export function ChorusMonaco({
     },
     padding: { top: 16, bottom: 16 },
     smoothScrolling: true,
-    cursorBlinking: "smooth",
-    cursorSmoothCaretAnimation: "on",
+    cursorBlinking: "smooth" as const,
+    cursorSmoothCaretAnimation: "on" as const,
     overviewRulerLanes: 0,
     hideCursorInOverviewRuler: true,
     scrollbar: {

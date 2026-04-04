@@ -1,5 +1,4 @@
-import MonacoEditor from "@monaco-editor/react";
-import type * as monaco from "monaco-editor";
+import MonacoEditor, { type OnMount } from "@monaco-editor/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { BorderlessFileViewProps } from "../types";
 
@@ -8,7 +7,7 @@ interface LspClientWrapper {
   start(): Promise<void>;
 }
 
-const BORDERLESS_THEME: monaco.editor.IStandaloneThemeData = {
+const BORDERLESS_THEME = {
   base: "vs-dark",
   inherit: true,
   rules: [],
@@ -26,16 +25,19 @@ const BORDERLESS_THEME: monaco.editor.IStandaloneThemeData = {
   },
 };
 
+let themeInitialized = false;
+
 export function BorderlessFileView({
   value,
   language,
+  filePath: _filePath,
   lspConfig,
   onChange,
   className,
   height = "100%",
 }: BorderlessFileViewProps) {
-  const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
-  const monacoRef = useRef<typeof monaco | null>(null);
+  const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
+  const monacoRef = useRef<Parameters<OnMount>[1] | null>(null);
   const lcWrapperRef = useRef<LspClientWrapper | null>(null);
   const [lspError, setLspError] = useState<string | null>(null);
   const lspConfigRef = useRef(lspConfig);
@@ -92,20 +94,25 @@ export function BorderlessFileView({
     };
   }, [startLsp]);
 
-  function handleEditorMount(
-    editor: monaco.editor.IStandaloneCodeEditor,
-    monacoInstance: typeof monaco
-  ) {
+  const handleEditorMount: OnMount = (editor, monacoInstance) => {
     editorRef.current = editor;
     monacoRef.current = monacoInstance;
 
-    monacoInstance.editor.defineTheme("chorus-borderless", BORDERLESS_THEME);
-    monacoInstance.editor.setTheme("chorus-borderless");
+    if (themeInitialized) {
+      monacoInstance.editor.setTheme("chorus-borderless");
+    } else {
+      monacoInstance.editor.defineTheme(
+        "chorus-borderless",
+        BORDERLESS_THEME as never
+      );
+      monacoInstance.editor.setTheme("chorus-borderless");
+      themeInitialized = true;
+    }
 
     if (lspConfigRef.current?.wsUrl) {
       startLsp();
     }
-  }
+  };
 
   function handleChange(val: string | undefined) {
     if (val !== undefined) {
@@ -113,25 +120,25 @@ export function BorderlessFileView({
     }
   }
 
-  const editorOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
+  const editorOptions = {
     minimap: { enabled: false },
     fontSize: 14,
     fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
-    wordWrap: "on",
+    wordWrap: "on" as const,
     automaticLayout: true,
     scrollBeyondLastLine: false,
-    lineNumbers: "off",
+    lineNumbers: "off" as const,
     glyphMargin: false,
     folding: false,
     lineDecorationsWidth: 0,
     lineNumbersMinChars: 0,
-    renderLineHighlight: "none",
+    renderLineHighlight: "none" as const,
     hideCursorInOverviewRuler: true,
     overviewRulerLanes: 0,
     bracketPairColorization: { enabled: true },
     smoothScrolling: true,
-    cursorBlinking: "smooth",
-    cursorSmoothCaretAnimation: "on",
+    cursorBlinking: "smooth" as const,
+    cursorSmoothCaretAnimation: "on" as const,
     scrollbar: {
       verticalScrollbarSize: 6,
       horizontalScrollbarSize: 6,
