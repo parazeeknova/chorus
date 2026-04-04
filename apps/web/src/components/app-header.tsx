@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  type BoardViewMode,
   type OpencodeCredentialSummary,
   type OpencodeProviderStatus,
   opencodeConfiguredProviderCatalogSchema,
@@ -27,6 +28,7 @@ import {
   ZapIcon,
 } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { getProviderIconData } from "@/components/icons";
 import {
@@ -57,7 +59,7 @@ import { useWorkspace } from "@/features/workspace/workspace-context";
 import { useVoiceConfig } from "@/hooks/use-voice-config";
 import { cn } from "@/lib/utils";
 
-const menuItems = ["Edit", "View", "Window", "Help"];
+const menuItems = ["Edit", "Window", "Help"];
 const islandChrome =
   "pointer-events-auto relative rounded-sm border border-white/10 bg-zinc-950/68 shadow-[0_18px_50px_rgba(0,0,0,0.42)] backdrop-blur-2xl";
 const settingsPanelClass = cn(sharedDropdownContentClass, "w-[22rem] p-2");
@@ -81,6 +83,8 @@ const headerMenuSubTriggerClass = cn(
   "data-[popup-open]:!text-white data-[popup-open]:**:!text-white data-[popup-open]:bg-white/10"
 );
 const headerMenuEmptyStateLabelClass = "px-3 py-2 text-[12px] text-white/40";
+const headerMenuSectionLabelClass =
+  "px-3 pb-1 pt-2 text-[10px] uppercase tracking-[0.2em] text-white/34";
 const DEFAULT_SPEECH_VOICE_VALUE = "__default_speech_voice__";
 
 function buildProvidersUrl(
@@ -1052,15 +1056,18 @@ function MobileMenuDrawer({
   open,
   onClose,
   onOpenFolder,
+  boardViewMode,
   isOpeningFolder,
   previousWorkspaces,
   recentProjects,
   createBoardFromHistory,
   createBoardFromProject,
+  setBoardViewMode,
 }: {
   open: boolean;
   onClose: () => void;
   onOpenFolder: () => void;
+  boardViewMode: BoardViewMode;
   isOpeningFolder: boolean;
   previousWorkspaces: ReturnType<typeof useWorkspace>["previousWorkspaces"];
   recentProjects: ReturnType<typeof useWorkspace>["recentProjects"];
@@ -1070,6 +1077,7 @@ function MobileMenuDrawer({
   createBoardFromProject: ReturnType<
     typeof useWorkspace
   >["createBoardFromProject"];
+  setBoardViewMode: ReturnType<typeof useWorkspace>["setBoardViewMode"];
 }) {
   // Lock body scroll while drawer is open
   useEffect(() => {
@@ -1087,7 +1095,7 @@ function MobileMenuDrawer({
     return null;
   }
 
-  const allMenuItems = ["Edit", "View", "Window", "Help"];
+  const allMenuItems = ["Edit", "Window", "Help"];
 
   return (
     <>
@@ -1107,7 +1115,12 @@ function MobileMenuDrawer({
       >
         {/* Drawer header */}
         <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-white/8 border-b px-4">
-          <div className="flex items-center gap-2">
+          <Link
+            aria-label="Go to Chorus home"
+            className="flex items-center gap-2 rounded-xs transition-colors hover:text-white/90"
+            href="/"
+            onClick={onClose}
+          >
             <Image
               alt="Chorus logo"
               className="h-5 w-6 invert"
@@ -1119,7 +1132,7 @@ function MobileMenuDrawer({
             <span className="select-none font-semibold text-sm text-white tracking-[0.02em]">
               Chorus
             </span>
-          </div>
+          </Link>
           <button
             className="flex size-7 items-center justify-center rounded-xs text-white/30 transition-colors hover:bg-white/8 hover:text-white/70"
             onClick={onClose}
@@ -1207,21 +1220,79 @@ function MobileMenuDrawer({
 
           <div className="my-1 h-px bg-white/6" />
 
+          <div>
+            <p className="mb-1 px-2 font-semibold text-[0.6rem] text-white/25 uppercase tracking-widest">
+              View
+            </p>
+            <button
+              className={cn(
+                "flex w-full flex-col items-start rounded-xs px-3 py-2.5 text-left transition-colors",
+                boardViewMode === "stacked"
+                  ? "bg-white/8 text-white"
+                  : "text-white/65 hover:bg-white/6 hover:text-white"
+              )}
+              onClick={() => {
+                setBoardViewMode("stacked");
+                onClose();
+              }}
+              type="button"
+            >
+              <span className="font-medium text-sm">Stacked</span>
+              <span className="text-[0.67rem] text-white/40">
+                Layer boards into a card stack with visible title bars.
+              </span>
+            </button>
+            <button
+              className={cn(
+                "mt-1 flex w-full flex-col items-start rounded-xs px-3 py-2.5 text-left transition-colors",
+                boardViewMode === "relaxed"
+                  ? "bg-white/8 text-white"
+                  : "text-white/65 hover:bg-white/6 hover:text-white"
+              )}
+              onClick={() => {
+                setBoardViewMode("relaxed");
+                onClose();
+              }}
+              type="button"
+            >
+              <span className="font-medium text-sm">Relaxed</span>
+              <span className="text-[0.67rem] text-white/40">
+                Auto-arrange boards into a clean grid with no overlap.
+              </span>
+            </button>
+          </div>
+
+          <div className="my-1 h-px bg-white/6" />
+
           {/* Other menu items */}
           <div>
             <p className="mb-1 px-2 font-semibold text-[0.6rem] text-white/25 uppercase tracking-widest">
               Menu
             </p>
-            {allMenuItems.map((item) => (
-              <button
-                className="flex w-full items-center rounded-xs px-3 py-2.5 text-sm text-white/60 transition-colors hover:bg-white/6 hover:text-white"
-                key={item}
-                onClick={onClose}
-                type="button"
-              >
-                {item}
-              </button>
-            ))}
+            {allMenuItems.map((item) => {
+              if (item === "Help") {
+                return (
+                  <Link
+                    className="flex w-full items-center rounded-xs px-3 py-2.5 text-sm text-white/60 transition-colors hover:bg-white/6 hover:text-white"
+                    href="/help"
+                    key={item}
+                    onClick={onClose}
+                  >
+                    {item}
+                  </Link>
+                );
+              }
+              return (
+                <button
+                  className="flex w-full items-center rounded-xs px-3 py-2.5 text-sm text-white/60 transition-colors hover:bg-white/6 hover:text-white"
+                  key={item}
+                  onClick={onClose}
+                  type="button"
+                >
+                  {item}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -1360,6 +1431,58 @@ function SettingsMenu() {
   );
 }
 
+function ViewMenu({
+  boardViewMode,
+  onValueChange,
+}: {
+  boardViewMode: BoardViewMode;
+  onValueChange: (mode: BoardViewMode) => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger className="group relative shrink-0 rounded-xs px-3 py-2 text-sm text-zinc-300 transition duration-300 hover:text-white">
+        <span className="relative z-10">View</span>
+        <div className="absolute inset-0 rounded-xs border border-transparent bg-zinc-900/85 opacity-0 transition duration-300 group-hover:opacity-100" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className={cn(headerMenuContentClass, "min-w-88")}>
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className={headerMenuSectionLabelClass}>
+            Board Layout
+          </DropdownMenuLabel>
+          <DropdownMenuItem
+            className={headerMenuItemClass}
+            onClick={() => onValueChange("stacked")}
+          >
+            <div className="flex min-w-0 flex-1 flex-col">
+              <span className="font-medium text-sm text-white/92">Stacked</span>
+              <span className="text-white/42 text-xs">
+                Layer boards as a deck while keeping every title bar exposed.
+              </span>
+            </div>
+            {boardViewMode === "stacked" ? (
+              <CheckIcon className="size-4 text-white/70" />
+            ) : null}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className={headerMenuItemClass}
+            onClick={() => onValueChange("relaxed")}
+          >
+            <div className="flex min-w-0 flex-1 flex-col">
+              <span className="font-medium text-sm text-white/92">Relaxed</span>
+              <span className="text-white/42 text-xs">
+                Auto-place boards into a clean non-overlapping grid.
+              </span>
+            </div>
+            {boardViewMode === "relaxed" ? (
+              <CheckIcon className="size-4 text-white/70" />
+            ) : null}
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 // ─── AppHeader ─────────────────────────────────────────────────────────────────
 export function AppHeader() {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
@@ -1372,8 +1495,10 @@ export function AppHeader() {
     createBoardFromProject,
     isOpeningFolder,
     openFolder,
+    preferences,
     previousWorkspaces,
     recentProjects,
+    setBoardViewMode,
   } = useWorkspace();
 
   // Close notification pane on outside click
@@ -1396,6 +1521,7 @@ export function AppHeader() {
     <>
       {/* ── Mobile drawer ── */}
       <MobileMenuDrawer
+        boardViewMode={preferences.boardViewMode}
         createBoardFromHistory={createBoardFromHistory}
         createBoardFromProject={createBoardFromProject}
         isOpeningFolder={isOpeningFolder}
@@ -1408,6 +1534,7 @@ export function AppHeader() {
         open={mobileMenuOpen}
         previousWorkspaces={previousWorkspaces}
         recentProjects={recentProjects}
+        setBoardViewMode={setBoardViewMode}
       />
 
       <header className="pointer-events-none fixed inset-x-0 top-0 z-50 px-3 pt-3 sm:px-4">
@@ -1416,7 +1543,11 @@ export function AppHeader() {
           <div className={cn(islandChrome, "min-w-0 shrink")}>
             <div className="relative flex h-12 min-w-0 items-center gap-2 px-2">
               {/* Logo pill — always visible */}
-              <div className="flex shrink-0 items-center gap-2 rounded-sm border border-white/8 bg-zinc-900/78 px-3 py-2">
+              <Link
+                aria-label="Go to Chorus home"
+                className="flex shrink-0 items-center gap-2 rounded-sm border border-white/8 bg-zinc-900/78 px-3 py-2 transition-colors hover:bg-zinc-900/92"
+                href="/"
+              >
                 <Image
                   alt="Chorus logo"
                   className="h-4.75 w-6 invert"
@@ -1429,7 +1560,7 @@ export function AppHeader() {
                 <span className="hidden select-none font-medium text-sm text-white tracking-[0.01em] min-[480px]:inline">
                   Chorus
                 </span>
-              </div>
+              </Link>
 
               {/* ── Mobile: hamburger button ── */}
               <button
@@ -1559,9 +1690,28 @@ export function AppHeader() {
                     </DropdownMenuSub>
                   </DropdownMenuContent>
                 </DropdownMenu>
+                <ViewMenu
+                  boardViewMode={preferences.boardViewMode}
+                  onValueChange={setBoardViewMode}
+                />
 
                 {menuItems.map((item) => {
                   const isActive = activeMenu === item;
+
+                  if (item === "Help") {
+                    return (
+                      <Link
+                        className={cn(
+                          "group relative inline-block shrink-0 rounded-xs px-3 py-2 text-sm text-zinc-300 transition duration-300 hover:text-white"
+                        )}
+                        href="/help"
+                        key={item}
+                      >
+                        <span className="relative z-10">{item}</span>
+                        <div className="absolute inset-0 rounded-xs border border-transparent bg-zinc-900/85 opacity-0 transition duration-300 group-hover:opacity-100" />
+                      </Link>
+                    );
+                  }
 
                   return (
                     <button

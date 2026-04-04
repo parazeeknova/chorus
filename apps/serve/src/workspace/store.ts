@@ -62,6 +62,7 @@ export class WorkspaceStore {
   #snapshot: WorkspaceSnapshot = {
     boards: [],
     preferences: {
+      boardViewMode: "relaxed",
       composerHintDismissed: false,
       speechVoiceId: null,
     },
@@ -82,6 +83,7 @@ export class WorkspaceStore {
       this.#snapshot = {
         boards: [],
         preferences: {
+          boardViewMode: "relaxed",
           composerHintDismissed: false,
           speechVoiceId: null,
         },
@@ -249,6 +251,18 @@ export class WorkspaceStore {
           preferences: {
             ...snapshot.preferences,
             speechVoiceId: mutation.payload.voiceId,
+          },
+          selectedBoardId: snapshot.selectedBoardId,
+        });
+        break;
+      }
+
+      case "preference.board_view_mode.set": {
+        nextSnapshot = await this.replaceSnapshot({
+          boards: snapshot.boards,
+          preferences: {
+            ...snapshot.preferences,
+            boardViewMode: mutation.payload.mode,
           },
           selectedBoardId: snapshot.selectedBoardId,
         });

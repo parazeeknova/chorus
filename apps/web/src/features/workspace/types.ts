@@ -34,6 +34,7 @@ export interface AgentEventEnvelope {
 }
 
 export interface WorkspaceContextValue {
+  boardLayoutVersion: number;
   boards: WorkspaceBoard[];
   clearSelection: () => void;
   createBoardFromHistory: (entry: WorkspaceHistoryEntry) => void;
@@ -59,6 +60,7 @@ export interface WorkspaceContextValue {
   selectedBoard?: WorkspaceBoard;
   selectedBoardId: string | null;
   sessionCommand: (command: "undo" | "redo") => Promise<boolean>;
+  setBoardViewMode: (mode: WorkspacePreferences["boardViewMode"]) => void;
   setSpeechVoiceId: (voiceId: string | null) => void;
   updateBoardColumns: (boardId: string, columns: Columns) => void;
   updateBoardPosition: (
