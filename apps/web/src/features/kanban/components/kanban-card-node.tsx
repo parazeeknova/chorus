@@ -10,10 +10,12 @@ import {
   GripVerticalIcon,
   LoaderCircleIcon,
   MonitorIcon,
+  Redo2Icon,
   TriangleAlertIcon,
+  Undo2Icon,
   XIcon,
 } from "lucide-react";
-import { memo, useCallback, useState } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,9 +26,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  type Columns,
   KanbanCardContent,
   type KanbanCardData,
 } from "@/features/kanban/components/kanban";
+import { useWorkspace } from "@/features/workspace/workspace-context";
 import { fetchSessionDiff, type SessionFileDiff } from "@/lib/opencode-client";
 import { cn } from "@/lib/utils";
 
@@ -167,15 +171,56 @@ function KanbanCardNodeComponent({
   const [selectedDiffFile, setSelectedDiffFile] =
     useState<SessionFileDiff | null>(null);
   const [isLoadingDiff, setIsLoadingDiff] = useState(false);
+  const [localColumns, setLocalColumns] = useState<Columns>(cardData.columns);
+
+  const { kanbanHistory, restorePrompt } = useWorkspace();
+
+  useEffect(() => {
+    setLocalColumns(cardData.columns);
+  }, [cardData.columns]);
 
   const filePath = cardData.filePath ?? cardData.projectName ?? cardData.title;
 
   const handleColumnsChange = useCallback(
-    (columns: KanbanCardData["columns"]) => {
+    (columns: Columns) => {
+      const prevColumns = localColumns;
+      setLocalColumns(columns);
+
+      const doneTasks = columns.done ?? [];
+      const prevDoneTasks = prevColumns.done ?? [];
+
+      if (doneTasks.length > prevDoneTasks.length) {
+        const newDoneTask = doneTasks.at(-1);
+        if (newDoneTask) {
+          kanbanHistory.recordMove(prevColumns, columns, newDoneTask);
+        }
+      }
+
       cardData.onUpdateColumns?.(id, columns);
     },
-    [cardData, id]
+    [cardData, id, kanbanHistory, localColumns]
   );
+
+  const handleUndo = useCallback(() => {
+    const result = kanbanHistory.undo();
+    if (!result) {
+      return;
+    }
+
+    setLocalColumns(result.columns);
+    cardData.onUpdateColumns?.(id, result.columns);
+    restorePrompt(result.prompt);
+  }, [kanbanHistory, cardData, id, restorePrompt]);
+
+  const handleRedo = useCallback(() => {
+    const result = kanbanHistory.redo();
+    if (!result) {
+      return;
+    }
+
+    setLocalColumns(result.columns);
+    cardData.onUpdateColumns?.(id, result.columns);
+  }, [kanbanHistory, cardData, id]);
 
   const handleOpenHere = useCallback(() => {
     setEditorMode("file");
@@ -265,6 +310,39 @@ function KanbanCardNodeComponent({
               sessionId={cardData.sessionId}
               state={cardData.sessionState}
             />
+
+            <span className="h-3.5 w-px bg-white/10" />
+
+            <div className="flex items-center gap-1">
+              <button
+                className={cn(
+                  "rounded-xs p-1 transition-colors",
+                  kanbanHistory.canUndo
+                    ? "text-white/50 hover:bg-white/10 hover:text-white/80"
+                    : "cursor-not-allowed text-white/15"
+                )}
+                disabled={!kanbanHistory.canUndo}
+                onClick={handleUndo}
+                title="Undo last task"
+                type="button"
+              >
+                <Undo2Icon className="size-3.5" />
+              </button>
+              <button
+                className={cn(
+                  "rounded-xs p-1 transition-colors",
+                  kanbanHistory.canRedo
+                    ? "text-white/50 hover:bg-white/10 hover:text-white/80"
+                    : "cursor-not-allowed text-white/15"
+                )}
+                disabled={!kanbanHistory.canRedo}
+                onClick={handleRedo}
+                title="Redo undone task"
+                type="button"
+              >
+                <Redo2Icon className="size-3.5" />
+              </button>
+            </div>
 
             <span className="h-3.5 w-px bg-white/10" />
 

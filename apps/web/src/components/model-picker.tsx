@@ -150,6 +150,7 @@ export function ModelPicker({
           "flex min-w-[13rem] max-w-[16rem] select-none items-center justify-between gap-2 rounded-xs border border-input bg-transparent px-2.5 py-1 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
           className
         )}
+        suppressHydrationWarning
       >
         <span className="flex min-w-0 flex-1 items-center gap-2">
           <span className="flex size-4 shrink-0 items-center justify-center text-white/70">
