@@ -29,6 +29,11 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { getProviderIconData } from "@/components/icons";
 import {
+  sharedDropdownContentClass,
+  sharedDropdownItemClass,
+  sharedDropdownTriggerClass,
+} from "@/components/ui/dropdown-aesthetics";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
@@ -54,14 +59,27 @@ import { cn } from "@/lib/utils";
 const menuItems = ["Edit", "View", "Window", "Help"];
 const islandChrome =
   "pointer-events-auto relative rounded-sm border border-white/10 bg-zinc-950/68 shadow-[0_18px_50px_rgba(0,0,0,0.42)] backdrop-blur-2xl";
-const settingsPanelClass =
-  "w-[22rem] rounded-xs border border-white/10 bg-[#121212]/98 p-2 text-white shadow-[0_20px_54px_rgba(0,0,0,0.52)] ring-1 ring-white/8 backdrop-blur-xl";
-const settingsSelectTriggerClass =
-  "h-8 w-full justify-between rounded-none border border-white/8 bg-white/[0.03] px-2.5 text-[11px] font-medium text-white/84 shadow-none transition-colors hover:border-white/12 hover:bg-white/[0.05] focus-visible:border-white/14 focus-visible:bg-white/[0.06] focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0";
-const settingsSelectContentClass =
-  "border-white/10 bg-[#151515]/98 p-1 text-white/92 shadow-[0_18px_44px_rgba(0,0,0,0.45)] backdrop-blur-xl";
-const settingsSelectItemClass =
-  "min-h-8 rounded-none px-2.5 py-1.5 text-[11px] text-white/78 focus:bg-white/7 focus:!text-white/88 focus:**:!text-white/88 aria-selected:bg-white/10 aria-selected:!text-white aria-selected:**:!text-white data-[highlighted]:bg-white/7 data-[highlighted]:!text-white/88 data-[highlighted]:**:!text-white/88";
+const settingsPanelClass = cn(sharedDropdownContentClass, "w-[22rem] p-2");
+const settingsSelectTriggerClass = cn(
+  sharedDropdownTriggerClass,
+  "h-8 w-full justify-between text-white/84"
+);
+const settingsSelectContentClass = sharedDropdownContentClass;
+const settingsSelectItemClass = sharedDropdownItemClass;
+const headerMenuContentClass = cn(sharedDropdownContentClass, "min-w-72 p-1.5");
+const headerSubmenuContentClass = cn(
+  sharedDropdownContentClass,
+  "min-w-80 p-1.5"
+);
+const headerMenuItemClass = cn(
+  sharedDropdownItemClass,
+  "focus:!text-white cursor-pointer px-3 py-2 text-sm text-white/85"
+);
+const headerMenuSubTriggerClass = cn(
+  headerMenuItemClass,
+  "data-[popup-open]:!text-white data-[popup-open]:**:!text-white data-[popup-open]:bg-white/10"
+);
+const headerMenuEmptyStateLabelClass = "px-3 py-2 text-[12px] text-white/40";
 const DEFAULT_SPEECH_VOICE_VALUE = "__default_speech_voice__";
 
 function buildProvidersUrl(
@@ -1436,9 +1454,9 @@ export function AppHeader() {
                     <span className="relative z-10">File</span>
                     <div className="absolute inset-0 rounded-xs border border-transparent bg-zinc-900/85 opacity-0 transition duration-300 group-hover:opacity-100" />
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent className="min-w-72 rounded-sm border border-white/10 bg-[#111111]/96 p-1.5 text-white shadow-2xl backdrop-blur-xl">
+                  <DropdownMenuContent className={headerMenuContentClass}>
                     <DropdownMenuItem
-                      className="cursor-pointer rounded-xs px-3 py-2 text-sm text-white/85 focus:bg-white/10 focus:text-white"
+                      className={headerMenuItemClass}
                       onClick={() => {
                         openFolder().catch((error) => {
                           console.error("Failed to open folder", error);
@@ -1454,20 +1472,26 @@ export function AppHeader() {
                     </DropdownMenuItem>
                     <DropdownMenuSeparator className="bg-white/8" />
                     <DropdownMenuSub>
-                      <DropdownMenuSubTrigger className="rounded-xs px-3 py-2 text-sm text-white/85 focus:bg-white/10 focus:text-white data-[popup-open]:bg-white/10 data-[popup-open]:text-white">
+                      <DropdownMenuSubTrigger
+                        className={headerMenuSubTriggerClass}
+                      >
                         Previous Working
                       </DropdownMenuSubTrigger>
-                      <DropdownMenuSubContent className="min-w-80 rounded-sm border border-white/10 bg-[#111111]/96 p-1.5 text-white shadow-2xl backdrop-blur-xl">
+                      <DropdownMenuSubContent
+                        className={headerSubmenuContentClass}
+                      >
                         {previousWorkspaces.length === 0 ? (
                           <DropdownMenuGroup>
-                            <DropdownMenuLabel className="text-white/40">
+                            <DropdownMenuLabel
+                              className={headerMenuEmptyStateLabelClass}
+                            >
                               No previous work yet
                             </DropdownMenuLabel>
                           </DropdownMenuGroup>
                         ) : (
                           previousWorkspaces.map((entry) => (
                             <DropdownMenuItem
-                              className="cursor-pointer rounded-xs px-3 py-2 text-sm text-white/85 focus:bg-white/10 focus:text-white"
+                              className={headerMenuItemClass}
                               key={entry.id}
                               onClick={() => {
                                 createBoardFromHistory(entry);
@@ -1487,20 +1511,26 @@ export function AppHeader() {
                       </DropdownMenuSubContent>
                     </DropdownMenuSub>
                     <DropdownMenuSub>
-                      <DropdownMenuSubTrigger className="rounded-xs px-3 py-2 text-sm text-white/85 focus:bg-white/10 focus:text-white data-[popup-open]:bg-white/10 data-[popup-open]:text-white">
+                      <DropdownMenuSubTrigger
+                        className={headerMenuSubTriggerClass}
+                      >
                         Known Projects
                       </DropdownMenuSubTrigger>
-                      <DropdownMenuSubContent className="min-w-80 rounded-sm border border-white/10 bg-[#111111]/96 p-1.5 text-white shadow-2xl backdrop-blur-xl">
+                      <DropdownMenuSubContent
+                        className={headerSubmenuContentClass}
+                      >
                         {recentProjects.length === 0 ? (
                           <DropdownMenuGroup>
-                            <DropdownMenuLabel className="text-white/40">
+                            <DropdownMenuLabel
+                              className={headerMenuEmptyStateLabelClass}
+                            >
                               No known projects yet
                             </DropdownMenuLabel>
                           </DropdownMenuGroup>
                         ) : (
                           recentProjects.map((project) => (
                             <DropdownMenuItem
-                              className="cursor-pointer rounded-xs px-3 py-2 text-sm text-white/85 focus:bg-white/10 focus:text-white"
+                              className={headerMenuItemClass}
                               key={`${project.projectId ?? project.directory}`}
                               onClick={() => {
                                 createBoardFromProject(project);
