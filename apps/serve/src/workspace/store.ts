@@ -10,6 +10,7 @@ import {
   workspaceSnapshotInputSchema,
   workspaceSnapshotSchema,
 } from "@chorus/contracts";
+import type { NormalizedAgentEvent } from "@chorus/oc-adapter";
 import { applyAgentEventToBoard, attachSessionToBoard } from "./projector";
 
 function createHistoryId(board: Pick<WorkspaceBoard, "repo">) {
