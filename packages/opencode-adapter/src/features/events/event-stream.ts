@@ -135,7 +135,7 @@ function extractFileDiffFromCompleted(
   toolName: string,
   metadata: Record<string, unknown>
 ): FileDiffInfo | undefined {
-  if (toolName === "edit" && metadata.filediff) {
+  if ((toolName === "edit" || toolName === "write") && metadata.filediff) {
     const fd = metadata.filediff as Record<string, unknown>;
     return {
       additions: safeNum(fd.additions),
@@ -166,18 +166,22 @@ function extractFileDiffFromRunning(
   toolName: string,
   input: Record<string, unknown>
 ): FileDiffInfo | undefined {
-  if (toolName !== "edit" || typeof input.filePath !== "string") {
-    return undefined;
-  }
-  const diff: FileDiffInfo = { filePath: input.filePath };
   if (
-    typeof input.oldString === "string" &&
-    typeof input.newString === "string"
+    (toolName === "edit" || toolName === "write") &&
+    typeof input.filePath === "string"
   ) {
-    diff.before = input.oldString;
-    diff.after = input.newString;
+    const diff: FileDiffInfo = { filePath: input.filePath };
+    if (
+      toolName === "edit" &&
+      typeof input.oldString === "string" &&
+      typeof input.newString === "string"
+    ) {
+      diff.before = input.oldString;
+      diff.after = input.newString;
+    }
+    return diff;
   }
-  return diff;
+  return undefined;
 }
 
 function extractFileDiff(
@@ -199,7 +203,7 @@ function extractFileDiff(
 
 function normalizeMessagePartUpdated(
   base: NormalizedAgentEvent,
-  raw: OCEvent
+  raw: Extract<OCEvent, { type: "message.part.updated" }>
 ): NormalizedAgentEvent {
   const part = raw.properties.part;
   if (part.type === "text") {
@@ -235,7 +239,7 @@ function normalizeMessagePartUpdated(
 
 function normalizeSessionStatus(
   base: NormalizedAgentEvent,
-  raw: OCEvent
+  raw: Extract<OCEvent, { type: "session.status" }>
 ): NormalizedAgentEvent {
   const status = raw.properties.status;
   let activity: NormalizedActivity = "idle";
@@ -254,7 +258,7 @@ function normalizeSessionStatus(
 
 function normalizeMessageUpdated(
   base: NormalizedAgentEvent,
-  raw: OCEvent
+  raw: Extract<OCEvent, { type: "message.updated" }>
 ): NormalizedAgentEvent {
   const info = raw.properties.info;
   if (info.role === "assistant" && "error" in info && info.error) {
