@@ -52,6 +52,7 @@ import {
 } from "@/components/ui/resizable";
 import {
   AgentOutputCard,
+  type AgentRunContext,
   PLACEHOLDER_RUN,
 } from "@/features/kanban/components/agent-output-card";
 import { cn } from "@/lib/utils";
@@ -69,6 +70,8 @@ export interface Task {
   linesAdded?: number;
   /** Lines removed by the agent run — shown in done cards */
   linesRemoved?: number;
+  /** Live or recorded run state shown in the in-progress card */
+  run?: AgentRunContext;
   /** Links to an OpenCode sessionId for live agent output */
   runId?: string;
   /** Short paragraph describing what the agent did — shown in done cards */
@@ -561,10 +564,13 @@ function TaskCard({
             </div>
           </div>
           <AgentOutputCard
-            run={{
-              ...PLACEHOLDER_RUN,
-              taskTitle: task.title,
-            }}
+            run={
+              task.run ?? {
+                ...PLACEHOLDER_RUN,
+                sessionId: task.runId,
+                taskTitle: task.title,
+              }
+            }
           />
         </>
       ) : (

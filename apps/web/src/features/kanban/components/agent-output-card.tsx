@@ -36,6 +36,7 @@ export interface AgentRunContext {
   elapsed: string;
   model: string;
   sessionId?: string;
+  startedAt?: number;
   steps: AgentStep[];
   taskTitle: string;
 }

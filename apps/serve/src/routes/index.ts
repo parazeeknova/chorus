@@ -1,7 +1,12 @@
+import { queueBoardPromptInputSchema } from "@chorus/contracts";
 import { Elysia, t } from "elysia";
 import type { OpenCodeBridge } from "../bridge/opencode/bridge";
+import type { BoardTaskService } from "../tasks/board-task-service";
 
-export function createHttpRoutes(bridge: OpenCodeBridge) {
+export function createHttpRoutes(
+  bridge: OpenCodeBridge,
+  boardTasks: BoardTaskService
+) {
   return new Elysia()
     .get("/health", () => ({
       status: "ok",
@@ -12,35 +17,20 @@ export function createHttpRoutes(bridge: OpenCodeBridge) {
 
     .post(
       "/tasks",
-      async ({ body }) => {
-        const session = await bridge.createSession({
-          title: body.text.slice(0, 80),
-        });
+      ({ body, set }) => {
+        const parsed = queueBoardPromptInputSchema.safeParse(body);
+        if (!parsed.success) {
+          set.status = 422;
+          return {
+            code: "invalid_task_payload",
+            issues: parsed.error.issues,
+          };
+        }
 
-        await bridge.promptSession({
-          sessionID: session.id,
-          text: body.text,
-          model: body.model,
-          agent: body.agent,
-        });
-
-        return {
-          sessionID: session.id,
-          accepted: true,
-          timestamp: Date.now(),
-        };
+        return boardTasks.queuePrompt(parsed.data);
       },
       {
-        body: t.Object({
-          text: t.String(),
-          model: t.Optional(
-            t.Object({
-              providerID: t.String(),
-              modelID: t.String(),
-            })
-          ),
-          agent: t.Optional(t.String()),
-        }),
+        body: t.Any(),
       }
     )
 

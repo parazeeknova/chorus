@@ -1,3 +1,4 @@
+import type { QueueBoardPromptInput } from "@chorus/contracts";
 import type { NormalizedAgentEvent } from "@chorus/oc-adapter";
 import type { ServerWebSocket } from "bun";
 
@@ -56,14 +57,7 @@ export type WsMessage =
   | { type: typeof WS_MESSAGE_TYPE.VIEWPORT_SYNC; payload: ViewportSyncPayload }
   | { type: typeof WS_MESSAGE_TYPE.PRESENCE_PING };
 
-export interface QueueTaskPayload {
-  agent?: string;
-  model?: {
-    providerID: string;
-    modelID: string;
-  };
-  text: string;
-}
+export type QueueTaskPayload = QueueBoardPromptInput;
 
 export interface ApprovePayload {
   message?: string;

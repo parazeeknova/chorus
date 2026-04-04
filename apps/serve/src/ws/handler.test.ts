@@ -30,11 +30,28 @@ function makeMockBridge() {
   };
 }
 
+function makeMockBoardTasks() {
+  return {
+    queuePrompt: mock(async () => ({
+      boardId: "board-1",
+      sessionId: "sess-123",
+      createdSession: true,
+      accepted: true,
+      timestamp: 123,
+    })),
+  };
+}
+
 describe("WebSocket handler", () => {
   test("creates WS handler with /ws endpoint", () => {
     const bridge = makeMockBridge();
     const wsManager = createWsClientManager();
-    const handler = createWsHandler(bridge as never, wsManager);
+    const boardTasks = makeMockBoardTasks();
+    const handler = createWsHandler(
+      bridge as never,
+      wsManager,
+      boardTasks as never
+    );
 
     expect(handler).toBeDefined();
   });
@@ -42,7 +59,8 @@ describe("WebSocket handler", () => {
   test("handler registers ws manager with empty clients", () => {
     const bridge = makeMockBridge();
     const wsManager = createWsClientManager();
-    createWsHandler(bridge as never, wsManager);
+    const boardTasks = makeMockBoardTasks();
+    createWsHandler(bridge as never, wsManager, boardTasks as never);
 
     expect(wsManager.clients.size).toBe(0);
   });
@@ -53,6 +71,8 @@ describe("WS message type definitions", () => {
     const msg: WsMessage = {
       type: "task.queue",
       payload: {
+        boardId: "board-1",
+        directory: "/tmp/repo",
         text: "build something",
         model: { providerID: "anthropic", modelID: "claude" },
         agent: "build",
@@ -60,6 +80,7 @@ describe("WS message type definitions", () => {
     };
 
     expect(msg.type).toBe("task.queue");
+    expect(msg.payload.boardId).toBe("board-1");
     expect(msg.payload.text).toBe("build something");
   });
 

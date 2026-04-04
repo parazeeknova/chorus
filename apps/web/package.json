@@ -1,6 +1,6 @@
 {
   "name": "@chorus/web",
-  "version": "0.0.14",
+  "version": "0.0.15",
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000 --turbopack",
@@ -19,6 +19,7 @@
     "@xyflow/react": "^12.10.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "dexie": "^4.4.2",
     "lucide-react": "^1.7.0",
     "next": "^16.2.2",
     "posthog-js": "^1.364.7",
@@ -36,7 +37,7 @@
     "@types/react-dom": "^19.2.3",
     "babel-plugin-react-compiler": "^1.0.0",
     "tailwindcss": "^4.2.2",
-    "typescript": "5.7.3"
+    "typescript": "^6.0.2"
   },
   "ignoreScripts": [
     "sharp",

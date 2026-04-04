@@ -11,40 +11,78 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useWorkspace } from "@/features/workspace/workspace-context";
+
+const MODEL_OPTIONS = {
+  default: undefined,
+  claude: {
+    providerID: "anthropic",
+    modelID: "claude-sonnet-4-5",
+  },
+  gpt4_1: {
+    providerID: "openai",
+    modelID: "gpt-4.1",
+  },
+  gemini: {
+    providerID: "google",
+    modelID: "gemini-2.5-pro",
+  },
+} as const;
 
 export function PromptInput() {
   const [prompt, setPrompt] = useState("");
-  const [selectedKanban, setSelectedKanban] = useState("main");
-  const [selectedModel, setSelectedModel] = useState("chorus");
+  const [selectedModel, setSelectedModel] =
+    useState<keyof typeof MODEL_OPTIONS>("default");
+  const { boards, isQueueingPrompt, queuePrompt, selectedBoard, selectBoard } =
+    useWorkspace();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const isBusy =
+    isQueueingPrompt || selectedBoard?.session.state === "starting";
+  const hasActiveRun = selectedBoard?.session.currentTaskId !== undefined;
+  let sessionMessage = "First prompt will start a new OpenCode session.";
+
+  if (hasActiveRun) {
+    sessionMessage = "Wait for the current run to finish.";
+  } else if (isBusy) {
+    sessionMessage = "Starting session…";
+  } else if (selectedBoard?.session.sessionId) {
+    sessionMessage = "Prompt will reuse the active session.";
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!prompt.trim()) {
+    if (!(prompt.trim() && selectedBoard) || isBusy || hasActiveRun) {
       return;
     }
 
-    // TODO: Handle prompt submission
-    console.log(
-      "Prompt submitted:",
-      prompt,
-      "to kanban:",
-      selectedKanban,
-      "with model:",
-      selectedModel
-    );
-    setPrompt("");
+    const result = await queuePrompt({
+      text: prompt.trim(),
+      model: MODEL_OPTIONS[selectedModel],
+    });
+
+    if (result) {
+      setPrompt("");
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit(e);
+      handleSubmit(e).catch((error) => {
+        console.error("Failed to submit prompt", error);
+      });
     }
   };
 
   return (
     <div className="fixed right-0 bottom-0 left-0 z-40 flex justify-center px-4 pb-0">
       <div className="w-full max-w-4xl">
+        <div className="mb-2 rounded-lg border border-white/10 bg-black/45 px-3 py-2 text-[11px] text-white/70 leading-4 shadow-lg backdrop-blur-md">
+          Boards persist locally across refresh.{" "}
+          {selectedBoard
+            ? `${selectedBoard.title} is selected. ${sessionMessage}`
+            : "Open or select a board, then send the first prompt to start its OpenCode session."}
+        </div>
         <form className="relative" onSubmit={handleSubmit}>
           <div className="rounded-t-2xl border-zinc-400/20 border-t-[6px] border-r-[6px] border-l-[6px] p-0.5 shadow-lg backdrop-blur-md">
             <div className="rounded-t-lg border-zinc-400 border-t border-r border-l bg-white px-4 py-3">
@@ -70,29 +108,38 @@ export function PromptInput() {
                       <SelectValue style={{ backgroundColor: "white" }} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="chorus">Chorus</SelectItem>
-                      <SelectItem value="gpt4">GPT-4</SelectItem>
-                      <SelectItem value="claude">Claude</SelectItem>
-                      <SelectItem value="gemini">Gemini</SelectItem>
+                      <SelectItem value="default">OpenCode Default</SelectItem>
+                      <SelectItem value="claude">Claude Sonnet</SelectItem>
+                      <SelectItem value="gpt4_1">GPT-4.1</SelectItem>
+                      <SelectItem value="gemini">Gemini 2.5 Pro</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="flex items-center gap-2">
                   <Select
-                    onValueChange={(value) => value && setSelectedKanban(value)}
-                    value={selectedKanban}
+                    onValueChange={(value) => value && selectBoard(value)}
+                    value={selectedBoard?.boardId ?? null}
                   >
                     <SelectTrigger
                       className="h-auto w-auto border-0 p-0 text-xs shadow-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0"
                       style={{ backgroundColor: "white" }}
                     >
-                      <SelectValue style={{ backgroundColor: "white" }} />
+                      <SelectValue
+                        placeholder="Select a board"
+                        style={{ backgroundColor: "white" }}
+                      />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="main">Main Kanban</SelectItem>
-                      <SelectItem value="dev">Dev Tasks</SelectItem>
-                      <SelectItem value="design">Design Board</SelectItem>
-                      <SelectItem value="bugs">Bug Tracker</SelectItem>
+                      {boards.map((board) => (
+                        <SelectItem key={board.boardId} value={board.boardId}>
+                          <span className="flex min-w-0 flex-col">
+                            <span className="truncate">{board.title}</span>
+                            <span className="truncate text-[11px] text-zinc-500">
+                              {board.repo.directory}
+                            </span>
+                          </span>
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <Button
@@ -105,7 +152,11 @@ export function PromptInput() {
                   </Button>
                   <Button
                     className="h-8 w-8 rounded-md bg-black text-white hover:bg-zinc-800 disabled:opacity-30"
-                    disabled={!prompt.trim()}
+                    disabled={
+                      !(prompt.trim() && selectedBoard) ||
+                      isBusy ||
+                      hasActiveRun
+                    }
                     size="icon"
                     type="submit"
                   >

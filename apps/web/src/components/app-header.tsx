@@ -1,13 +1,32 @@
 "use client";
 
-import { Settings } from "lucide-react";
+import { FolderOpenIcon, Settings } from "lucide-react";
 import Image from "next/image";
-import { useState } from "react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useWorkspace } from "@/features/workspace/workspace-context";
 
-const menuItems = ["File", "Edit", "View", "Window", "Help"];
+const menuItems = ["Edit", "View", "Window", "Help"];
 
 export function AppHeader() {
-  const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  const {
+    createBoardFromHistory,
+    createBoardFromProject,
+    isOpeningFolder,
+    openFolder,
+    previousWorkspaces,
+    recentProjects,
+  } = useWorkspace();
 
   return (
     <header className="fixed top-0 right-0 left-0 z-50 border-zinc-200 border-b bg-white">
@@ -30,20 +49,103 @@ export function AppHeader() {
 
           {/* Menu Items */}
           <nav className="flex items-center">
+            <DropdownMenu>
+              <DropdownMenuTrigger className="rounded-md px-3 py-1.5 text-black text-sm transition-colors hover:bg-zinc-100">
+                File
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="min-w-72 rounded-xl border border-zinc-200 bg-white p-1.5 text-black shadow-2xl">
+                <DropdownMenuItem
+                  className="cursor-pointer rounded-lg px-3 py-2 text-sm"
+                  onClick={() => {
+                    openFolder().catch((error) => {
+                      console.error("Failed to open folder", error);
+                    });
+                  }}
+                >
+                  <FolderOpenIcon className="size-4" />
+                  <span>{isOpeningFolder ? "Opening…" : "Open Folder..."}</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger className="rounded-lg px-3 py-2 text-sm">
+                    Previous Working
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent className="min-w-80 rounded-xl border border-zinc-200 bg-white p-1.5 text-black shadow-2xl">
+                    {previousWorkspaces.length === 0 ? (
+                      <DropdownMenuGroup>
+                        <DropdownMenuLabel>
+                          No previous work yet
+                        </DropdownMenuLabel>
+                      </DropdownMenuGroup>
+                    ) : (
+                      previousWorkspaces.map((entry) => (
+                        <DropdownMenuItem
+                          className="cursor-pointer rounded-lg px-3 py-2 text-sm"
+                          key={entry.id}
+                          onClick={() => {
+                            createBoardFromHistory(entry);
+                          }}
+                        >
+                          <div className="flex min-w-0 flex-col">
+                            <span className="truncate font-medium text-sm text-zinc-900">
+                              {entry.title}
+                            </span>
+                            <span className="truncate text-xs text-zinc-500">
+                              {entry.repo.directory}
+                            </span>
+                          </div>
+                        </DropdownMenuItem>
+                      ))
+                    )}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger className="rounded-lg px-3 py-2 text-sm">
+                    Known Projects
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent className="min-w-80 rounded-xl border border-zinc-200 bg-white p-1.5 text-black shadow-2xl">
+                    {recentProjects.length === 0 ? (
+                      <DropdownMenuGroup>
+                        <DropdownMenuLabel>
+                          No known projects yet
+                        </DropdownMenuLabel>
+                      </DropdownMenuGroup>
+                    ) : (
+                      recentProjects.map((project) => (
+                        <DropdownMenuItem
+                          className="cursor-pointer rounded-lg px-3 py-2 text-sm"
+                          key={`${project.projectId ?? project.directory}`}
+                          onClick={() => {
+                            createBoardFromProject(project);
+                          }}
+                        >
+                          <div className="flex min-w-0 flex-col">
+                            <span className="truncate font-medium text-sm text-zinc-900">
+                              {project.projectName ??
+                                project.directory
+                                  .split("/")
+                                  .filter(Boolean)
+                                  .at(-1) ??
+                                project.directory}
+                            </span>
+                            <span className="truncate text-xs text-zinc-500">
+                              {project.directory}
+                            </span>
+                          </div>
+                        </DropdownMenuItem>
+                      ))
+                    )}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+              </DropdownMenuContent>
+            </DropdownMenu>
             {menuItems.map((item) => (
               <button
-                className="group relative px-3 py-1.5 text-black text-sm transition-colors hover:bg-zinc-100"
+                className="rounded-md px-3 py-1.5 text-black text-sm transition-colors hover:bg-zinc-100"
                 key={item}
-                onClick={() => setActiveMenu(activeMenu === item ? null : item)}
-                onMouseEnter={() => activeMenu && setActiveMenu(item)}
                 type="button"
               >
-                <span className="relative z-10">{item}</span>
-                <div
-                  className={`absolute inset-0 origin-left scale-x-0 bg-zinc-100 transition-transform duration-200 group-hover:scale-x-100 ${
-                    activeMenu === item ? "scale-x-100" : ""
-                  }`}
-                />
+                {item}
               </button>
             ))}
           </nav>

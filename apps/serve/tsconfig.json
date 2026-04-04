@@ -31,6 +31,7 @@
     "baseUrl": ".",
     "ignoreDeprecations": "6.0",
     "paths": {
+      "@chorus/contracts": ["../../packages/contracts/src"],
       "@chorus/voice": ["../../packages/voice/src"],
       "@chorus/agent-events": ["../../packages/agent-events/src"],
       "@chorus/policy-engine": ["../../packages/policy-engine/src"]

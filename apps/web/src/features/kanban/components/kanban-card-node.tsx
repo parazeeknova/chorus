@@ -2,16 +2,14 @@
 
 import { type Node, type NodeProps, NodeResizeControl } from "@xyflow/react";
 import {
-  ArrowDownIcon,
-  ArrowUpIcon,
   ChevronDownIcon,
   Code2Icon,
   GitBranchIcon,
   GlobeIcon,
   GripVerticalIcon,
-  MinusIcon,
+  LoaderCircleIcon,
   MonitorIcon,
-  PlusIcon,
+  TriangleAlertIcon,
   XIcon,
 } from "lucide-react";
 import { memo, useCallback } from "react";
@@ -30,38 +28,18 @@ import { cn } from "@/lib/utils";
 export const KANBAN_CARD_NODE_TYPE = "kanbanCard";
 
 export interface KanbanCardNodeData {
+  boardId: string;
   columns: KanbanCardData["columns"];
-  diffAdded?: number;
-  diffRemoved?: number;
   filePath?: string;
   gitBranch?: string;
-  id: string;
-  incomingChanges?: number;
   onRemove?: (id: string) => void;
   onUpdateColumns?: (id: string, columns: KanbanCardData["columns"]) => void;
-  outgoingChanges?: number;
+  projectName?: string;
+  sessionId?: string;
+  sessionState: "uninitialized" | "starting" | "active" | "error";
   title: string;
   [key: string]: unknown;
 }
-
-const PLACEHOLDER: Required<
-  Pick<
-    KanbanCardNodeData,
-    | "filePath"
-    | "gitBranch"
-    | "diffAdded"
-    | "diffRemoved"
-    | "incomingChanges"
-    | "outgoingChanges"
-  >
-> = {
-  filePath: "apps/web/src/features/kanban",
-  gitBranch: "feat/kanban-board",
-  diffAdded: 42,
-  diffRemoved: 7,
-  incomingChanges: 3,
-  outgoingChanges: 5,
-};
 
 function FilePath({ path }: { path: string }) {
   const parts = path.split("/");
@@ -91,45 +69,51 @@ function GitBranch({ branch }: { branch: string }) {
   );
 }
 
-function DiffStat({ added, removed }: { added: number; removed: number }) {
-  return (
-    <span className="flex items-center gap-1.5">
-      <span className="flex items-center gap-0.5 font-medium text-[0.65rem] text-emerald-400/80 leading-none">
-        <PlusIcon className="size-2.5" />
-        {added}
-      </span>
-      <span className="text-white/15">·</span>
-      <span className="flex items-center gap-0.5 font-medium text-[0.65rem] text-red-400/70 leading-none">
-        <MinusIcon className="size-2.5" />
-        {removed}
-      </span>
-    </span>
-  );
-}
-
-function SyncStat({
-  incoming,
-  outgoing,
+function SessionStatus({
+  sessionId,
+  state,
 }: {
-  incoming: number;
-  outgoing: number;
+  sessionId?: string;
+  state: KanbanCardNodeData["sessionState"];
 }) {
-  return (
-    <span className="flex items-center gap-1.5">
-      <span
-        className="flex items-center gap-0.5 font-medium text-[0.65rem] text-sky-400/70 leading-none"
-        title={`${incoming} incoming commits`}
-      >
-        <ArrowDownIcon className="size-2.5" />
-        {incoming}
+  if (state === "starting") {
+    return (
+      <span className="flex items-center gap-1 rounded-md border border-cyan-400/20 bg-cyan-400/10 px-1.5 py-0.5">
+        <LoaderCircleIcon className="size-3 animate-spin text-cyan-300/80" />
+        <span className="font-medium text-[0.65rem] text-cyan-200/80 leading-none">
+          Starting
+        </span>
       </span>
-      <span className="text-white/15">·</span>
-      <span
-        className="flex items-center gap-0.5 font-medium text-[0.65rem] text-violet-400/70 leading-none"
-        title={`${outgoing} outgoing commits`}
-      >
-        <ArrowUpIcon className="size-2.5" />
-        {outgoing}
+    );
+  }
+
+  if (state === "error") {
+    return (
+      <span className="flex items-center gap-1 rounded-md border border-red-400/20 bg-red-400/10 px-1.5 py-0.5">
+        <TriangleAlertIcon className="size-3 text-red-300/80" />
+        <span className="font-medium text-[0.65rem] text-red-200/80 leading-none">
+          Error
+        </span>
+      </span>
+    );
+  }
+
+  if (state === "active") {
+    return (
+      <span className="flex items-center gap-1 rounded-md border border-emerald-400/20 bg-emerald-400/10 px-1.5 py-0.5">
+        <span className="size-1.5 rounded-full bg-emerald-300/90" />
+        <span className="font-medium text-[0.65rem] text-emerald-200/80 leading-none">
+          {sessionId ? "Live" : "Ready"}
+        </span>
+      </span>
+    );
+  }
+
+  return (
+    <span className="flex items-center gap-1 rounded-md border border-white/8 bg-white/5 px-1.5 py-0.5">
+      <span className="size-1.5 rounded-full bg-white/35" />
+      <span className="font-medium text-[0.65rem] text-white/55 leading-none">
+        Ready
       </span>
     </span>
   );
@@ -142,14 +126,7 @@ function KanbanCardNodeComponent({
 }: NodeProps<Node<Record<string, unknown>>>) {
   const cardData = rawData as unknown as KanbanCardNodeData;
 
-  const filePath = cardData.filePath ?? PLACEHOLDER.filePath;
-  const gitBranch = cardData.gitBranch ?? PLACEHOLDER.gitBranch;
-  const diffAdded = cardData.diffAdded ?? PLACEHOLDER.diffAdded;
-  const diffRemoved = cardData.diffRemoved ?? PLACEHOLDER.diffRemoved;
-  const incomingChanges =
-    cardData.incomingChanges ?? PLACEHOLDER.incomingChanges;
-  const outgoingChanges =
-    cardData.outgoingChanges ?? PLACEHOLDER.outgoingChanges;
+  const filePath = cardData.filePath ?? cardData.projectName ?? cardData.title;
 
   const handleColumnsChange = useCallback(
     (columns: KanbanCardData["columns"]) => {
@@ -202,17 +179,17 @@ function KanbanCardNodeComponent({
 
           {/* Right-aligned metadata */}
           <div className="nodrag flex shrink-0 items-center gap-2.5">
-            <GitBranch branch={gitBranch} />
+            {cardData.gitBranch ? (
+              <GitBranch branch={cardData.gitBranch} />
+            ) : null}
 
             {/* Separator */}
             <span className="h-3.5 w-px bg-white/10" />
 
-            <DiffStat added={diffAdded} removed={diffRemoved} />
-
-            {/* Separator */}
-            <span className="h-3.5 w-px bg-white/10" />
-
-            <SyncStat incoming={incomingChanges} outgoing={outgoingChanges} />
+            <SessionStatus
+              sessionId={cardData.sessionId}
+              state={cardData.sessionState}
+            />
 
             {/* Separator */}
             <span className="h-3.5 w-px bg-white/10" />
@@ -256,7 +233,11 @@ function KanbanCardNodeComponent({
 
         <div className="nodrag flex min-h-0 min-w-0 flex-1 flex-col p-4">
           <KanbanCardContent
-            data={cardData}
+            data={{
+              id: cardData.boardId,
+              title: cardData.title,
+              columns: cardData.columns,
+            }}
             onColumnsChange={handleColumnsChange}
           />
         </div>
