@@ -6,6 +6,7 @@ export interface WsClientManager {
   broadcast: (event: NormalizedAgentEvent) => void;
   broadcastRaw: (message: string) => void;
   clients: Set<ServerWebSocket<WsContext>>;
+  close: () => void;
 }
 
 export function createWsClientManager(): WsClientManager {
@@ -29,5 +30,12 @@ export function createWsClientManager(): WsClientManager {
     }
   }
 
-  return { clients, broadcast, broadcastRaw };
+  function close(): void {
+    for (const ws of clients) {
+      ws.close();
+    }
+    clients.clear();
+  }
+
+  return { clients, broadcast, broadcastRaw, close };
 }

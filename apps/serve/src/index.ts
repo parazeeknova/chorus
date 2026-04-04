@@ -7,6 +7,7 @@ import { Elysia } from "elysia";
 import { OpenCodeBridge } from "./bridge/opencode/bridge";
 import { loadConfig } from "./config";
 import { createWsClientManager } from "./events/broadcaster";
+import { OpenCodeProcessManager } from "./opencode/process-manager";
 import { NativeFolderPicker } from "./projects/folder-picker";
 import { ProjectService } from "./projects/service";
 import { createHttpRoutes } from "./routes";
@@ -25,6 +26,14 @@ const logger = createLogger(
   },
   "SERVE"
 );
+
+const processManager = new OpenCodeProcessManager({
+  directory: config.opencodeDirectory,
+});
+
+if (config.autoStartOpencode) {
+  await processManager.start();
+}
 
 const bridge = new OpenCodeBridge(
   config.opencodeBaseUrl,
@@ -76,13 +85,57 @@ const projectService = new ProjectService(
 
 bridge.subscribe((event) => {
   wsManager.broadcast(event);
-  logger.debug("bridge-event", { event: JSON.stringify(event) });
+
+  const hasSession = !!event.sessionID;
+  const hasActivity = !!event.activity;
+  logger.debug("bridge-event", {
+    type: event.type,
+    sessionID: event.sessionID,
+    activity: event.activity,
+    textPreview: event.text ? event.text.slice(0, 80) : undefined,
+  });
+
+  if (!(hasSession && hasActivity)) {
+    return;
+  }
+
   workspaceStore
     .applyAgentEvent(event)
     .then((snapshot) => {
       if (!snapshot) {
+        logger.debug("workspace-no-snapshot-change", {
+          sessionID: event.sessionID,
+          eventType: event.type,
+        });
         return;
       }
+
+      const board = snapshot.boards.find(
+        (b) => b.session.sessionId === event.sessionID
+      );
+
+      logger.info("workspace-snapshot-broadcast", {
+        sessionID: event.sessionID,
+        revision: snapshot.revision,
+        boardId: board?.boardId,
+        taskCount: board
+          ? Object.values(board.columns).reduce(
+              (sum, tasks) => sum + tasks.length,
+              0
+            )
+          : 0,
+        steps: board
+          ? Object.values(board.columns)
+              .flat()
+              .filter((t) => t.run)
+              .flatMap((t) => t.run?.steps ?? [])
+              .map((s) => ({
+                kind: s.kind,
+                summary: s.summary,
+                status: s.status,
+              }))
+          : [],
+      });
 
       wsManager.broadcastRaw(
         JSON.stringify({
@@ -95,7 +148,11 @@ bridge.subscribe((event) => {
     .catch((error) => {
       logger.error(
         "workspace-projection-failed",
-        error instanceof Error ? error : undefined
+        error instanceof Error ? error : undefined,
+        {
+          sessionID: event.sessionID,
+          eventType: event.type,
+        }
       );
     });
 });
@@ -136,3 +193,41 @@ try {
     url: config.opencodeBaseUrl,
   });
 }
+
+const SHUTDOWN_TIMEOUT_MS = 5000;
+let isShuttingDown = false;
+
+function gracefulShutdown(signal: string): void {
+  if (isShuttingDown) {
+    return;
+  }
+  isShuttingDown = true;
+  logger.info("server-shutdown", { signal });
+
+  const shutdownTimeout = setTimeout(() => {
+    logger.warn("shutdown-timeout-force-kill");
+    forceKillOpencode();
+    process.exit(1);
+  }, SHUTDOWN_TIMEOUT_MS);
+
+  try {
+    wsManager.close();
+    bridge.stop();
+    processManager.stop();
+    app.server?.stop();
+    clearTimeout(shutdownTimeout);
+    logger.info("shutdown-complete");
+    process.exit(0);
+  } catch (error) {
+    logger.error("shutdown-error", error instanceof Error ? error : undefined);
+    clearTimeout(shutdownTimeout);
+    process.exit(1);
+  }
+}
+
+function forceKillOpencode(): void {
+  processManager.forceKill();
+}
+
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
