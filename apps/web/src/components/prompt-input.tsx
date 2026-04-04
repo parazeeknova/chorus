@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUp, MoreHorizontal } from "lucide-react";
+import { ArrowUp, Mic, MoreHorizontal } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,11 +11,27 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useVoiceRecording } from "@/hooks/use-voice-recording";
 
 export function PromptInput() {
   const [prompt, setPrompt] = useState("");
   const [selectedKanban, setSelectedKanban] = useState("main");
   const [selectedModel, setSelectedModel] = useState("chorus");
+
+  const handleTranscriptionComplete = (text: string) => {
+    setPrompt((prev) => prev + (prev ? " " : "") + text);
+  };
+
+  const { isRecording, isTranscribing, startRecording, stopRecording } =
+    useVoiceRecording(handleTranscriptionComplete);
+
+  const handleVoiceButtonClick = async () => {
+    if (isRecording) {
+      await stopRecording();
+    } else {
+      await startRecording();
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,6 +111,22 @@ export function PromptInput() {
                       <SelectItem value="bugs">Bug Tracker</SelectItem>
                     </SelectContent>
                   </Select>
+                  <Button
+                    className={`h-8 w-8 rounded-md text-zinc-600 hover:bg-zinc-100 ${
+                      isRecording
+                        ? "bg-red-100 text-red-600 hover:bg-red-200"
+                        : ""
+                    }`}
+                    disabled={isTranscribing}
+                    onClick={handleVoiceButtonClick}
+                    size="icon"
+                    type="button"
+                    variant="ghost"
+                  >
+                    <Mic
+                      className={`h-4 w-4 ${isRecording ? "animate-pulse" : ""}`}
+                    />
+                  </Button>
                   <Button
                     className="h-8 w-8 rounded-md text-zinc-600 hover:bg-zinc-100"
                     size="icon"
