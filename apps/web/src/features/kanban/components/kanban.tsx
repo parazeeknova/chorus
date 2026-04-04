@@ -1,5 +1,6 @@
 "use client";
 
+import { BorderlessFileView, ChorusMonaco } from "@chorus/monaco";
 import {
   closestCorners,
   DndContext,
@@ -47,7 +48,6 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-
 import {
   ResizableHandle,
   ResizablePanel,
@@ -627,6 +627,7 @@ function TaskCard({
   const [questionAnswers, setQuestionAnswers] = useState<string[]>(
     task.questions?.map(() => "") ?? []
   );
+  const [showPlanPopup, setShowPlanPopup] = useState(false);
 
   useEffect(() => {
     setEditedPlan(task.plan ?? "");
@@ -678,13 +679,24 @@ function TaskCard({
               <span className="font-medium text-[0.7rem] text-amber-400 uppercase tracking-wider">
                 Plan
               </span>
+              <button
+                className="rounded-xs border border-white/8 bg-white/5 px-2 py-0.5 text-[0.65rem] text-white/60 transition-colors hover:border-amber-400/30 hover:bg-white/10 hover:text-amber-400"
+                onClick={() => setShowPlanPopup(true)}
+                type="button"
+              >
+                Expand
+              </button>
             </div>
-            <textarea
-              className="min-h-[120px] w-full resize-y rounded-xs border border-white/10 bg-white/5 p-2.5 font-mono text-[0.72rem] text-white/70 leading-relaxed placeholder:text-white/20 focus:border-amber-400/40 focus:outline-none"
-              onChange={(e) => setEditedPlan(e.target.value)}
-              placeholder="AI will generate a plan here. You can edit it directly..."
-              value={editedPlan}
-            />
+            <div className="min-h-[120px] w-full overflow-hidden rounded-xs border border-white/10">
+              <BorderlessFileView
+                className="h-full min-h-[120px]"
+                filePath="plan.md"
+                height="120px"
+                language="markdown"
+                onChange={(val) => setEditedPlan(val)}
+                value={editedPlan}
+              />
+            </div>
           </div>
 
           {/* Questions Section */}
@@ -738,13 +750,13 @@ function TaskCard({
         <div className="flex flex-col gap-2.5 border-white/5 border-t pt-2.5">
           {task.run && task.run.steps.length > 0 && (
             <div className="flex flex-col gap-1.5">
-              {groupSteps(task.run.steps).map((group) => (
+              {groupSteps(task.run.steps).map((group, index) => (
                 <DoneGroupedStepRow
                   group={group}
                   key={
                     group.kind === "thinking" || group.kind === "response"
-                      ? group.id
-                      : group.step.id
+                      ? `${group.id}-${index}-${group.sourceSteps?.length ?? 0}`
+                      : `${group.step.id}-${index}-${group.step.content?.slice(0, 30) ?? ""}`
                   }
                 />
               ))}
@@ -897,6 +909,54 @@ function TaskCard({
       ) : (
         contentNode
       )}
+      {showPlanPopup &&
+        createPortal(
+          // biome-ignore lint/a11y/useSemanticElements: modal overlay pattern
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+            onClick={() => setShowPlanPopup(false)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                setShowPlanPopup(false);
+              }
+            }}
+            role="button"
+            tabIndex={0}
+          >
+            {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: modal content stops propagation */}
+            <div
+              className="flex h-[80vh] w-[80vw] min-w-[600px] flex-col rounded-lg border border-white/10 bg-[#0d0d0d] shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+              role="dialog"
+              tabIndex={-1}
+            >
+              <div className="flex items-center justify-between border-white/10 border-b px-4 py-2.5">
+                <span className="font-medium text-[0.8rem] text-amber-400 uppercase tracking-wider">
+                  Implementation Plan
+                </span>
+                <button
+                  aria-label="Close"
+                  className="rounded-xs p-1 text-white/40 transition-colors hover:bg-white/10 hover:text-white/70"
+                  onClick={() => setShowPlanPopup(false)}
+                  type="button"
+                >
+                  <XIcon className="size-4" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-hidden p-3">
+                <ChorusMonaco
+                  filePath="plan.md"
+                  height="100%"
+                  language="markdown"
+                  onChange={(val) => setEditedPlan(val ?? "")}
+                  value={editedPlan}
+                />
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
     </KanbanItem>
   );
 }

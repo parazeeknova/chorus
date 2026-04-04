@@ -508,7 +508,11 @@ export function AgentOutputCard({
             group.kind === "thinking" || group.kind === "response"
               ? group.id
               : group.step.id;
-          return <GroupedStepRow group={group} key={stepId} />;
+          const uniqueKey =
+            "sourceSteps" in group
+              ? `${stepId}-${group.sourceSteps.length}-${group.sourceSteps[0]?.id}`
+              : `${stepId}-${group.step.content?.slice(0, 50)}`;
+          return <GroupedStepRow group={group} key={uniqueKey} />;
         })}
       </div>
 

@@ -228,6 +228,34 @@ function appendRunStep(task: Task, event: NormalizedAgentEvent): Task {
         runId: event.sessionID ?? task.runId,
       };
     }
+
+    const step = buildStep({
+      ...event,
+      delta: undefined,
+    });
+
+    if (step) {
+      const steps = previousRun.steps
+        .map<AgentStep>((entry) =>
+          entry.status === "running" ? { ...entry, status: "done" } : entry
+        )
+        .concat({
+          ...step,
+          content: event.delta,
+          summary: event.delta.slice(0, 72),
+        });
+      return {
+        ...task,
+        run: {
+          ...previousRun,
+          elapsed: formatElapsed(startedAt),
+          startedAt,
+          sessionId: event.sessionID ?? previousRun.sessionId,
+          steps,
+        },
+        runId: event.sessionID ?? task.runId,
+      };
+    }
   }
 
   const step = buildStep(event);
