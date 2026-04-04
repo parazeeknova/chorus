@@ -1,4 +1,4 @@
-import { blobToWav } from "@/lib/audio-wav-encoder";
+import posthog from "posthog-js";
 
 const VOICE_API_BASE =
   process.env.NEXT_PUBLIC_VOICE_API_URL ?? "http://localhost:2000";
@@ -45,22 +45,27 @@ export async function transcribeSpeech(
     diarize?: boolean;
   }
 ): Promise<SpeechToTextResult> {
-  console.log("[voice-api] transcribeSpeech called", {
+  const startTime = Date.now();
+
+  posthog.capture("voice_transcription_start", {
     blobSize: audioBlob.size,
     blobType: audioBlob.type,
-    options,
+    modelId: options?.modelId,
+    diarize: options?.diarize,
+    timestamp: Date.now(),
   });
 
-  const wavBuffer = await blobToWav(audioBlob);
+  const arrayBuffer = await audioBlob.arrayBuffer();
   const base64 = btoa(
-    Array.from(new Uint8Array(wavBuffer))
+    Array.from(new Uint8Array(arrayBuffer))
       .map((byte) => String.fromCharCode(byte))
       .join("")
   );
 
-  console.log("[voice-api] sending request to", `${VOICE_API_BASE}/voice/stt`, {
+  posthog.capture("voice_transcription_request", {
     base64Length: base64.length,
-    originalBlobType: audioBlob.type,
+    mimeType: audioBlob.type,
+    timestamp: Date.now(),
   });
 
   const response = await fetch(`${VOICE_API_BASE}/voice/stt`, {
@@ -70,21 +75,50 @@ export async function transcribeSpeech(
       audio: base64,
       modelId: options?.modelId,
       diarize: options?.diarize ?? false,
-      mimeType: "audio/wav",
-      filename: "recording.wav",
+      mimeType: audioBlob.type || "audio/webm",
+      filename: "recording.webm",
     }),
   });
 
-  console.log("[voice-api] response status:", response.status);
+  posthog.capture("voice_transcription_response", {
+    status: response.status,
+    durationMs: Date.now() - startTime,
+    timestamp: Date.now(),
+  });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    console.error("[voice-api] error response:", error);
-    throw new Error(error.error ?? `Voice API error: ${response.status}`);
+    const errorBody = await response.json().catch(() => ({}));
+    posthog.capture("voice_transcription_error", {
+      status: response.status,
+      statusText: response.statusText,
+      errorBody,
+      durationMs: Date.now() - startTime,
+      timestamp: Date.now(),
+    });
+    throw new Error(errorBody.error ?? `Voice API error: ${response.status}`);
   }
 
   const data = await response.json();
-  console.log("[voice-api] response data:", data);
+
+  if (!data.text || data.text.length === 0) {
+    posthog.capture("voice_transcription_empty_result", {
+      confidence: data.confidence,
+      wordCount: data.words?.length ?? 0,
+      durationMs: Date.now() - startTime,
+      timestamp: Date.now(),
+    });
+    throw new Error(
+      "Speech recognition returned empty text. Try speaking more clearly or check your microphone."
+    );
+  }
+
+  posthog.capture("voice_transcription_success", {
+    textLength: data.text.length,
+    wordCount: data.words?.length ?? 0,
+    confidence: data.confidence,
+    durationMs: Date.now() - startTime,
+    timestamp: Date.now(),
+  });
 
   return data;
 }

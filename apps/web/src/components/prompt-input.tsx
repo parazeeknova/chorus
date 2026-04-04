@@ -28,7 +28,6 @@ import {
   type AutocompleteItem,
   useAutocomplete,
 } from "@/hooks/use-autocomplete";
-import { useVoiceConfig } from "@/hooks/use-voice-config";
 import { useVoiceRecording } from "@/hooks/use-voice-recording";
 import { extractLineRange, formatLineRange } from "@/lib/line-range";
 import { cn } from "@/lib/utils";
@@ -94,8 +93,6 @@ export function PromptInput() {
 
   const autocomplete = useAutocomplete(selectedBoard?.repo.directory);
 
-  const { defaultModelId: defaultSpeechModelId } = useVoiceConfig();
-
   useEffect(() => {
     if (restoredPrompt) {
       setPrompt(restoredPrompt);
@@ -127,9 +124,7 @@ export function PromptInput() {
   };
 
   const { isRecording, isTranscribing, startRecording, stopRecording } =
-    useVoiceRecording(handleTranscriptionComplete, {
-      modelId: defaultSpeechModelId ?? undefined,
-    });
+    useVoiceRecording(handleTranscriptionComplete);
 
   useEffect(() => {
     let isCancelled = false;

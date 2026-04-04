@@ -132,41 +132,26 @@ export class VoiceService {
           type: mimeType,
         }),
         model: modelId,
-        response_format: "verbose_json",
-        timestamp_granularities: ["word", "segment"],
+        response_format: "json",
       });
-
-      const verboseResult = result as {
-        text: string;
-        words?: Array<{
-          word: string;
-          start: number;
-          end: number;
-        }>;
-      };
 
       logger.info("stt-success", {
         modelId,
         textLength: result.text?.length ?? 0,
-        wordCount: verboseResult.words?.length ?? 0,
       });
 
       return {
         text: result.text ?? "",
         confidence: undefined,
-        words:
-          verboseResult.words?.map(
-            (w: { word: string; start: number; end: number }) => ({
-              word: w.word ?? "",
-              start: w.start ?? 0,
-              end: w.end ?? 0,
-              confidence: undefined,
-            })
-          ) ?? undefined,
+        words: undefined,
       };
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       logger.error("stt-failed", error instanceof Error ? error : undefined, {
         modelId,
+        mimeType,
+        errorMessage,
       });
       return {
         text: "",
