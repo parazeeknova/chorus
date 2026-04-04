@@ -11,11 +11,18 @@ import {
   type Node,
   Panel,
   ReactFlow,
+  type ReactFlowInstance,
   useReactFlow,
   type Viewport,
 } from "@xyflow/react";
 import { KeyboardIcon, MinusIcon, PlusIcon, XIcon } from "lucide-react";
-import { useCallback, useEffect, useEffectEvent, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import type { Columns } from "@/features/kanban/components/kanban";
 import {
@@ -58,6 +65,9 @@ export const CANVAS_SHORTCUTS = [
   {
     group: "Canvas",
     shortcuts: [
+      { keys: ["Scroll"], label: "Pan canvas" },
+      { keys: ["Ctrl", "Scroll"], label: "Zoom in/out" },
+      { keys: ["Shift", "Scroll"], label: "Toggle pan direction + pan" },
       { keys: ["+", "="], label: "Zoom in" },
       { keys: ["-"], label: "Zoom out" },
       { keys: ["0"], label: "Reset view" },
@@ -389,9 +399,71 @@ export function BackgroundCanvas() {
   const [edges, setEdges] = useState<Edge[]>([]);
   const [showHelp, setShowHelp] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const rfInstanceRef = useRef<ReactFlowInstance<
+    Node<KanbanCardNodeData>,
+    Edge
+  > | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
+  }, []);
+
+  const handleWheel = useEffectEvent((event: WheelEvent) => {
+    // Let Kanban columns and other scrollable children handle their own scroll.
+    if (
+      event.target instanceof HTMLElement &&
+      event.target.closest(".nowheel")
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const rf = rfInstanceRef.current;
+    if (!rf) {
+      return;
+    }
+
+    const current = rf.getViewport();
+
+    if (event.ctrlKey || event.metaKey) {
+      // ── Pinch-to-zoom / Ctrl+scroll ─────────────────────────────────────
+      // Use a small factor so the zoom feels natural.
+      const zoomFactor = 0.002;
+      const newZoom = Math.max(
+        0.15,
+        Math.min(4, current.zoom * (1 - event.deltaY * zoomFactor))
+      );
+      rf.setViewport({ x: current.x, y: current.y, zoom: newZoom });
+    } else {
+      // ── Two-finger pan / scroll-wheel pan ────────────────────────────────
+      // Consume both axes so touchpad diagonal swipes work correctly.
+      // Shift+scroll remaps deltaY → horizontal (common browser convention).
+      const panFactor = 1.2;
+      const dx = event.shiftKey
+        ? -event.deltaY * panFactor
+        : -event.deltaX * panFactor;
+      const dy = event.shiftKey ? 0 : -event.deltaY * panFactor;
+
+      rf.setViewport({
+        x: current.x + dx,
+        y: current.y + dy,
+        zoom: current.zoom,
+      });
+    }
+  });
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) {
+      return;
+    }
+
+    container.addEventListener("wheel", handleWheel, { passive: false });
+    return () => {
+      container.removeEventListener("wheel", handleWheel);
+    };
   }, []);
 
   const handleUpdateColumns = useCallback(
@@ -459,7 +531,7 @@ export function BackgroundCanvas() {
   }, [boards, handleRemoveBoard, handleUpdateColumns, selectedBoardId]);
 
   return (
-    <div className="h-full w-full">
+    <div className="h-full w-full" ref={containerRef}>
       <ReactFlow
         className="background-flow dark"
         defaultViewport={DEFAULT_VIEWPORT}
@@ -475,6 +547,9 @@ export function BackgroundCanvas() {
         nodesFocusable={true}
         nodeTypes={nodeTypes}
         onConnect={onConnect}
+        onInit={(instance) => {
+          rfInstanceRef.current = instance;
+        }}
         onlyRenderVisibleElements
         onNodeClick={(_, node) => {
           selectBoard(node.id);
@@ -498,7 +573,7 @@ export function BackgroundCanvas() {
         translateExtent={WORLD_EXTENT}
         zoomOnDoubleClick={false}
         zoomOnPinch
-        zoomOnScroll
+        zoomOnScroll={false}
       >
         <KeyboardShortcuts
           onApproveSelected={handleApproveSelected}

@@ -7,8 +7,8 @@ import {
   CheckIcon,
   ChevronRightIcon,
   EyeIcon,
-  FolderOpenIcon,
   HelpCircleIcon,
+  MenuIcon,
   SendIcon,
   Settings,
   SquareIcon,
@@ -325,7 +325,11 @@ function NotificationPane({ onClose }: { onClose: () => void }) {
   return (
     <div
       className={cn(
-        "absolute top-[calc(100%+8px)] right-0 w-[360px] overflow-hidden rounded-2xl",
+        // On mobile: attach to viewport edges with a small margin
+        // On sm+: fixed width anchored to the right of the button
+        "absolute top-[calc(100%+8px)] right-0",
+        "w-[calc(100vw-1.5rem)] max-w-[360px] sm:w-[360px]",
+        "overflow-hidden rounded-2xl",
         "border border-white/10 bg-zinc-950/90 shadow-[0_24px_60px_rgba(0,0,0,0.55)] backdrop-blur-2xl"
       )}
     >
@@ -353,7 +357,7 @@ function NotificationPane({ onClose }: { onClose: () => void }) {
       </div>
 
       {/* List */}
-      <div className="flex max-h-[520px] flex-col divide-y divide-white/[0.04] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex max-h-[min(520px,calc(100dvh-7rem))] flex-col divide-y divide-white/[0.04] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {notifs.length === 0 ? (
           <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
             <BellIcon className="size-7 text-zinc-800" />
@@ -369,10 +373,191 @@ function NotificationPane({ onClose }: { onClose: () => void }) {
   );
 }
 
+// ─── MobileMenuDrawer ──────────────────────────────────────────────────────────
+function MobileMenuDrawer({
+  open,
+  onClose,
+  onOpenFolder,
+  isOpeningFolder,
+  previousWorkspaces,
+  recentProjects,
+  createBoardFromHistory,
+  createBoardFromProject,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onOpenFolder: () => void;
+  isOpeningFolder: boolean;
+  previousWorkspaces: ReturnType<typeof useWorkspace>["previousWorkspaces"];
+  recentProjects: ReturnType<typeof useWorkspace>["recentProjects"];
+  createBoardFromHistory: ReturnType<
+    typeof useWorkspace
+  >["createBoardFromHistory"];
+  createBoardFromProject: ReturnType<
+    typeof useWorkspace
+  >["createBoardFromProject"];
+}) {
+  // Lock body scroll while drawer is open
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [open]);
+
+  if (!open) {
+    return null;
+  }
+
+  const allMenuItems = ["Edit", "View", "Window", "Help"];
+
+  return (
+    <>
+      {/* Backdrop — full-screen button so keyboard/SR users can also close the drawer */}
+      <button
+        aria-label="Close menu"
+        className="fixed inset-0 z-60 cursor-default bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+        type="button"
+      />
+      {/* Drawer panel */}
+      <div
+        className={cn(
+          "fixed inset-y-0 left-0 z-61 flex w-72 flex-col",
+          "border-white/10 border-r bg-zinc-950/95 shadow-[4px_0_40px_rgba(0,0,0,0.6)] backdrop-blur-2xl"
+        )}
+      >
+        {/* Drawer header */}
+        <div className="flex h-14 shrink-0 items-center justify-between gap-2 border-white/8 border-b px-4">
+          <div className="flex items-center gap-2">
+            <Image
+              alt="Chorus logo"
+              className="h-5 w-6 invert"
+              height={19}
+              loading="eager"
+              src="/chrous.svg"
+              width={24}
+            />
+            <span className="select-none font-semibold text-sm text-white tracking-[0.02em]">
+              Chorus
+            </span>
+          </div>
+          <button
+            className="flex size-7 items-center justify-center rounded-lg text-white/30 transition-colors hover:bg-white/8 hover:text-white/70"
+            onClick={onClose}
+            type="button"
+          >
+            <XIcon className="size-4" />
+          </button>
+        </div>
+
+        {/* Drawer content */}
+        <div className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
+          {/* File section */}
+          <div className="mb-1">
+            <p className="mb-1 px-2 font-semibold text-[0.6rem] text-white/25 uppercase tracking-widest">
+              File
+            </p>
+            <button
+              className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-white/70 transition-colors hover:bg-white/6 hover:text-white"
+              onClick={() => {
+                onOpenFolder();
+                onClose();
+              }}
+              type="button"
+            >
+              <span className="text-white/40">📁</span>
+              {isOpeningFolder ? "Opening…" : "Open Folder…"}
+            </button>
+
+            {previousWorkspaces.length > 0 && (
+              <>
+                <p className="mt-3 mb-1 px-2 font-semibold text-[0.6rem] text-white/25 uppercase tracking-widest">
+                  Previous Working
+                </p>
+                {previousWorkspaces.map((entry) => (
+                  <button
+                    className="flex w-full flex-col rounded-xl px-3 py-2 transition-colors hover:bg-white/6"
+                    key={entry.id}
+                    onClick={() => {
+                      createBoardFromHistory(entry);
+                      onClose();
+                    }}
+                    type="button"
+                  >
+                    <span className="truncate font-medium text-sm text-white/85">
+                      {entry.title}
+                    </span>
+                    <span className="truncate text-[0.67rem] text-white/35">
+                      {entry.repo.directory}
+                    </span>
+                  </button>
+                ))}
+              </>
+            )}
+
+            {recentProjects.length > 0 && (
+              <>
+                <p className="mt-3 mb-1 px-2 font-semibold text-[0.6rem] text-white/25 uppercase tracking-widest">
+                  Known Projects
+                </p>
+                {recentProjects.map((project) => (
+                  <button
+                    className="flex w-full flex-col rounded-xl px-3 py-2 transition-colors hover:bg-white/6"
+                    key={`${project.projectId ?? project.directory}`}
+                    onClick={() => {
+                      createBoardFromProject(project);
+                      onClose();
+                    }}
+                    type="button"
+                  >
+                    <span className="truncate font-medium text-sm text-white/85">
+                      {project.projectName ??
+                        project.directory.split("/").filter(Boolean).at(-1) ??
+                        project.directory}
+                    </span>
+                    <span className="truncate text-[0.67rem] text-white/35">
+                      {project.directory}
+                    </span>
+                  </button>
+                ))}
+              </>
+            )}
+          </div>
+
+          <div className="my-1 h-px bg-white/6" />
+
+          {/* Other menu items */}
+          <div>
+            <p className="mb-1 px-2 font-semibold text-[0.6rem] text-white/25 uppercase tracking-widest">
+              Menu
+            </p>
+            {allMenuItems.map((item) => (
+              <button
+                className="flex w-full items-center rounded-xl px-3 py-2.5 text-sm text-white/60 transition-colors hover:bg-white/6 hover:text-white"
+                key={item}
+                onClick={onClose}
+                type="button"
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ─── AppHeader ─────────────────────────────────────────────────────────────────
 export function AppHeader() {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -384,7 +569,7 @@ export function AppHeader() {
     recentProjects,
   } = useWorkspace();
 
-  // Close pane on outside click
+  // Close notification pane on outside click
   useEffect(() => {
     if (!notifOpen) {
       return;
@@ -401,208 +586,245 @@ export function AppHeader() {
   const unreadCount = INITIAL_NOTIFICATIONS.filter((n) => !n.read).length;
 
   return (
-    <header className="pointer-events-none fixed inset-x-0 top-0 z-50 px-3 pt-3 sm:px-4">
-      <div className="flex items-start justify-between gap-3">
-        {/* ── Left island: logo + menu ── */}
-        <div className={cn(islandChrome, "max-w-full")}>
-          <div className="relative flex h-12 items-center gap-2 px-2">
-            <div className="flex items-center gap-2 rounded-[1rem] border border-white/8 bg-zinc-900/78 px-3 py-2">
-              <Image
-                alt="Chorus logo"
-                className="h-4.75 w-6 invert"
-                height={19}
-                loading="eager"
-                src="/chrous.svg"
-                width={24}
-              />
-              <span className="select-none font-medium text-sm text-white tracking-[0.01em]">
-                Chorus
-              </span>
-            </div>
+    <>
+      {/* ── Mobile drawer ── */}
+      <MobileMenuDrawer
+        createBoardFromHistory={createBoardFromHistory}
+        createBoardFromProject={createBoardFromProject}
+        isOpeningFolder={isOpeningFolder}
+        onClose={() => setMobileMenuOpen(false)}
+        onOpenFolder={() => {
+          openFolder().catch((error) => {
+            console.error("Failed to open folder", error);
+          });
+        }}
+        open={mobileMenuOpen}
+        previousWorkspaces={previousWorkspaces}
+        recentProjects={recentProjects}
+      />
 
-            <div className="h-6 w-px bg-white/10" />
+      <header className="pointer-events-none fixed inset-x-0 top-0 z-50 px-3 pt-3 sm:px-4">
+        <div className="flex items-start justify-between gap-2 sm:gap-3">
+          {/* ── Left island: logo + nav ── */}
+          <div className={cn(islandChrome, "min-w-0 shrink")}>
+            <div className="relative flex h-12 min-w-0 items-center gap-2 px-2">
+              {/* Logo pill — always visible */}
+              <div className="flex shrink-0 items-center gap-2 rounded-2xl border border-white/8 bg-zinc-900/78 px-3 py-2">
+                <Image
+                  alt="Chorus logo"
+                  className="h-4.75 w-6 invert"
+                  height={19}
+                  loading="eager"
+                  src="/chrous.svg"
+                  width={24}
+                />
+                {/* Hide the wordmark on very small screens (<480px) */}
+                <span className="hidden select-none font-medium text-sm text-white tracking-[0.01em] min-[480px]:inline">
+                  Chorus
+                </span>
+              </div>
 
-            <nav className="flex min-w-0 items-center gap-1 overflow-x-auto pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  className={cn(
-                    "group relative shrink-0 rounded-xl px-3 py-2 text-sm text-zinc-300 transition duration-300 hover:text-white"
-                  )}
-                >
-                  <span className="relative z-10">File</span>
-                  <div className="absolute inset-0 rounded-xl border border-transparent bg-zinc-900/85 opacity-0 transition duration-300 group-hover:opacity-100" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="min-w-72 rounded-2xl border border-white/10 bg-[#111111]/96 p-1.5 text-white shadow-2xl backdrop-blur-xl">
-                  <DropdownMenuItem
-                    className="cursor-pointer rounded-lg px-3 py-2 text-sm text-white/85 focus:bg-white/10 focus:text-white"
-                    onClick={() => {
-                      openFolder().catch((error) => {
-                        console.error("Failed to open folder", error);
-                      });
-                    }}
-                  >
-                    <FolderOpenIcon className="size-4" />
-                    <span>
-                      {isOpeningFolder ? "Opening…" : "Open Folder..."}
-                    </span>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator className="bg-white/8" />
-                  <DropdownMenuSub>
-                    <DropdownMenuSubTrigger className="rounded-lg px-3 py-2 text-sm text-white/85 focus:bg-white/10 focus:text-white data-[popup-open]:bg-white/10 data-[popup-open]:text-white">
-                      Previous Working
-                    </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent className="min-w-80 rounded-2xl border border-white/10 bg-[#111111]/96 p-1.5 text-white shadow-2xl backdrop-blur-xl">
-                      {previousWorkspaces.length === 0 ? (
-                        <DropdownMenuGroup>
-                          <DropdownMenuLabel className="text-white/40">
-                            No previous work yet
-                          </DropdownMenuLabel>
-                        </DropdownMenuGroup>
-                      ) : (
-                        previousWorkspaces.map((entry) => (
-                          <DropdownMenuItem
-                            className="cursor-pointer rounded-lg px-3 py-2 text-sm text-white/85 focus:bg-white/10 focus:text-white"
-                            key={entry.id}
-                            onClick={() => {
-                              createBoardFromHistory(entry);
-                            }}
-                          >
-                            <div className="flex min-w-0 flex-col">
-                              <span className="truncate font-medium text-sm text-white/90">
-                                {entry.title}
-                              </span>
-                              <span className="truncate text-white/40 text-xs">
-                                {entry.repo.directory}
-                              </span>
-                            </div>
-                          </DropdownMenuItem>
-                        ))
-                      )}
-                    </DropdownMenuSubContent>
-                  </DropdownMenuSub>
-                  <DropdownMenuSub>
-                    <DropdownMenuSubTrigger className="rounded-lg px-3 py-2 text-sm text-white/85 focus:bg-white/10 focus:text-white data-[popup-open]:bg-white/10 data-[popup-open]:text-white">
-                      Known Projects
-                    </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent className="min-w-80 rounded-2xl border border-white/10 bg-[#111111]/96 p-1.5 text-white shadow-2xl backdrop-blur-xl">
-                      {recentProjects.length === 0 ? (
-                        <DropdownMenuGroup>
-                          <DropdownMenuLabel className="text-white/40">
-                            No known projects yet
-                          </DropdownMenuLabel>
-                        </DropdownMenuGroup>
-                      ) : (
-                        recentProjects.map((project) => (
-                          <DropdownMenuItem
-                            className="cursor-pointer rounded-lg px-3 py-2 text-sm text-white/85 focus:bg-white/10 focus:text-white"
-                            key={`${project.projectId ?? project.directory}`}
-                            onClick={() => {
-                              createBoardFromProject(project);
-                            }}
-                          >
-                            <div className="flex min-w-0 flex-col">
-                              <span className="truncate font-medium text-sm text-white/90">
-                                {project.projectName ??
-                                  project.directory
-                                    .split("/")
-                                    .filter(Boolean)
-                                    .at(-1) ??
-                                  project.directory}
-                              </span>
-                              <span className="truncate text-white/40 text-xs">
-                                {project.directory}
-                              </span>
-                            </div>
-                          </DropdownMenuItem>
-                        ))
-                      )}
-                    </DropdownMenuSubContent>
-                  </DropdownMenuSub>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              {menuItems.map((item) => {
-                const isActive = activeMenu === item;
-
-                return (
-                  <button
-                    className={cn(
-                      "group relative shrink-0 rounded-xl px-3 py-2 text-sm text-zinc-300 transition duration-300 hover:text-white",
-                      isActive && "text-white"
-                    )}
-                    key={item}
-                    onClick={() => setActiveMenu(isActive ? null : item)}
-                    onMouseEnter={() => activeMenu && setActiveMenu(item)}
-                    type="button"
-                  >
-                    <span className="relative z-10">{item}</span>
-                    <div
-                      className={cn(
-                        "absolute inset-0 rounded-xl border border-transparent bg-zinc-900/85 opacity-0 transition duration-300 group-hover:opacity-100",
-                        isActive && "border-cyan-300/18 bg-zinc-900 opacity-100"
-                      )}
-                    />
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
-        </div>
-
-        {/* ── Right island: notifications + settings ── */}
-        <div className={cn(islandChrome, "shrink-0")}>
-          <div className="flex h-12 items-center divide-x divide-white/8">
-            {/* Notification button */}
-            <div className="relative" ref={notifRef}>
+              {/* ── Mobile: hamburger button ── */}
               <button
-                aria-label="Notifications"
+                aria-label="Open menu"
                 className={cn(
-                  "group relative flex h-12 w-12 items-center justify-center text-zinc-300 transition duration-300 hover:text-white",
-                  notifOpen && "text-white"
+                  "group relative flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-zinc-300 transition duration-300 hover:text-white sm:hidden"
                 )}
-                onClick={() => setNotifOpen((v) => !v)}
+                onClick={() => setMobileMenuOpen(true)}
                 type="button"
               >
-                <div
-                  className={cn(
-                    "absolute inset-[5px] rounded-[1rem] border bg-zinc-900/80 transition duration-300",
-                    notifOpen
-                      ? "border-cyan-300/18 bg-zinc-900"
-                      : "border-white/8 group-hover:border-cyan-300/18 group-hover:bg-zinc-900"
-                  )}
-                />
-                <BellIcon
-                  className={cn(
-                    "relative z-10 h-4 w-4 transition duration-300",
-                    notifOpen && "text-white"
-                  )}
-                />
-                {/* Unread badge */}
-                {unreadCount > 0 && (
-                  <span className="absolute top-2.5 right-2.5 flex size-3.5 items-center justify-center rounded-full bg-cyan-500 font-semibold text-[0.5rem] text-white shadow-[0_0_6px_rgba(6,182,212,0.6)]">
-                    {unreadCount}
-                  </span>
-                )}
+                <div className="absolute inset-0 rounded-xl border border-white/8 bg-zinc-900/80 opacity-0 transition duration-300 group-hover:opacity-100" />
+                <MenuIcon className="relative z-10 size-4" />
               </button>
 
-              {/* Floating pane */}
-              {notifOpen && (
-                <NotificationPane onClose={() => setNotifOpen(false)} />
-              )}
-            </div>
+              {/* ── Desktop: divider + nav items ── */}
+              <div className="hidden h-6 w-px shrink-0 bg-white/10 sm:block" />
 
-            {/* Settings button */}
-            <button
-              aria-label="Settings"
-              className="group relative flex h-12 w-12 items-center justify-center text-zinc-300 transition duration-300 hover:text-white"
-              type="button"
-            >
-              <div className="absolute inset-[5px] rounded-[1rem] border border-white/8 bg-zinc-900/80 transition duration-300 group-hover:border-cyan-300/18 group-hover:bg-zinc-900" />
-              <Settings className="relative z-10 h-4 w-4 transition duration-300 group-hover:rotate-45" />
-            </button>
+              <nav className="hidden min-w-0 items-center gap-1 overflow-x-auto pr-1 [scrollbar-width:none] sm:flex [&::-webkit-scrollbar]:hidden">
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    className={cn(
+                      "group relative shrink-0 rounded-xl px-3 py-2 text-sm text-zinc-300 transition duration-300 hover:text-white"
+                    )}
+                  >
+                    <span className="relative z-10">File</span>
+                    <div className="absolute inset-0 rounded-xl border border-transparent bg-zinc-900/85 opacity-0 transition duration-300 group-hover:opacity-100" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="min-w-72 rounded-2xl border border-white/10 bg-[#111111]/96 p-1.5 text-white shadow-2xl backdrop-blur-xl">
+                    <DropdownMenuItem
+                      className="cursor-pointer rounded-lg px-3 py-2 text-sm text-white/85 focus:bg-white/10 focus:text-white"
+                      onClick={() => {
+                        openFolder().catch((error) => {
+                          console.error("Failed to open folder", error);
+                        });
+                      }}
+                    >
+                      <span className="flex items-center gap-2">
+                        <span>📁</span>
+                        <span>
+                          {isOpeningFolder ? "Opening…" : "Open Folder..."}
+                        </span>
+                      </span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="bg-white/8" />
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger className="rounded-lg px-3 py-2 text-sm text-white/85 focus:bg-white/10 focus:text-white data-[popup-open]:bg-white/10 data-[popup-open]:text-white">
+                        Previous Working
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent className="min-w-80 rounded-2xl border border-white/10 bg-[#111111]/96 p-1.5 text-white shadow-2xl backdrop-blur-xl">
+                        {previousWorkspaces.length === 0 ? (
+                          <DropdownMenuGroup>
+                            <DropdownMenuLabel className="text-white/40">
+                              No previous work yet
+                            </DropdownMenuLabel>
+                          </DropdownMenuGroup>
+                        ) : (
+                          previousWorkspaces.map((entry) => (
+                            <DropdownMenuItem
+                              className="cursor-pointer rounded-lg px-3 py-2 text-sm text-white/85 focus:bg-white/10 focus:text-white"
+                              key={entry.id}
+                              onClick={() => {
+                                createBoardFromHistory(entry);
+                              }}
+                            >
+                              <div className="flex min-w-0 flex-col">
+                                <span className="truncate font-medium text-sm text-white/90">
+                                  {entry.title}
+                                </span>
+                                <span className="truncate text-white/40 text-xs">
+                                  {entry.repo.directory}
+                                </span>
+                              </div>
+                            </DropdownMenuItem>
+                          ))
+                        )}
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger className="rounded-lg px-3 py-2 text-sm text-white/85 focus:bg-white/10 focus:text-white data-[popup-open]:bg-white/10 data-[popup-open]:text-white">
+                        Known Projects
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent className="min-w-80 rounded-2xl border border-white/10 bg-[#111111]/96 p-1.5 text-white shadow-2xl backdrop-blur-xl">
+                        {recentProjects.length === 0 ? (
+                          <DropdownMenuGroup>
+                            <DropdownMenuLabel className="text-white/40">
+                              No known projects yet
+                            </DropdownMenuLabel>
+                          </DropdownMenuGroup>
+                        ) : (
+                          recentProjects.map((project) => (
+                            <DropdownMenuItem
+                              className="cursor-pointer rounded-lg px-3 py-2 text-sm text-white/85 focus:bg-white/10 focus:text-white"
+                              key={`${project.projectId ?? project.directory}`}
+                              onClick={() => {
+                                createBoardFromProject(project);
+                              }}
+                            >
+                              <div className="flex min-w-0 flex-col">
+                                <span className="truncate font-medium text-sm text-white/90">
+                                  {project.projectName ??
+                                    project.directory
+                                      .split("/")
+                                      .filter(Boolean)
+                                      .at(-1) ??
+                                    project.directory}
+                                </span>
+                                <span className="truncate text-white/40 text-xs">
+                                  {project.directory}
+                                </span>
+                              </div>
+                            </DropdownMenuItem>
+                          ))
+                        )}
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                {menuItems.map((item) => {
+                  const isActive = activeMenu === item;
+
+                  return (
+                    <button
+                      className={cn(
+                        "group relative shrink-0 rounded-xl px-3 py-2 text-sm text-zinc-300 transition duration-300 hover:text-white",
+                        isActive && "text-white"
+                      )}
+                      key={item}
+                      onClick={() => setActiveMenu(isActive ? null : item)}
+                      onMouseEnter={() => activeMenu && setActiveMenu(item)}
+                      type="button"
+                    >
+                      <span className="relative z-10">{item}</span>
+                      <div
+                        className={cn(
+                          "absolute inset-0 rounded-xl border border-transparent bg-zinc-900/85 opacity-0 transition duration-300 group-hover:opacity-100",
+                          isActive &&
+                            "border-cyan-300/18 bg-zinc-900 opacity-100"
+                        )}
+                      />
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
+          </div>
+
+          {/* ── Right island: notifications + settings ── */}
+          <div className={cn(islandChrome, "shrink-0")}>
+            <div className="flex h-12 items-center divide-x divide-white/8">
+              {/* Notification button */}
+              <div className="relative" ref={notifRef}>
+                <button
+                  aria-label="Notifications"
+                  className={cn(
+                    "group relative flex h-12 w-12 items-center justify-center text-zinc-300 transition duration-300 hover:text-white",
+                    notifOpen && "text-white"
+                  )}
+                  onClick={() => setNotifOpen((v) => !v)}
+                  type="button"
+                >
+                  <div
+                    className={cn(
+                      "absolute inset-[5px] rounded-[1rem] border bg-zinc-900/80 transition duration-300",
+                      notifOpen
+                        ? "border-cyan-300/18 bg-zinc-900"
+                        : "border-white/8 group-hover:border-cyan-300/18 group-hover:bg-zinc-900"
+                    )}
+                  />
+                  <BellIcon
+                    className={cn(
+                      "relative z-10 h-4 w-4 transition duration-300",
+                      notifOpen && "text-white"
+                    )}
+                  />
+                  {/* Unread badge */}
+                  {unreadCount > 0 && (
+                    <span className="absolute top-2.5 right-2.5 flex size-3.5 items-center justify-center rounded-full bg-cyan-500 font-semibold text-[0.5rem] text-white shadow-[0_0_6px_rgba(6,182,212,0.6)]">
+                      {unreadCount}
+                    </span>
+                  )}
+                </button>
+
+                {/* Floating notification pane */}
+                {notifOpen && (
+                  <NotificationPane onClose={() => setNotifOpen(false)} />
+                )}
+              </div>
+
+              {/* Settings button */}
+              <button
+                aria-label="Settings"
+                className="group relative flex h-12 w-12 items-center justify-center text-zinc-300 transition duration-300 hover:text-white"
+                type="button"
+              >
+                <div className="absolute inset-[5px] rounded-[1rem] border border-white/8 bg-zinc-900/80 transition duration-300 group-hover:border-cyan-300/18 group-hover:bg-zinc-900" />
+                <Settings className="relative z-10 h-4 w-4 transition duration-300 group-hover:rotate-45" />
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    </header>
+      </header>
+    </>
   );
 }
