@@ -28,9 +28,13 @@ import {
   CircleCheckIcon,
   CircleDot,
   CircleIcon,
+  ClipboardListIcon,
+  EyeIcon,
+  PartyPopperIcon,
   PlayIcon,
   PlusIcon,
   RotateCcwIcon,
+  SparklesIcon,
   XIcon,
 } from "lucide-react";
 import {
@@ -416,27 +420,95 @@ function KanbanItemHandle({
   );
 }
 
-const COLUMNS: Record<string, { title: string; icon: React.ReactNode }> = {
+const COLUMNS: Record<
+  string,
+  {
+    title: string;
+    icon: React.ReactNode;
+    bg: string;
+    border: string;
+    badge: string;
+    cardGlow: string;
+    emptyIcon: React.ComponentType<{ className?: string }>;
+    emptyHeadline: string;
+    emptyHint: string;
+  }
+> = {
   queue: {
     title: "Queue",
-    icon: <CircleIcon className="size-3.5" />,
+    icon: <CircleIcon className="size-3.5 text-white/25" />,
+    bg: "dark:bg-white/[0.015]",
+    border: "dark:border-white/[0.04]",
+    badge: "dark:bg-white/6 dark:text-white/45",
+    cardGlow:
+      "dark:hover:border-white/14 dark:hover:shadow-[0_4px_20px_rgba(255,255,255,0.03)]",
+    emptyIcon: ClipboardListIcon,
+    emptyHeadline: "Nothing lined up yet",
+    emptyHint: 'Hit "Create Task" to give the agents something to chew on.',
   },
   in_progress: {
     title: "In Progress",
-    icon: <CircleDot className="size-3.5 text-muted-foreground" />,
+    icon: <CircleDot className="size-3.5 text-sky-400/50" />,
+    bg: "dark:bg-sky-950/10",
+    border: "dark:border-sky-500/[0.07]",
+    badge: "dark:bg-sky-500/10 dark:text-sky-300/60",
+    cardGlow:
+      "dark:hover:border-sky-500/15 dark:hover:shadow-[0_4px_20px_rgba(14,165,233,0.04)]",
+    emptyIcon: SparklesIcon,
+    emptyHeadline: "All quiet on the agent front",
+    emptyHint: "Agents will appear here once a task is running.",
   },
   approve: {
     title: "Review",
-    icon: <AlertCircle className="size-3.5 text-amber-500" />,
+    icon: <AlertCircle className="size-3.5 text-amber-400/50" />,
+    bg: "dark:bg-amber-950/8",
+    border: "dark:border-amber-500/[0.06]",
+    badge: "dark:bg-amber-500/10 dark:text-amber-300/55",
+    cardGlow:
+      "dark:hover:border-amber-500/14 dark:hover:shadow-[0_4px_20px_rgba(245,158,11,0.04)]",
+    emptyIcon: EyeIcon,
+    emptyHeadline: "Nothing needs your eyes",
+    emptyHint: "Completed tasks awaiting a human call will land here.",
   },
   done: {
     title: "Done",
-    icon: <CircleCheckIcon className="size-3.5 text-emerald-500" />,
+    icon: <CircleCheckIcon className="size-3.5 text-emerald-400/50" />,
+    bg: "dark:bg-emerald-950/8",
+    border: "dark:border-emerald-500/[0.06]",
+    badge: "dark:bg-emerald-500/10 dark:text-emerald-300/55",
+    cardGlow:
+      "dark:hover:border-emerald-500/14 dark:hover:shadow-[0_4px_20px_rgba(52,211,153,0.04)]",
+    emptyIcon: PartyPopperIcon,
+    emptyHeadline: "The slate is clean",
+    emptyHint: "Shipped work stacks up here. Start something great.",
   },
 };
 
+function ColumnEmptyState({
+  icon: Icon,
+  headline,
+  hint,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  headline: string;
+  hint: string;
+}) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-2.5 px-4 py-8 text-center">
+      <div className="flex size-9 items-center justify-center rounded-xl border border-white/6 bg-white/3">
+        <Icon className="size-4 text-white/20" />
+      </div>
+      <div className="flex flex-col gap-1">
+        <p className="font-medium text-[0.75rem] text-white/30">{headline}</p>
+        <p className="text-[0.68rem] text-white/18 leading-relaxed">{hint}</p>
+      </div>
+    </div>
+  );
+}
+
 interface TaskCardProps {
   asHandle?: boolean;
+  cardGlow?: string;
   draggable?: boolean;
   showApprovalControls?: boolean;
   showDone?: boolean;
@@ -448,6 +520,7 @@ interface TaskCardProps {
 function TaskCard({
   task,
   asHandle,
+  cardGlow = "",
   draggable,
   showOutput,
   showDone,
@@ -455,39 +528,40 @@ function TaskCard({
   showPlay,
 }: TaskCardProps) {
   const content = (
-    <div className="group flex flex-col gap-3 rounded-xl border border-border/50 bg-card p-3.5 shadow-sm transition-all hover:border-border hover:shadow-md dark:border-white/10 dark:bg-white/3 dark:hover:border-white/20 dark:hover:bg-white/6">
-      <span className="font-medium text-[0.85rem] text-foreground leading-snug dark:text-white/90">
+    <div
+      className={cn(
+        "group flex flex-col gap-3 rounded-xl border border-border/50 bg-card p-3.5 shadow-sm",
+        "transition-all duration-200 hover:border-border hover:shadow-md",
+        "dark:border-white/8 dark:bg-white/2.5",
+        cardGlow
+      )}
+    >
+      <span className="font-medium text-[0.85rem] text-foreground leading-snug dark:text-white/85">
         {task.title}
       </span>
 
       {/* Done: summary + diff stats */}
       {showDone && (
-        <div className="flex flex-col gap-2 border-white/5 border-t pt-2.5">
+        <div className="flex flex-col gap-2.5 border-white/5 border-t pt-2.5">
           {task.summary && (
-            <p className="text-[0.72rem] text-white/40 leading-relaxed">
+            <p className="text-[0.72rem] text-white/38 leading-relaxed">
               {task.summary}
             </p>
           )}
           {(task.linesAdded !== undefined ||
             task.linesRemoved !== undefined) && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               {task.linesAdded !== undefined && task.linesAdded > 0 && (
-                <span className="flex items-center gap-0.5 font-mono text-[0.65rem] text-emerald-400/70">
+                <span className="inline-flex items-center rounded-sm bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[0.62rem] text-emerald-400/80">
                   +{task.linesAdded}
                 </span>
               )}
-              {task.linesAdded !== undefined &&
-                task.linesAdded > 0 &&
-                task.linesRemoved !== undefined &&
-                task.linesRemoved > 0 && (
-                  <span className="text-[0.65rem] text-white/15">·</span>
-                )}
               {task.linesRemoved !== undefined && task.linesRemoved > 0 && (
-                <span className="flex items-center gap-0.5 font-mono text-[0.65rem] text-red-400/60">
+                <span className="inline-flex items-center rounded-sm bg-red-500/10 px-1.5 py-0.5 font-mono text-[0.62rem] text-red-400/70">
                   -{task.linesRemoved}
                 </span>
               )}
-              <span className="text-[0.65rem] text-white/20">
+              <span className="text-[0.62rem] text-white/20">
                 lines changed
               </span>
             </div>
@@ -496,9 +570,15 @@ function TaskCard({
       )}
 
       {showPlay && (
-        <div className="flex items-center justify-end pt-1">
+        <div className="flex items-center justify-end pt-0.5">
           <button
-            className="flex items-center gap-1.5 rounded-md bg-white/8 px-2.5 py-1.5 font-medium text-[0.7rem] text-white/60 transition-all hover:bg-emerald-500/15 hover:text-emerald-400 active:scale-95"
+            className={cn(
+              "flex items-center gap-1.5 rounded-lg border border-white/6 bg-white/6 px-2.5 py-1.5",
+              "font-medium text-[0.7rem] text-white/50",
+              "transition-all duration-150",
+              "hover:border-emerald-500/20 hover:bg-emerald-500/12 hover:text-emerald-400",
+              "active:scale-[0.97]"
+            )}
             title="Run task"
             type="button"
           >
@@ -509,28 +589,43 @@ function TaskCard({
       )}
 
       {showApprovalControls && (
-        <div className="flex items-center justify-end gap-1.5 pt-1">
+        <div className="flex items-center justify-end gap-1.5 pt-0.5">
           <button
-            className="flex size-7 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-500 transition-colors hover:bg-emerald-500/20 active:scale-95"
+            className={cn(
+              "flex items-center gap-1 rounded-lg border border-emerald-500/15 bg-emerald-500/10 px-2.5 py-1.5",
+              "font-medium text-[0.7rem] text-emerald-400",
+              "transition-all duration-150 hover:border-emerald-500/30 hover:bg-emerald-500/20",
+              "active:scale-[0.97]"
+            )}
             title="Approve"
             type="button"
           >
-            <CheckIcon className="size-4" />
+            <CheckIcon className="size-3.5" />
           </button>
           <button
-            className="flex size-7 items-center justify-center rounded-md bg-rose-500/10 text-rose-500 transition-colors hover:bg-rose-500/20 active:scale-95"
+            className={cn(
+              "flex items-center gap-1 rounded-lg border border-rose-500/15 bg-rose-500/10 px-2.5 py-1.5",
+              "font-medium text-[0.7rem] text-rose-400",
+              "transition-all duration-150 hover:border-rose-500/30 hover:bg-rose-500/20",
+              "active:scale-[0.97]"
+            )}
             title="Reject"
             type="button"
           >
-            <XIcon className="size-4" />
+            <XIcon className="size-3.5" />
           </button>
         </div>
       )}
 
       {showDone && (
-        <div className="flex items-center justify-end pt-1">
+        <div className="flex items-center justify-end pt-0.5">
           <button
-            className="flex items-center gap-1.5 rounded-md bg-white/5 px-2.5 py-1.5 font-medium text-[0.7rem] text-white/35 transition-all hover:bg-white/10 hover:text-white/60 active:scale-95"
+            className={cn(
+              "flex items-center gap-1.5 rounded-lg border border-white/6 bg-white/4 px-2.5 py-1.5",
+              "font-medium text-[0.7rem] text-white/30",
+              "transition-all duration-150 hover:border-white/10 hover:bg-white/8 hover:text-white/55",
+              "active:scale-[0.97]"
+            )}
             title="Retry task"
             type="button"
           >
@@ -557,10 +652,10 @@ function TaskCard({
           {contentNode}
           {/* Connector: vertical line linking task to output */}
           <div className="flex">
-            <div className="ml-4 flex flex-col items-center">
-              <div className="h-3 w-px bg-white/10" />
-              <div className="size-1.5 rounded-full bg-white/20" />
-              <div className="h-1.5 w-px bg-white/10" />
+            <div className="ml-5 flex flex-col items-center">
+              <div className="h-2 w-px bg-linear-to-b from-white/5 to-white/15" />
+              <div className="size-1.5 rounded-full border border-white/20 bg-white/10" />
+              <div className="h-1.5 w-px bg-linear-to-b from-white/15 to-white/5" />
             </div>
           </div>
           <AgentOutputCard
@@ -638,6 +733,153 @@ function defaultColumns(boardId = "board"): Columns {
   };
 }
 
+function KanbanColumnRenderer({
+  columnId,
+  tasks,
+  autoAccept,
+  onAutoAcceptChange,
+}: {
+  columnId: string;
+  tasks: Task[];
+  autoAccept: boolean;
+  onAutoAcceptChange: (value: boolean) => void;
+}) {
+  const col = COLUMNS[columnId];
+  const isQueue = columnId === "queue";
+  const isReview = columnId === "approve";
+
+  return (
+    <ResizablePanel
+      className="flex min-w-0 flex-col"
+      defaultSize={25}
+      minSize={15}
+    >
+      <div className="flex h-full min-w-0 flex-col px-1.5">
+        <KanbanColumn value={columnId}>
+          <div
+            className={cn(
+              "flex h-full min-w-0 flex-col gap-2.5 rounded-xl border p-3",
+              "border-transparent bg-muted/30",
+              col.bg,
+              col.border
+            )}
+          >
+            {/* Column header */}
+            <div className="flex items-center gap-2 px-1 pt-0.5 pb-0.5">
+              {col.icon}
+              <h3 className="truncate font-semibold text-[0.7rem] text-muted-foreground uppercase tracking-widest dark:text-white/40">
+                {col.title}
+              </h3>
+              {isReview ? (
+                <div className="ml-auto flex items-center gap-2">
+                  <button
+                    className="flex items-center gap-1.5 rounded-md px-1.5 py-0.5 transition-colors hover:bg-white/5"
+                    onClick={() => onAutoAcceptChange(!autoAccept)}
+                    title={
+                      autoAccept
+                        ? "Switch to manual review"
+                        : "Switch to auto-accept"
+                    }
+                    type="button"
+                  >
+                    <span
+                      className={cn(
+                        "font-medium text-[0.6rem] uppercase tracking-wider transition-colors",
+                        autoAccept ? "text-emerald-400" : "text-white/25"
+                      )}
+                    >
+                      {autoAccept ? "Auto" : "Manual"}
+                    </span>
+                    <span
+                      className={cn(
+                        "relative inline-flex h-3.5 w-6 shrink-0 items-center rounded-full transition-all duration-200",
+                        autoAccept
+                          ? "bg-emerald-500/35 shadow-[0_0_8px_rgba(52,211,153,0.25)]"
+                          : "bg-white/10"
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "absolute size-2.5 rounded-full shadow-sm transition-all duration-200",
+                          autoAccept
+                            ? "left-[calc(100%-2px)] -translate-x-full bg-emerald-400"
+                            : "left-[2px] bg-white/35"
+                        )}
+                      />
+                    </span>
+                  </button>
+                  <div
+                    className={cn(
+                      "flex size-5 shrink-0 items-center justify-center rounded-full font-semibold text-[10px]",
+                      col.badge
+                    )}
+                  >
+                    {tasks.length}
+                  </div>
+                </div>
+              ) : (
+                <div
+                  className={cn(
+                    "ml-auto flex size-5 shrink-0 items-center justify-center rounded-full font-semibold text-[10px]",
+                    col.badge
+                  )}
+                >
+                  {tasks.length}
+                </div>
+              )}
+            </div>
+
+            {/* Queue: create task button */}
+            {isQueue && (
+              <button
+                className={cn(
+                  "flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2.5",
+                  "bg-white font-semibold text-[0.8rem] text-black",
+                  "shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_2px_12px_rgba(255,255,255,0.08)]",
+                  "transition-all duration-150",
+                  "hover:bg-white/93 hover:shadow-[0_0_0_1px_rgba(255,255,255,0.15),0_4px_20px_rgba(255,255,255,0.15)]",
+                  "active:scale-[0.98] active:shadow-[0_0_0_1px_rgba(255,255,255,0.1),0_1px_6px_rgba(255,255,255,0.1)]"
+                )}
+                type="button"
+              >
+                <PlusIcon className="size-3.5 shrink-0" />
+                Create Task
+              </button>
+            )}
+
+            <KanbanColumnContent
+              className="nowheel custom-scrollbar flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-1 pb-1"
+              value={columnId}
+            >
+              {tasks.length === 0 ? (
+                <ColumnEmptyState
+                  headline={col.emptyHeadline}
+                  hint={col.emptyHint}
+                  icon={col.emptyIcon}
+                />
+              ) : (
+                tasks.map((task) => (
+                  <TaskCard
+                    asHandle
+                    cardGlow={col.cardGlow}
+                    draggable={columnId === "queue"}
+                    key={task.id}
+                    showApprovalControls={columnId === "approve" && !autoAccept}
+                    showDone={columnId === "done"}
+                    showOutput={columnId === "in_progress"}
+                    showPlay={columnId === "queue"}
+                    task={task}
+                  />
+                ))
+              )}
+            </KanbanColumnContent>
+          </div>
+        </KanbanColumn>
+      </div>
+    </ResizablePanel>
+  );
+}
+
 export function KanbanCardContent({
   data,
   onColumnsChange,
@@ -659,112 +901,17 @@ export function KanbanCardContent({
           className="relative w-full flex-1"
           direction="horizontal"
         >
-          {Object.entries(data.columns).map(([columnId, tasks], index, arr) => {
-            const col = COLUMNS[columnId];
-            const isQueue = columnId === "queue";
-            const isReview = columnId === "approve";
-            return (
-              <Fragment key={columnId}>
-                <ResizablePanel
-                  className="flex min-w-0 flex-col"
-                  defaultSize={25}
-                  minSize={15}
-                >
-                  <div className="flex h-full min-w-0 flex-col px-1.5">
-                    <KanbanColumn value={columnId}>
-                      <div className="flex h-full min-w-0 flex-col gap-3 rounded-xl border border-transparent bg-muted/30 p-3 dark:border-white/2 dark:bg-black/30">
-                        {/* Column header */}
-                        <div className="flex items-center gap-2 px-1 py-1">
-                          {col.icon}
-                          <h3 className="truncate font-medium text-[0.75rem] text-muted-foreground uppercase tracking-wider dark:text-white/50">
-                            {col.title}
-                          </h3>
-                          {isReview ? (
-                            <div className="ml-auto flex items-center gap-2">
-                              <button
-                                className="flex items-center gap-1.5 rounded-md px-1.5 py-0.5 transition-colors hover:bg-white/5"
-                                onClick={() => setAutoAccept((v) => !v)}
-                                title={
-                                  autoAccept
-                                    ? "Switch to manual review"
-                                    : "Switch to auto-accept"
-                                }
-                                type="button"
-                              >
-                                <span
-                                  className={`font-medium text-[0.6rem] uppercase tracking-wider transition-colors ${
-                                    autoAccept
-                                      ? "text-emerald-400"
-                                      : "text-white/30"
-                                  }`}
-                                >
-                                  {autoAccept ? "Auto" : "Manual"}
-                                </span>
-                                <span
-                                  className={`relative inline-flex h-3.5 w-6 shrink-0 items-center rounded-full transition-all ${
-                                    autoAccept
-                                      ? "bg-emerald-500/40"
-                                      : "bg-white/10"
-                                  }`}
-                                >
-                                  <span
-                                    className={`absolute size-2.5 rounded-full transition-all ${
-                                      autoAccept
-                                        ? "left-[calc(100%-2px)] -translate-x-full bg-emerald-400"
-                                        : "left-[2px] bg-white/40"
-                                    }`}
-                                  />
-                                </span>
-                              </button>
-                              <div className="flex size-5 shrink-0 items-center justify-center rounded-full bg-background font-semibold text-[10px] dark:bg-white/10 dark:text-white/80">
-                                {tasks.length}
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="ml-auto flex size-5 shrink-0 items-center justify-center rounded-full bg-background font-semibold text-[10px] dark:bg-white/10 dark:text-white/80">
-                              {tasks.length}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Queue: create task button */}
-                        {isQueue && (
-                          <button
-                            className="flex w-full items-center justify-center gap-2 rounded-lg bg-white px-3 py-2.5 font-semibold text-[0.8rem] text-black shadow-[0_0_15px_rgba(255,255,255,0.1)] transition-all hover:bg-white/90 hover:shadow-[0_0_20px_rgba(255,255,255,0.2)] active:scale-[0.98]"
-                            type="button"
-                          >
-                            <PlusIcon className="size-4 shrink-0" />
-                            Create Task
-                          </button>
-                        )}
-
-                        <KanbanColumnContent
-                          className="nowheel custom-scrollbar flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto pr-1 pb-1"
-                          value={columnId}
-                        >
-                          {tasks.map((task) => (
-                            <TaskCard
-                              asHandle
-                              draggable={columnId === "queue"}
-                              key={task.id}
-                              showApprovalControls={
-                                columnId === "approve" && !autoAccept
-                              }
-                              showDone={columnId === "done"}
-                              showOutput={columnId === "in_progress"}
-                              showPlay={columnId === "queue"}
-                              task={task}
-                            />
-                          ))}
-                        </KanbanColumnContent>
-                      </div>
-                    </KanbanColumn>
-                  </div>
-                </ResizablePanel>
-                {index < arr.length - 1 && <ResizableHandle withHandle />}
-              </Fragment>
-            );
-          })}
+          {Object.entries(data.columns).map(([columnId, tasks], index, arr) => (
+            <Fragment key={columnId}>
+              <KanbanColumnRenderer
+                autoAccept={autoAccept}
+                columnId={columnId}
+                onAutoAcceptChange={setAutoAccept}
+                tasks={tasks}
+              />
+              {index < arr.length - 1 && <ResizableHandle withHandle />}
+            </Fragment>
+          ))}
         </ResizablePanelGroup>
       </KanbanBoard>
     </Kanban>

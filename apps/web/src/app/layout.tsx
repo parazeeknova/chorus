@@ -36,7 +36,7 @@ export default function RootLayout({
         <PostHogProvider>
           <ChorusWorkspaceProvider>
             <AppHeader />
-            <div className="flex-1 overflow-hidden pt-12">{children}</div>
+            <div className="flex-1 overflow-hidden">{children}</div>
             <PromptInput />
           </ChorusWorkspaceProvider>
         </PostHogProvider>
