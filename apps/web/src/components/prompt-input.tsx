@@ -13,6 +13,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useWorkspace } from "@/features/workspace/workspace-context";
 import { useVoiceRecording } from "@/hooks/use-voice-recording";
+import { cn } from "@/lib/utils";
 import { fetchVoiceConfig, type GroqVoice } from "@/lib/voice-api";
 
 const MODEL_OPTIONS = {
@@ -30,6 +31,15 @@ const MODEL_OPTIONS = {
     modelID: "gemini-2.5-pro",
   },
 } as const;
+
+const composerSelectTriggerClass =
+  "h-7 min-w-0 gap-1.5 rounded-xs border border-white/8 bg-white/[0.04] px-2.5 py-1 font-medium text-[11px] text-white/72 shadow-none transition-colors hover:border-white/14 hover:bg-white/[0.07] hover:text-white/90 focus-visible:border-white/16 focus-visible:bg-white/[0.08] focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 disabled:opacity-40 dark:border-white/8 dark:bg-white/[0.04] dark:hover:bg-white/[0.07]";
+
+const composerSelectContentClass =
+  "border-white/10 bg-[#151515]/96 p-1 text-white/92 shadow-[0_18px_44px_rgba(0,0,0,0.45)] backdrop-blur-xl";
+
+const composerSelectItemClass =
+  "min-h-8 rounded-xs px-2.5 py-1.5 text-[12px] text-white/78 focus:bg-white/7 focus:!text-white/86 focus:**:!text-white/86 aria-selected:bg-white/10 aria-selected:!text-white aria-selected:**:!text-white data-[highlighted]:bg-white/7 data-[highlighted]:!text-white/86 data-[highlighted]:**:!text-white/86";
 
 export function PromptInput() {
   const [prompt, setPrompt] = useState("");
@@ -159,14 +169,40 @@ export function PromptInput() {
                     onValueChange={(value) => value && setSelectedModel(value)}
                     value={selectedModel}
                   >
-                    <SelectTrigger className="h-7 w-auto gap-1 rounded-xs border-0 bg-white/5 px-2.5 py-1 font-semibold text-white/70 text-xs shadow-none hover:bg-white/10 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 data-[state=open]:bg-white/10 data-[state=open]:text-white dark:bg-white/5 dark:data-[state=open]:bg-white/10 dark:data-[state=open]:text-white dark:hover:bg-white/10">
+                    <SelectTrigger
+                      className={composerSelectTriggerClass}
+                      size="sm"
+                    >
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="border-white/10 bg-[#161616] text-white/90">
-                      <SelectItem value="default">OpenCode Default</SelectItem>
-                      <SelectItem value="claude">Claude Sonnet 4.5</SelectItem>
-                      <SelectItem value="gpt4_1">GPT-4.1</SelectItem>
-                      <SelectItem value="gemini">Gemini 2.5 Pro</SelectItem>
+                    <SelectContent
+                      align="start"
+                      className={cn("min-w-48", composerSelectContentClass)}
+                    >
+                      <SelectItem
+                        className={composerSelectItemClass}
+                        value="default"
+                      >
+                        OpenCode Default
+                      </SelectItem>
+                      <SelectItem
+                        className={composerSelectItemClass}
+                        value="claude"
+                      >
+                        Claude Sonnet 4.5
+                      </SelectItem>
+                      <SelectItem
+                        className={composerSelectItemClass}
+                        value="gpt4_1"
+                      >
+                        GPT-4.1
+                      </SelectItem>
+                      <SelectItem
+                        className={composerSelectItemClass}
+                        value="gemini"
+                      >
+                        Gemini 2.5 Pro
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                   {voices.length > 0 && (
@@ -176,12 +212,25 @@ export function PromptInput() {
                       }
                       value={selectedVoice}
                     >
-                      <SelectTrigger className="h-7 w-auto gap-1 rounded-xs border-0 bg-white/5 px-2.5 py-1 font-medium text-white/60 text-xs shadow-none hover:bg-white/10 hover:text-white/80 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 data-[state=open]:bg-white/10 data-[state=open]:text-white dark:bg-white/5 dark:data-[state=open]:bg-white/10 dark:data-[state=open]:text-white dark:hover:bg-white/10">
+                      <SelectTrigger
+                        className={cn(
+                          composerSelectTriggerClass,
+                          "text-white/64"
+                        )}
+                        size="sm"
+                      >
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="border-white/10 bg-[#161616] text-white/90">
+                      <SelectContent
+                        align="start"
+                        className={cn("min-w-52", composerSelectContentClass)}
+                      >
                         {voices.map((voice) => (
-                          <SelectItem key={voice.id} value={voice.id}>
+                          <SelectItem
+                            className={composerSelectItemClass}
+                            key={voice.id}
+                            value={voice.id}
+                          >
                             {voice.name} ({voice.gender})
                           </SelectItem>
                         ))}
@@ -194,16 +243,29 @@ export function PromptInput() {
                     onValueChange={(value) => value && selectBoard(value)}
                     value={selectedBoard?.boardId ?? null}
                   >
-                    <SelectTrigger className="h-7 w-auto gap-1 rounded-xs border-0 bg-transparent px-2.5 py-1 font-medium text-white/50 text-xs shadow-none hover:bg-white/10 hover:text-white/80 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 data-[state=open]:bg-white/10 data-[state=open]:text-white dark:bg-transparent dark:data-[state=open]:bg-white/10 dark:data-[state=open]:text-white dark:hover:bg-white/10">
+                    <SelectTrigger
+                      className={cn(
+                        composerSelectTriggerClass,
+                        "bg-transparent text-white/58"
+                      )}
+                      size="sm"
+                    >
                       <SelectValue placeholder="Select a board" />
                     </SelectTrigger>
-                    <SelectContent className="border-white/10 bg-[#161616] text-white/90">
+                    <SelectContent
+                      align="end"
+                      className={cn("min-w-64", composerSelectContentClass)}
+                    >
                       {boards.map((board) => (
-                        <SelectItem key={board.boardId} value={board.boardId}>
+                        <SelectItem
+                          className={composerSelectItemClass}
+                          key={board.boardId}
+                          value={board.boardId}
+                        >
                           <span className="flex min-w-0 flex-col">
                             <span className="truncate">{board.title}</span>
                             <span className="truncate text-[11px] text-white/40">
-                              {board.repo.directory}
+                              {board.repo.branch ?? board.repo.directory}
                             </span>
                           </span>
                         </SelectItem>
