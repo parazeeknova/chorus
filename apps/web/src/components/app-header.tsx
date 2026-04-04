@@ -35,7 +35,7 @@ import { cn } from "@/lib/utils";
 
 const menuItems = ["Edit", "View", "Window", "Help"];
 const islandChrome =
-  "pointer-events-auto relative rounded-[1.35rem] border border-white/10 bg-zinc-950/68 shadow-[0_18px_50px_rgba(0,0,0,0.42)] backdrop-blur-2xl";
+  "pointer-events-auto relative rounded-sm border border-white/10 bg-zinc-950/68 shadow-[0_18px_50px_rgba(0,0,0,0.42)] backdrop-blur-2xl";
 
 // ─── Notification types ────────────────────────────────────────────────────────
 type NotifType = "review" | "question" | "done" | "warning";
@@ -182,7 +182,7 @@ function NotificationItem({
         {n.type === "review" && (
           <div className="flex gap-1.5">
             <button
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-emerald-500/25 bg-emerald-500/10 py-1.5 font-medium text-[0.65rem] text-emerald-400 transition-all hover:border-emerald-500/40 hover:bg-emerald-500/18 active:scale-[0.97]"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-xs border border-emerald-500/25 bg-emerald-500/10 py-1.5 font-medium text-[0.65rem] text-emerald-400 transition-all hover:border-emerald-500/40 hover:bg-emerald-500/18 active:scale-[0.97]"
               onClick={() => onDismiss(n.id)}
               type="button"
             >
@@ -190,7 +190,7 @@ function NotificationItem({
               Approve
             </button>
             <button
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-rose-500/20 bg-rose-500/8 py-1.5 font-medium text-[0.65rem] text-rose-400/80 transition-all hover:border-rose-500/35 hover:bg-rose-500/15 active:scale-[0.97]"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-xs border border-rose-500/20 bg-rose-500/8 py-1.5 font-medium text-[0.65rem] text-rose-400/80 transition-all hover:border-rose-500/35 hover:bg-rose-500/15 active:scale-[0.97]"
               onClick={() => onDismiss(n.id)}
               type="button"
             >
@@ -198,7 +198,7 @@ function NotificationItem({
               Reject
             </button>
             <button
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-white/6 bg-white/3 py-1.5 text-[0.65rem] text-white/30 transition-all hover:bg-white/6 hover:text-white/55 active:scale-[0.97]"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-xs border border-white/6 bg-white/3 py-1.5 text-[0.65rem] text-white/30 transition-all hover:bg-white/6 hover:text-white/55 active:scale-[0.97]"
               type="button"
             >
               <ChevronRightIcon className="size-3" />
@@ -210,7 +210,7 @@ function NotificationItem({
         {n.type === "question" && !answerOpen && (
           <div className="flex gap-1.5">
             <button
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-sky-500/25 bg-sky-500/10 py-1.5 font-medium text-[0.65rem] text-sky-400 transition-all hover:border-sky-500/40 hover:bg-sky-500/18 active:scale-[0.97]"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-xs border border-sky-500/25 bg-sky-500/10 py-1.5 font-medium text-[0.65rem] text-sky-400 transition-all hover:border-sky-500/40 hover:bg-sky-500/18 active:scale-[0.97]"
               onClick={() => setAnswerOpen(true)}
               type="button"
             >
@@ -224,7 +224,7 @@ function NotificationItem({
           <div className="flex flex-col gap-1.5">
             <textarea
               autoFocus
-              className="w-full resize-none rounded-lg border border-sky-500/20 bg-sky-950/20 px-2.5 py-2 text-[0.67rem] text-white/70 placeholder-white/25 outline-none transition-all [scrollbar-width:none] focus:border-sky-500/35 focus:bg-sky-950/30 [&::-webkit-scrollbar]:hidden"
+              className="w-full resize-none rounded-xs border border-sky-500/20 bg-sky-950/20 px-2.5 py-2 text-[0.67rem] text-white/70 placeholder-white/25 outline-none transition-all [scrollbar-width:none] focus:border-sky-500/35 focus:bg-sky-950/30 [&::-webkit-scrollbar]:hidden"
               onChange={(e) => setAnswer(e.target.value)}
               placeholder="Type your answer…"
               rows={2}
@@ -232,7 +232,7 @@ function NotificationItem({
             />
             <div className="flex gap-1.5">
               <button
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-sky-500/25 bg-sky-500/10 py-1.5 font-medium text-[0.65rem] text-sky-400 transition-all hover:border-sky-500/40 hover:bg-sky-500/18 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40"
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-xs border border-sky-500/25 bg-sky-500/10 py-1.5 font-medium text-[0.65rem] text-sky-400 transition-all hover:border-sky-500/40 hover:bg-sky-500/18 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40"
                 disabled={!answer.trim()}
                 onClick={() => answer.trim() && onDismiss(n.id)}
                 type="button"
@@ -241,7 +241,7 @@ function NotificationItem({
                 Send
               </button>
               <button
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-white/6 bg-white/3 py-1.5 text-[0.65rem] text-white/30 transition-all hover:bg-white/6 hover:text-white/55 active:scale-[0.97]"
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-xs border border-white/6 bg-white/3 py-1.5 text-[0.65rem] text-white/30 transition-all hover:bg-white/6 hover:text-white/55 active:scale-[0.97]"
                 onClick={() => {
                   setAnswerOpen(false);
                   setAnswer("");
@@ -257,14 +257,14 @@ function NotificationItem({
         {n.type === "done" && (
           <div className="flex gap-1.5">
             <button
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-white/8 bg-white/4 py-1.5 font-medium text-[0.65rem] text-white/55 transition-all hover:border-white/14 hover:bg-white/8 hover:text-white/80 active:scale-[0.97]"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-xs border border-white/8 bg-white/4 py-1.5 font-medium text-[0.65rem] text-white/55 transition-all hover:border-white/14 hover:bg-white/8 hover:text-white/80 active:scale-[0.97]"
               type="button"
             >
               <ChevronRightIcon className="size-3" />
               View changes
             </button>
             <button
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-emerald-500/15 bg-emerald-500/6 py-1.5 font-medium text-[0.65rem] text-emerald-400/70 transition-all hover:border-emerald-500/28 hover:bg-emerald-500/12 hover:text-emerald-400 active:scale-[0.97]"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-xs border border-emerald-500/15 bg-emerald-500/6 py-1.5 font-medium text-[0.65rem] text-emerald-400/70 transition-all hover:border-emerald-500/28 hover:bg-emerald-500/12 hover:text-emerald-400 active:scale-[0.97]"
               onClick={() => onDismiss(n.id)}
               type="button"
             >
@@ -277,14 +277,14 @@ function NotificationItem({
         {n.type === "warning" && (
           <div className="flex gap-1.5">
             <button
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-amber-500/25 bg-amber-500/10 py-1.5 font-medium text-[0.65rem] text-amber-400 transition-all hover:border-amber-500/40 hover:bg-amber-500/18 active:scale-[0.97]"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-xs border border-amber-500/25 bg-amber-500/10 py-1.5 font-medium text-[0.65rem] text-amber-400 transition-all hover:border-amber-500/40 hover:bg-amber-500/18 active:scale-[0.97]"
               type="button"
             >
               <ZapIcon className="size-3" />
               Extend budget
             </button>
             <button
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-rose-500/20 bg-rose-500/8 py-1.5 font-medium text-[0.65rem] text-rose-400/80 transition-all hover:border-rose-500/35 hover:bg-rose-500/15 active:scale-[0.97]"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-xs border border-rose-500/20 bg-rose-500/8 py-1.5 font-medium text-[0.65rem] text-rose-400/80 transition-all hover:border-rose-500/35 hover:bg-rose-500/15 active:scale-[0.97]"
               onClick={() => onDismiss(n.id)}
               type="button"
             >
@@ -297,7 +297,7 @@ function NotificationItem({
 
       {/* dismiss */}
       <button
-        className="absolute top-3 right-3 flex size-5 items-center justify-center rounded-md text-white/20 opacity-0 transition-all hover:bg-white/8 hover:text-white/50 group-hover:opacity-100"
+        className="absolute top-3 right-3 flex size-5 items-center justify-center rounded-xs text-white/20 opacity-0 transition-all hover:bg-white/8 hover:text-white/50 group-hover:opacity-100"
         onClick={() => onDismiss(n.id)}
         title="Dismiss"
         type="button"
@@ -329,7 +329,7 @@ function NotificationPane({ onClose }: { onClose: () => void }) {
         // On sm+: fixed width anchored to the right of the button
         "absolute top-[calc(100%+8px)] right-0",
         "w-[calc(100vw-1.5rem)] max-w-[360px] sm:w-[360px]",
-        "overflow-hidden rounded-2xl",
+        "overflow-hidden rounded-sm",
         "border border-white/10 bg-zinc-950/90 shadow-[0_24px_60px_rgba(0,0,0,0.55)] backdrop-blur-2xl"
       )}
     >
@@ -340,7 +340,7 @@ function NotificationPane({ onClose }: { onClose: () => void }) {
         </span>
         {unread > 0 && (
           <button
-            className="rounded-md px-2 py-0.5 text-[0.62rem] text-white/35 transition-colors hover:text-white/60"
+            className="rounded-xs px-2 py-0.5 text-[0.62rem] text-white/35 transition-colors hover:text-white/60"
             onClick={markAllRead}
             type="button"
           >
@@ -348,7 +348,7 @@ function NotificationPane({ onClose }: { onClose: () => void }) {
           </button>
         )}
         <button
-          className="flex size-6 items-center justify-center rounded-lg text-white/30 transition-colors hover:bg-white/6 hover:text-white/60"
+          className="flex size-6 items-center justify-center rounded-xs text-white/30 transition-colors hover:bg-white/6 hover:text-white/60"
           onClick={onClose}
           type="button"
         >
@@ -447,7 +447,7 @@ function MobileMenuDrawer({
             </span>
           </div>
           <button
-            className="flex size-7 items-center justify-center rounded-lg text-white/30 transition-colors hover:bg-white/8 hover:text-white/70"
+            className="flex size-7 items-center justify-center rounded-xs text-white/30 transition-colors hover:bg-white/8 hover:text-white/70"
             onClick={onClose}
             type="button"
           >
@@ -463,7 +463,7 @@ function MobileMenuDrawer({
               File
             </p>
             <button
-              className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-white/70 transition-colors hover:bg-white/6 hover:text-white"
+              className="flex w-full items-center gap-2.5 rounded-xs px-3 py-2.5 text-sm text-white/70 transition-colors hover:bg-white/6 hover:text-white"
               onClick={() => {
                 onOpenFolder();
                 onClose();
@@ -481,7 +481,7 @@ function MobileMenuDrawer({
                 </p>
                 {previousWorkspaces.map((entry) => (
                   <button
-                    className="flex w-full flex-col rounded-xl px-3 py-2 transition-colors hover:bg-white/6"
+                    className="flex w-full flex-col rounded-xs px-3 py-2 transition-colors hover:bg-white/6"
                     key={entry.id}
                     onClick={() => {
                       createBoardFromHistory(entry);
@@ -507,7 +507,7 @@ function MobileMenuDrawer({
                 </p>
                 {recentProjects.map((project) => (
                   <button
-                    className="flex w-full flex-col rounded-xl px-3 py-2 transition-colors hover:bg-white/6"
+                    className="flex w-full flex-col rounded-xs px-3 py-2 transition-colors hover:bg-white/6"
                     key={`${project.projectId ?? project.directory}`}
                     onClick={() => {
                       createBoardFromProject(project);
@@ -538,7 +538,7 @@ function MobileMenuDrawer({
             </p>
             {allMenuItems.map((item) => (
               <button
-                className="flex w-full items-center rounded-xl px-3 py-2.5 text-sm text-white/60 transition-colors hover:bg-white/6 hover:text-white"
+                className="flex w-full items-center rounded-xs px-3 py-2.5 text-sm text-white/60 transition-colors hover:bg-white/6 hover:text-white"
                 key={item}
                 onClick={onClose}
                 type="button"
@@ -609,7 +609,7 @@ export function AppHeader() {
           <div className={cn(islandChrome, "min-w-0 shrink")}>
             <div className="relative flex h-12 min-w-0 items-center gap-2 px-2">
               {/* Logo pill — always visible */}
-              <div className="flex shrink-0 items-center gap-2 rounded-2xl border border-white/8 bg-zinc-900/78 px-3 py-2">
+              <div className="flex shrink-0 items-center gap-2 rounded-sm border border-white/8 bg-zinc-900/78 px-3 py-2">
                 <Image
                   alt="Chorus logo"
                   className="h-4.75 w-6 invert"
@@ -628,12 +628,12 @@ export function AppHeader() {
               <button
                 aria-label="Open menu"
                 className={cn(
-                  "group relative flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-zinc-300 transition duration-300 hover:text-white sm:hidden"
+                  "group relative flex h-8 w-8 shrink-0 items-center justify-center rounded-xs text-zinc-300 transition duration-300 hover:text-white sm:hidden"
                 )}
                 onClick={() => setMobileMenuOpen(true)}
                 type="button"
               >
-                <div className="absolute inset-0 rounded-xl border border-white/8 bg-zinc-900/80 opacity-0 transition duration-300 group-hover:opacity-100" />
+                <div className="absolute inset-0 rounded-xs border border-white/8 bg-zinc-900/80 opacity-0 transition duration-300 group-hover:opacity-100" />
                 <MenuIcon className="relative z-10 size-4" />
               </button>
 
@@ -644,15 +644,15 @@ export function AppHeader() {
                 <DropdownMenu>
                   <DropdownMenuTrigger
                     className={cn(
-                      "group relative shrink-0 rounded-xl px-3 py-2 text-sm text-zinc-300 transition duration-300 hover:text-white"
+                      "group relative shrink-0 rounded-xs px-3 py-2 text-sm text-zinc-300 transition duration-300 hover:text-white"
                     )}
                   >
                     <span className="relative z-10">File</span>
-                    <div className="absolute inset-0 rounded-xl border border-transparent bg-zinc-900/85 opacity-0 transition duration-300 group-hover:opacity-100" />
+                    <div className="absolute inset-0 rounded-xs border border-transparent bg-zinc-900/85 opacity-0 transition duration-300 group-hover:opacity-100" />
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent className="min-w-72 rounded-2xl border border-white/10 bg-[#111111]/96 p-1.5 text-white shadow-2xl backdrop-blur-xl">
+                  <DropdownMenuContent className="min-w-72 rounded-sm border border-white/10 bg-[#111111]/96 p-1.5 text-white shadow-2xl backdrop-blur-xl">
                     <DropdownMenuItem
-                      className="cursor-pointer rounded-lg px-3 py-2 text-sm text-white/85 focus:bg-white/10 focus:text-white"
+                      className="cursor-pointer rounded-xs px-3 py-2 text-sm text-white/85 focus:bg-white/10 focus:text-white"
                       onClick={() => {
                         openFolder().catch((error) => {
                           console.error("Failed to open folder", error);
@@ -668,10 +668,10 @@ export function AppHeader() {
                     </DropdownMenuItem>
                     <DropdownMenuSeparator className="bg-white/8" />
                     <DropdownMenuSub>
-                      <DropdownMenuSubTrigger className="rounded-lg px-3 py-2 text-sm text-white/85 focus:bg-white/10 focus:text-white data-[popup-open]:bg-white/10 data-[popup-open]:text-white">
+                      <DropdownMenuSubTrigger className="rounded-xs px-3 py-2 text-sm text-white/85 focus:bg-white/10 focus:text-white data-[popup-open]:bg-white/10 data-[popup-open]:text-white">
                         Previous Working
                       </DropdownMenuSubTrigger>
-                      <DropdownMenuSubContent className="min-w-80 rounded-2xl border border-white/10 bg-[#111111]/96 p-1.5 text-white shadow-2xl backdrop-blur-xl">
+                      <DropdownMenuSubContent className="min-w-80 rounded-sm border border-white/10 bg-[#111111]/96 p-1.5 text-white shadow-2xl backdrop-blur-xl">
                         {previousWorkspaces.length === 0 ? (
                           <DropdownMenuGroup>
                             <DropdownMenuLabel className="text-white/40">
@@ -681,7 +681,7 @@ export function AppHeader() {
                         ) : (
                           previousWorkspaces.map((entry) => (
                             <DropdownMenuItem
-                              className="cursor-pointer rounded-lg px-3 py-2 text-sm text-white/85 focus:bg-white/10 focus:text-white"
+                              className="cursor-pointer rounded-xs px-3 py-2 text-sm text-white/85 focus:bg-white/10 focus:text-white"
                               key={entry.id}
                               onClick={() => {
                                 createBoardFromHistory(entry);
@@ -701,10 +701,10 @@ export function AppHeader() {
                       </DropdownMenuSubContent>
                     </DropdownMenuSub>
                     <DropdownMenuSub>
-                      <DropdownMenuSubTrigger className="rounded-lg px-3 py-2 text-sm text-white/85 focus:bg-white/10 focus:text-white data-[popup-open]:bg-white/10 data-[popup-open]:text-white">
+                      <DropdownMenuSubTrigger className="rounded-xs px-3 py-2 text-sm text-white/85 focus:bg-white/10 focus:text-white data-[popup-open]:bg-white/10 data-[popup-open]:text-white">
                         Known Projects
                       </DropdownMenuSubTrigger>
-                      <DropdownMenuSubContent className="min-w-80 rounded-2xl border border-white/10 bg-[#111111]/96 p-1.5 text-white shadow-2xl backdrop-blur-xl">
+                      <DropdownMenuSubContent className="min-w-80 rounded-sm border border-white/10 bg-[#111111]/96 p-1.5 text-white shadow-2xl backdrop-blur-xl">
                         {recentProjects.length === 0 ? (
                           <DropdownMenuGroup>
                             <DropdownMenuLabel className="text-white/40">
@@ -714,7 +714,7 @@ export function AppHeader() {
                         ) : (
                           recentProjects.map((project) => (
                             <DropdownMenuItem
-                              className="cursor-pointer rounded-lg px-3 py-2 text-sm text-white/85 focus:bg-white/10 focus:text-white"
+                              className="cursor-pointer rounded-xs px-3 py-2 text-sm text-white/85 focus:bg-white/10 focus:text-white"
                               key={`${project.projectId ?? project.directory}`}
                               onClick={() => {
                                 createBoardFromProject(project);
@@ -747,7 +747,7 @@ export function AppHeader() {
                   return (
                     <button
                       className={cn(
-                        "group relative shrink-0 rounded-xl px-3 py-2 text-sm text-zinc-300 transition duration-300 hover:text-white",
+                        "group relative shrink-0 rounded-xs px-3 py-2 text-sm text-zinc-300 transition duration-300 hover:text-white",
                         isActive && "text-white"
                       )}
                       key={item}
@@ -758,7 +758,7 @@ export function AppHeader() {
                       <span className="relative z-10">{item}</span>
                       <div
                         className={cn(
-                          "absolute inset-0 rounded-xl border border-transparent bg-zinc-900/85 opacity-0 transition duration-300 group-hover:opacity-100",
+                          "absolute inset-0 rounded-xs border border-transparent bg-zinc-900/85 opacity-0 transition duration-300 group-hover:opacity-100",
                           isActive &&
                             "border-cyan-300/18 bg-zinc-900 opacity-100"
                         )}
@@ -786,7 +786,7 @@ export function AppHeader() {
                 >
                   <div
                     className={cn(
-                      "absolute inset-[5px] rounded-[1rem] border bg-zinc-900/80 transition duration-300",
+                      "absolute inset-[5px] rounded-xs border bg-zinc-900/80 transition duration-300",
                       notifOpen
                         ? "border-cyan-300/18 bg-zinc-900"
                         : "border-white/8 group-hover:border-cyan-300/18 group-hover:bg-zinc-900"
@@ -818,7 +818,7 @@ export function AppHeader() {
                 className="group relative flex h-12 w-12 items-center justify-center text-zinc-300 transition duration-300 hover:text-white"
                 type="button"
               >
-                <div className="absolute inset-[5px] rounded-[1rem] border border-white/8 bg-zinc-900/80 transition duration-300 group-hover:border-cyan-300/18 group-hover:bg-zinc-900" />
+                <div className="absolute inset-[5px] rounded-xs border border-white/8 bg-zinc-900/80 transition duration-300 group-hover:border-cyan-300/18 group-hover:bg-zinc-900" />
                 <Settings className="relative z-10 h-4 w-4 transition duration-300 group-hover:rotate-45" />
               </button>
             </div>

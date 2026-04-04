@@ -61,7 +61,7 @@ function FilePath({ path }: { path: string }) {
 
 function GitBranch({ branch }: { branch: string }) {
   return (
-    <span className="flex items-center gap-1 rounded-md border border-white/8 bg-white/5 px-1.5 py-0.5">
+    <span className="flex items-center gap-1 rounded-xs border border-white/8 bg-white/5 px-1.5 py-0.5">
       <GitBranchIcon className="size-2.5 text-white/40" />
       <span className="font-mono text-[0.65rem] text-white/50 leading-none">
         {branch}
@@ -79,7 +79,7 @@ function SessionStatus({
 }) {
   if (state === "starting") {
     return (
-      <span className="flex items-center gap-1 rounded-md border border-cyan-400/20 bg-cyan-400/10 px-1.5 py-0.5">
+      <span className="flex items-center gap-1 rounded-xs border border-cyan-400/20 bg-cyan-400/10 px-1.5 py-0.5">
         <LoaderCircleIcon className="size-3 animate-spin text-cyan-300/80" />
         <span className="font-medium text-[0.65rem] text-cyan-200/80 leading-none">
           Starting
@@ -90,7 +90,7 @@ function SessionStatus({
 
   if (state === "error") {
     return (
-      <span className="flex items-center gap-1 rounded-md border border-red-400/20 bg-red-400/10 px-1.5 py-0.5">
+      <span className="flex items-center gap-1 rounded-xs border border-red-400/20 bg-red-400/10 px-1.5 py-0.5">
         <TriangleAlertIcon className="size-3 text-red-300/80" />
         <span className="font-medium text-[0.65rem] text-red-200/80 leading-none">
           Error
@@ -101,7 +101,7 @@ function SessionStatus({
 
   if (state === "active") {
     return (
-      <span className="flex items-center gap-1 rounded-md border border-emerald-400/20 bg-emerald-400/10 px-1.5 py-0.5">
+      <span className="flex items-center gap-1 rounded-xs border border-emerald-400/20 bg-emerald-400/10 px-1.5 py-0.5">
         <span className="size-1.5 rounded-full bg-emerald-300/90" />
         <span className="font-medium text-[0.65rem] text-emerald-200/80 leading-none">
           {sessionId ? "Live" : "Ready"}
@@ -111,7 +111,7 @@ function SessionStatus({
   }
 
   return (
-    <span className="flex items-center gap-1 rounded-md border border-white/8 bg-white/5 px-1.5 py-0.5">
+    <span className="flex items-center gap-1 rounded-xs border border-white/8 bg-white/5 px-1.5 py-0.5">
       <span className="size-1.5 rounded-full bg-white/35" />
       <span className="font-medium text-[0.65rem] text-white/55 leading-none">
         Ready
@@ -203,12 +203,12 @@ function KanbanCardNodeComponent({
       )}
       <div
         className={cn(
-          "dark flex h-full w-full flex-col rounded-2xl border border-white/10 bg-[#111111]/95 shadow-[0_24px_80px_rgba(0,0,0,0.6)] backdrop-blur-xl transition-shadow",
+          "dark flex h-full w-full flex-col rounded-sm border border-white/10 bg-[#111111]/95 shadow-[0_24px_80px_rgba(0,0,0,0.6)] backdrop-blur-xl transition-shadow",
           "active:shadow-[0_32px_100px_rgba(0,0,0,0.8)] active:ring-1 active:ring-white/15"
         )}
       >
         <div className="flex items-center gap-3 border-white/8 border-b px-3 py-2.5">
-          <div className="flex shrink-0 cursor-grab items-center justify-center rounded-md p-1 text-white/25 hover:text-white/50 active:cursor-grabbing">
+          <div className="flex shrink-0 cursor-grab items-center justify-center rounded-xs p-1 text-white/25 hover:text-white/50 active:cursor-grabbing">
             <GripVerticalIcon className="size-3.5" />
           </div>
 
@@ -237,7 +237,7 @@ function KanbanCardNodeComponent({
             <span className="h-3.5 w-px bg-white/10" />
 
             <DropdownMenu>
-              <DropdownMenuTrigger className="flex items-center gap-1.5 rounded-md bg-white/15 px-2 py-1 font-medium text-[0.65rem] text-white transition-all hover:bg-white/25 active:scale-95">
+              <DropdownMenuTrigger className="flex items-center gap-1.5 rounded-xs bg-white/15 px-2 py-1 font-medium text-[0.65rem] text-white transition-all hover:bg-white/25 active:scale-95">
                 <Code2Icon className="size-3" />
                 <span>Open in Editor</span>
                 <ChevronDownIcon className="size-3 text-white/50" />
@@ -247,21 +247,21 @@ function KanbanCardNodeComponent({
                 className="w-40 border-white/10 bg-[#1e1e1e] p-1.5 text-white/90 shadow-2xl"
               >
                 <DropdownMenuItem
-                  className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-white/80 text-xs transition-colors focus:bg-white/10 focus:text-white"
+                  className="flex cursor-pointer items-center gap-2 rounded-xs px-2 py-1.5 text-white/80 text-xs transition-colors focus:bg-white/10 focus:text-white"
                   onClick={handleOpenLocally}
                 >
                   <MonitorIcon className="size-3.5" />
                   <span>Open Locally</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-white/80 text-xs transition-colors focus:bg-white/10 focus:text-white"
+                  className="flex cursor-pointer items-center gap-2 rounded-xs px-2 py-1.5 text-white/80 text-xs transition-colors focus:bg-white/10 focus:text-white"
                   onClick={handleOpenHere}
                 >
                   <GlobeIcon className="size-3.5" />
                   <span>Open Here</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-white/80 text-xs transition-colors focus:bg-white/10 focus:text-white"
+                  className="flex cursor-pointer items-center gap-2 rounded-xs px-2 py-1.5 text-white/80 text-xs transition-colors focus:bg-white/10 focus:text-white"
                   onClick={handleToggleDiff}
                 >
                   <Code2Icon className="size-3.5" />
@@ -272,7 +272,7 @@ function KanbanCardNodeComponent({
 
             {editorMode !== null && (
               <button
-                className="rounded-md bg-white/10 px-2 py-1 font-medium text-[0.65rem] text-white transition-all hover:bg-white/20 active:scale-95"
+                className="rounded-xs bg-white/10 px-2 py-1 font-medium text-[0.65rem] text-white transition-all hover:bg-white/20 active:scale-95"
                 onClick={handleCloseEditor}
                 type="button"
               >
@@ -284,7 +284,7 @@ function KanbanCardNodeComponent({
               <>
                 <span className="h-3.5 w-px bg-white/10" />
                 <button
-                  className="rounded-md p-1 text-white/25 transition-colors hover:bg-white/8 hover:text-white/60"
+                  className="rounded-xs p-1 text-white/25 transition-colors hover:bg-white/8 hover:text-white/60"
                   onClick={() => cardData.onRemove?.(id)}
                   type="button"
                 >

@@ -118,7 +118,7 @@ function useKanbanContext() {
 }
 
 const badgeVariants = cva(
-  "inline-flex items-center rounded-full font-medium text-xs transition-colors",
+  "inline-flex items-center rounded-xs font-medium text-xs transition-colors",
   {
     variants: {
       variant: {
@@ -314,7 +314,7 @@ export function Kanban({
               <DragOverlay>
                 {activeTask ? (
                   <div className="rotate-2 scale-105 opacity-90">
-                    <div className="rounded-lg border border-border/50 bg-card p-3 text-[14px] shadow-xl dark:border-white/10 dark:bg-[#1e1e1e] dark:shadow-2xl">
+                    <div className="rounded-xs border border-border/50 bg-card p-3 text-[14px] shadow-xl dark:border-white/10 dark:bg-[#1e1e1e] dark:shadow-2xl">
                       <span className="font-medium text-foreground text-sm dark:text-white/90">
                         {activeTask.title}
                       </span>
@@ -519,7 +519,7 @@ function FilePill({ path }: { path: string }) {
   const label = parts.length > 2 ? `…/${parts.slice(-2).join("/")}` : path;
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-sm bg-white/4 px-1.5 py-0.5 font-mono text-[0.6rem] text-white/35 ring-1 ring-white/6 ring-inset transition-colors hover:bg-white/7 hover:text-white/55"
+      className="inline-flex items-center gap-1 rounded-xs bg-white/4 px-1.5 py-0.5 font-mono text-[0.6rem] text-white/35 ring-1 ring-white/6 ring-inset transition-colors hover:bg-white/7 hover:text-white/55"
       title={path}
     >
       <span className="opacity-50">#</span>
@@ -541,12 +541,12 @@ function ChangedFileRow({ file }: { file: ChangedFile }) {
       </span>
       <div className="flex shrink-0 items-center gap-1">
         {file.added > 0 && (
-          <span className="inline-flex items-center rounded-sm bg-emerald-500/10 px-1 py-0 font-mono text-[0.58rem] text-emerald-400/75">
+          <span className="inline-flex items-center rounded-xs bg-emerald-500/10 px-1 py-0 font-mono text-[0.58rem] text-emerald-400/75">
             +{file.added}
           </span>
         )}
         {file.removed > 0 && (
-          <span className="inline-flex items-center rounded-sm bg-red-500/10 px-1 py-0 font-mono text-[0.58rem] text-red-400/65">
+          <span className="inline-flex items-center rounded-xs bg-red-500/10 px-1 py-0 font-mono text-[0.58rem] text-red-400/65">
             -{file.removed}
           </span>
         )}
@@ -579,7 +579,7 @@ function TaskCard({
   const content = (
     <div
       className={cn(
-        "group flex flex-col gap-3 rounded-xl border border-border/50 bg-card p-3.5 shadow-sm",
+        "group flex flex-col gap-3 rounded-sm border border-border/50 bg-card p-3.5 shadow-sm",
         "transition-all duration-200 hover:border-border hover:shadow-md",
         "dark:border-white/8 dark:bg-white/2.5",
         cardGlow
@@ -601,12 +601,12 @@ function TaskCard({
             task.linesRemoved !== undefined) && (
             <div className="flex items-center gap-1.5">
               {task.linesAdded !== undefined && task.linesAdded > 0 && (
-                <span className="inline-flex items-center rounded-sm bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[0.62rem] text-emerald-400/80">
+                <span className="inline-flex items-center rounded-xs bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[0.62rem] text-emerald-400/80">
                   +{task.linesAdded}
                 </span>
               )}
               {task.linesRemoved !== undefined && task.linesRemoved > 0 && (
-                <span className="inline-flex items-center rounded-sm bg-red-500/10 px-1.5 py-0.5 font-mono text-[0.62rem] text-red-400/70">
+                <span className="inline-flex items-center rounded-xs bg-red-500/10 px-1.5 py-0.5 font-mono text-[0.62rem] text-red-400/70">
                   -{task.linesRemoved}
                 </span>
               )}
@@ -630,7 +630,7 @@ function TaskCard({
         <div className="flex items-center justify-end pt-0.5">
           <button
             className={cn(
-              "flex items-center gap-1.5 rounded-lg border border-white/6 bg-white/6 px-2.5 py-1.5",
+              "flex items-center gap-1.5 rounded-xs border border-white/6 bg-white/6 px-2.5 py-1.5",
               "font-medium text-[0.7rem] text-white/50",
               "transition-all duration-150",
               "hover:border-emerald-500/20 hover:bg-emerald-500/12 hover:text-emerald-400",
@@ -659,7 +659,7 @@ function TaskCard({
         <div className="flex items-center justify-end gap-1.5 pt-0.5">
           <button
             className={cn(
-              "flex items-center gap-1 rounded-lg border border-emerald-500/15 bg-emerald-500/10 px-2.5 py-1.5",
+              "flex items-center gap-1 rounded-xs border border-emerald-500/15 bg-emerald-500/10 px-2.5 py-1.5",
               "font-medium text-[0.7rem] text-emerald-400",
               "transition-all duration-150 hover:border-emerald-500/30 hover:bg-emerald-500/20",
               "active:scale-[0.97]"
@@ -671,7 +671,7 @@ function TaskCard({
           </button>
           <button
             className={cn(
-              "flex items-center gap-1 rounded-lg border border-rose-500/15 bg-rose-500/10 px-2.5 py-1.5",
+              "flex items-center gap-1 rounded-xs border border-rose-500/15 bg-rose-500/10 px-2.5 py-1.5",
               "font-medium text-[0.7rem] text-rose-400",
               "transition-all duration-150 hover:border-rose-500/30 hover:bg-rose-500/20",
               "active:scale-[0.97]"
@@ -688,7 +688,7 @@ function TaskCard({
         <div className="flex items-center justify-end pt-0.5">
           <button
             className={cn(
-              "flex items-center gap-1.5 rounded-lg border border-white/6 bg-white/4 px-2.5 py-1.5",
+              "flex items-center gap-1.5 rounded-xs border border-white/6 bg-white/4 px-2.5 py-1.5",
               "font-medium text-[0.7rem] text-white/30",
               "transition-all duration-150 hover:border-white/10 hover:bg-white/8 hover:text-white/55",
               "active:scale-[0.97]"
@@ -825,7 +825,7 @@ function AutoAcceptToggle({
 }) {
   return (
     <button
-      className="flex items-center gap-1.5 rounded-md px-1.5 py-0.5 transition-colors hover:bg-white/5"
+      className="flex items-center gap-1.5 rounded-xs px-1.5 py-0.5 transition-colors hover:bg-white/5"
       onClick={onToggle}
       title={autoAccept ? "Switch to manual review" : "Switch to auto-accept"}
       type="button"
@@ -947,7 +947,7 @@ function KanbanColumnRenderer({
         <KanbanColumn value={columnId}>
           <div
             className={cn(
-              "flex h-full min-w-0 flex-col gap-2.5 rounded-xl border p-3",
+              "flex h-full min-w-0 flex-col gap-2.5 rounded-sm border p-3",
               "border-transparent bg-muted/30",
               col.bg,
               col.border
@@ -963,7 +963,7 @@ function KanbanColumnRenderer({
             {isQueue && (
               <button
                 className={cn(
-                  "flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2.5",
+                  "flex w-full items-center justify-center gap-2 rounded-xs px-3 py-2.5",
                   "bg-white font-semibold text-[0.8rem] text-black",
                   "shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_2px_12px_rgba(255,255,255,0.08)]",
                   "transition-all duration-150",

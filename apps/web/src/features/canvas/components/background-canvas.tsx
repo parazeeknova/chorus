@@ -196,13 +196,13 @@ function CanvasControls() {
 
   return (
     <Panel
-      className="flex flex-col items-center gap-1 rounded-xl border border-white/10 bg-[#020617]/80 p-1.5 shadow-[0_4px_20px_rgba(0,0,0,0.5)] backdrop-blur-xl"
+      className="flex flex-col items-center gap-1 rounded-sm border border-white/10 bg-[#020617]/80 p-1.5 shadow-[0_4px_20px_rgba(0,0,0,0.5)] backdrop-blur-xl"
       position="bottom-right"
       style={{ margin: 0, bottom: "4.25rem", right: "1rem" }}
     >
       <button
         aria-label="Zoom in"
-        className="flex size-8 items-center justify-center rounded-lg text-white/35 transition-all duration-150 hover:bg-white/10 hover:text-white/60 active:scale-95"
+        className="flex size-8 items-center justify-center rounded-xs text-white/35 transition-all duration-150 hover:bg-white/10 hover:text-white/60 active:scale-95"
         onClick={() => zoomIn({ duration: 140 })}
         title="Zoom in (+)"
         type="button"
@@ -211,7 +211,7 @@ function CanvasControls() {
       </button>
       <button
         aria-label="Zoom out"
-        className="flex size-8 items-center justify-center rounded-lg text-white/35 transition-all duration-150 hover:bg-white/10 hover:text-white/60 active:scale-95"
+        className="flex size-8 items-center justify-center rounded-xs text-white/35 transition-all duration-150 hover:bg-white/10 hover:text-white/60 active:scale-95"
         onClick={() => zoomOut({ duration: 140 })}
         title="Zoom out (-)"
         type="button"
@@ -221,7 +221,7 @@ function CanvasControls() {
       <div className="mx-1 my-0.5 h-px w-6 bg-white/10" />
       <button
         aria-label="Fit view"
-        className="flex size-8 items-center justify-center rounded-lg text-white/35 transition-all duration-150 hover:bg-white/10 hover:text-white/60 active:scale-95"
+        className="flex size-8 items-center justify-center rounded-xs text-white/35 transition-all duration-150 hover:bg-white/10 hover:text-white/60 active:scale-95"
         onClick={() => fitView({ duration: 300, padding: 0.1 })}
         title="Fit view (F)"
         type="button"
@@ -250,7 +250,7 @@ function CanvasControls() {
 
 function Kbd({ children }: { children: React.ReactNode }) {
   return (
-    <kbd className="inline-flex min-w-6 items-center justify-center rounded border border-white/15 bg-white/8 px-1 py-0.5 font-mono text-[0.6rem] text-white/60 leading-none">
+    <kbd className="inline-flex min-w-6 items-center justify-center rounded-xs border border-white/15 bg-white/8 px-1 py-0.5 font-mono text-[0.6rem] text-white/60 leading-none">
       {children}
     </kbd>
   );
@@ -259,7 +259,7 @@ function Kbd({ children }: { children: React.ReactNode }) {
 function KeyboardHelpPanel({ onClose }: { onClose: () => void }) {
   return (
     <div
-      className="fade-in slide-in-from-bottom-2 pointer-events-auto w-64 animate-in rounded-2xl border border-white/10 bg-[#020617]/88 p-4 shadow-[0_24px_60px_rgba(0,0,0,0.6)] backdrop-blur-2xl duration-200"
+      className="fade-in slide-in-from-bottom-2 pointer-events-auto w-64 animate-in rounded-sm border border-white/10 bg-[#020617]/88 p-4 shadow-[0_24px_60px_rgba(0,0,0,0.6)] backdrop-blur-2xl duration-200"
       style={{ backdropFilter: "blur(20px)" }}
     >
       {/* Header */}
@@ -270,7 +270,7 @@ function KeyboardHelpPanel({ onClose }: { onClose: () => void }) {
         </span>
         <button
           aria-label="Close shortcuts panel"
-          className="rounded-md p-0.5 text-white/25 transition-colors hover:bg-white/8 hover:text-white/60"
+          className="rounded-xs p-0.5 text-white/25 transition-colors hover:bg-white/8 hover:text-white/60"
           onClick={onClose}
           type="button"
         >
@@ -604,7 +604,7 @@ export function BackgroundCanvas() {
             <button
               aria-label="Keyboard shortcuts"
               className={[
-                "flex size-11 items-center justify-center rounded-xl border transition-all duration-150",
+                "flex size-11 items-center justify-center rounded-sm border transition-all duration-150",
                 "shadow-[0_4px_20px_rgba(0,0,0,0.5)] backdrop-blur-xl",
                 showHelp
                   ? "border-white/20 bg-white/15 text-white/80"
