@@ -19,9 +19,9 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import type { WorkspaceBoard } from "@/features/workspace/types";
 import { useWorkspace } from "@/features/workspace/workspace-context";
 import {
   type AutocompleteItem,
@@ -39,6 +39,20 @@ const composerSelectContentClass =
 
 const composerSelectItemClass =
   "min-h-8 rounded-xs px-2.5 py-1.5 text-[12px] text-white/78 focus:bg-white/7 focus:!text-white/86 focus:**:!text-white/86 aria-selected:bg-white/10 aria-selected:!text-white aria-selected:**:!text-white data-[highlighted]:bg-white/7 data-[highlighted]:!text-white/86 data-[highlighted]:**:!text-white/86";
+
+const PATH_SEPARATOR_RE = /[/\\]/;
+
+function getRepoBaseName(directory: string) {
+  return directory.split(PATH_SEPARATOR_RE).filter(Boolean).at(-1) ?? directory;
+}
+
+function getBoardRepoName(board: WorkspaceBoard) {
+  return (
+    board.repo.projectName?.trim() ||
+    getRepoBaseName(board.repo.directory) ||
+    board.title
+  );
+}
 
 export function PromptInput() {
   const [prompt, setPrompt] = useState("");
@@ -317,7 +331,11 @@ export function PromptInput() {
                       )}
                       size="sm"
                     >
-                      <SelectValue placeholder="Select a board" />
+                      <span className="min-w-0 flex-1 truncate text-left">
+                        {selectedBoard
+                          ? getBoardRepoName(selectedBoard)
+                          : "Select a board"}
+                      </span>
                     </SelectTrigger>
                     <SelectContent
                       align="end"
@@ -330,7 +348,9 @@ export function PromptInput() {
                           value={board.boardId}
                         >
                           <span className="flex min-w-0 flex-col">
-                            <span className="truncate">{board.title}</span>
+                            <span className="truncate">
+                              {getBoardRepoName(board)}
+                            </span>
                             <span className="truncate text-[11px] text-white/40">
                               {board.repo.branch ?? board.repo.directory}
                             </span>

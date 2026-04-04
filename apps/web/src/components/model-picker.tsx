@@ -170,9 +170,6 @@ export function ModelPicker({
             <span className="block truncate text-left text-[11px] text-white/86">
               {triggerCopy.label}
             </span>
-            <span className="block truncate text-left text-[10px] text-white/42">
-              {triggerCopy.meta}
-            </span>
           </span>
         </span>
         <ChevronDownIcon className="size-4 shrink-0 text-white/45" />
