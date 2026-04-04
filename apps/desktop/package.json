@@ -1,6 +1,6 @@
 {
   "name": "@chorus/desktop",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "private": true,
   "description": "Chorus desktop app bundling web and serve into a single self-contained app",
   "scripts": {
