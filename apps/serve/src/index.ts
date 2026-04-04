@@ -1,3 +1,4 @@
+import { createLogger } from "@chorus/logger";
 import { Elysia } from "elysia";
 import { OpenCodeBridge } from "./bridge/opencode/bridge";
 import { loadConfig } from "./config";
@@ -8,6 +9,13 @@ import { voiceRoutes } from "./routes/voice";
 import { createWsHandler } from "./ws/handler";
 
 const config = loadConfig();
+const logger = createLogger(
+  {
+    env: process.env.NODE_ENV === "production" ? "production" : "development",
+  },
+  "SERVE"
+);
+
 const bridge = new OpenCodeBridge(
   config.opencodeBaseUrl,
   config.opencodeDirectory
@@ -16,9 +24,19 @@ const wsManager = createWsClientManager();
 
 bridge.subscribe((event) => {
   wsManager.broadcast(event);
+  logger.debug("bridge-event", { event: JSON.stringify(event) });
 });
 
 const app = new Elysia()
+  .onStart(() => {
+    logger.info("server-starting", { port: config.port });
+  })
+  .onError(({ error, code }) => {
+    logger.error(
+      `server-error: ${code}`,
+      error instanceof Error ? error : undefined
+    );
+  })
   .get("/", () => "Hello Elysia")
   .use(createHttpRoutes(bridge))
   .use(voiceRoutes)
@@ -26,22 +44,19 @@ const app = new Elysia()
   .use(createWsHandler(bridge, wsManager))
   .listen(config.port);
 
-console.log(
-  `Chorus bridge running at ${app.server?.hostname}:${app.server?.port}`
-);
-console.log(`   OpenCode: ${config.opencodeBaseUrl}`);
-console.log(`   Directory: ${config.opencodeDirectory}`);
-console.log(
-  `   WebSocket: ws://${app.server?.hostname}:${app.server?.port}/ws`
-);
+logger.info("server-running", {
+  host: app.server?.hostname,
+  port: app.server?.port,
+  opencode: config.opencodeBaseUrl,
+  directory: config.opencodeDirectory,
+  ws: `ws://${app.server?.hostname}:${app.server?.port}/ws`,
+});
 
 try {
   await bridge.start();
+  logger.info("bridge-connected", { url: config.opencodeBaseUrl });
 } catch (error) {
-  console.error(
-    "[bridge] failed to connect to OpenCode:",
-    error instanceof Error ? error.message : error
-  );
-  console.error("[bridge] HTTP and WebSocket endpoints remain available");
-  console.error("[bridge] Restart the bridge once OpenCode is reachable");
+  logger.error("bridge-failed", error instanceof Error ? error : undefined, {
+    url: config.opencodeBaseUrl,
+  });
 }

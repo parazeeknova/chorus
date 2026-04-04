@@ -4,6 +4,7 @@ import "@xyflow/react/dist/style.css";
 import "./globals.css";
 import { AppHeader } from "@/components/app-header";
 import { PromptInput } from "@/components/prompt-input";
+import { PostHogProvider } from "@/components/providers/posthog-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,9 +32,11 @@ export default function RootLayout({
       lang="en"
     >
       <body className="flex h-screen flex-col overflow-hidden">
-        <AppHeader />
-        <div className="flex-1 overflow-hidden pt-12">{children}</div>
-        <PromptInput />
+        <PostHogProvider>
+          <AppHeader />
+          <div className="flex-1 overflow-hidden pt-12">{children}</div>
+          <PromptInput />
+        </PostHogProvider>
       </body>
     </html>
   );
