@@ -39,6 +39,8 @@ import {
   Fragment,
   useCallback,
   useContext,
+  useEffect,
+  useId,
   useState,
 } from "react";
 import { createPortal } from "react-dom";
@@ -152,11 +154,13 @@ export function Badge({
 }
 
 export function Kanban({
+  id,
   value,
   onValueChange,
   getItemValue,
   children,
 }: {
+  id?: string;
   value: Columns;
   onValueChange: (columns: Columns) => void;
   getItemValue: (item: Task) => string;
@@ -164,6 +168,13 @@ export function Kanban({
 }) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+  const fallbackId = useId();
+  const dndContextId = id ?? fallbackId;
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 2 } }),
@@ -275,15 +286,15 @@ export function Kanban({
     >
       <DndContext
         collisionDetection={closestCorners}
+        id={dndContextId}
         onDragEnd={handleDragEnd}
         onDragOver={handleDragOver}
         onDragStart={handleDragStart}
         sensors={sensors}
       >
         {children}
-        {typeof document === "undefined"
-          ? null
-          : createPortal(
+        {isMounted
+          ? createPortal(
               <DragOverlay>
                 {activeTask ? (
                   <div className="rotate-2 scale-105 opacity-90">
@@ -296,7 +307,8 @@ export function Kanban({
                 ) : null}
               </DragOverlay>,
               document.body
-            )}
+            )
+          : null}
       </DndContext>
     </KanbanContext.Provider>
   );
@@ -562,25 +574,25 @@ function TaskCard({
   );
 }
 
-function defaultColumns(): Columns {
+function defaultColumns(boardId = "board"): Columns {
   return {
     queue: [
       {
-        id: `${Date.now()}-1`,
+        id: `${boardId}-queue-auth-middleware`,
         title:
           "Refactor the auth middleware to use JWT RS256 and add refresh token rotation",
         label: "Backend",
         labelVariant: "primary-light",
       },
       {
-        id: `${Date.now()}-2`,
+        id: `${boardId}-queue-landing-page`,
         title:
           "Design a dark-mode landing page with hero section and pricing table",
         label: "Design",
         labelVariant: "info-light",
       },
       {
-        id: `${Date.now()}-3`,
+        id: `${boardId}-queue-cicd`,
         title:
           "Set up GitHub Actions CI/CD pipeline with Turbo cache and preview deploys",
         label: "DevOps",
@@ -589,7 +601,7 @@ function defaultColumns(): Columns {
     ],
     in_progress: [
       {
-        id: `${Date.now()}-4`,
+        id: `${boardId}-in-progress-cursors`,
         title:
           "Implement real-time collaborative cursor tracking via WebSocket",
         label: "Frontend",
@@ -598,7 +610,7 @@ function defaultColumns(): Columns {
     ],
     approve: [
       {
-        id: `${Date.now()}-6`,
+        id: `${boardId}-approve-dark-mode-palette`,
         title: "Update color palette for dark mode compatibility",
         label: "Design",
         labelVariant: "info-light",
@@ -606,7 +618,7 @@ function defaultColumns(): Columns {
     ],
     done: [
       {
-        id: `${Date.now()}-5`,
+        id: `${boardId}-done-monorepo-foundation`,
         title:
           "Project kickoff — repo structure, monorepo config, base design system",
         label: "Planning",
@@ -632,6 +644,7 @@ export function KanbanCardContent({
   return (
     <Kanban
       getItemValue={(item) => item.id}
+      id={data.id}
       onValueChange={onColumnsChange}
       value={data.columns}
     >

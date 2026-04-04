@@ -140,7 +140,7 @@ export function BackgroundCanvas() {
       {
         id: "card-1",
         title: "Sprint 1",
-        columns: defaultColumns(),
+        columns: defaultColumns("card-1"),
       }
     ),
     createKanbanCardNode(
@@ -152,7 +152,7 @@ export function BackgroundCanvas() {
         columns: {
           queue: [
             {
-              id: "t1",
+              id: "card-2-queue-research",
               title: "Research competitors",
               label: "Research",
               labelVariant: "info-light",

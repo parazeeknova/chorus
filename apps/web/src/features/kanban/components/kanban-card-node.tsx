@@ -33,7 +33,6 @@ export interface KanbanCardNodeData {
   columns: KanbanCardData["columns"];
   diffAdded?: number;
   diffRemoved?: number;
-  // Future linkable fields
   filePath?: string;
   gitBranch?: string;
   id: string;
@@ -45,7 +44,6 @@ export interface KanbanCardNodeData {
   [key: string]: unknown;
 }
 
-// Placeholder data — will be replaced with real agent/session data
 const PLACEHOLDER: Required<
   Pick<
     KanbanCardNodeData,
@@ -227,7 +225,7 @@ function KanbanCardNodeComponent({
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="end"
-                className="w-[160px] border-white/10 bg-[#1e1e1e] p-1.5 text-white/90 shadow-2xl"
+                className="w-40 border-white/10 bg-[#1e1e1e] p-1.5 text-white/90 shadow-2xl"
               >
                 <DropdownMenuItem className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-white/80 text-xs transition-colors focus:bg-white/10 focus:text-white">
                   <MonitorIcon className="size-3.5" />

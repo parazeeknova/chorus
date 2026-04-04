@@ -10,15 +10,7 @@ import {
   TerminalIcon,
   WrenchIcon,
 } from "lucide-react";
-
 import { cn } from "@/lib/utils";
-
-// ---------------------------------------------------------------------------
-// Data model
-// These types mirror what OpenCode SDK will eventually provide.
-// When wiring to real data, replace the placeholder below with a live
-// subscription to session events from the opencode-adapter package.
-// ---------------------------------------------------------------------------
 
 export type AgentStepKind =
   | "thinking"
@@ -30,35 +22,23 @@ export type AgentStepKind =
 export type AgentStepStatus = "running" | "done" | "error";
 
 export interface AgentStep {
-  /** Full content shown when expanded (markdown / diff / stdout) */
   content?: string;
-  /** For file_edit steps */
   filePath?: string;
-  /** Unique step ID — will map to OpenCode event ID */
   id: string;
   kind: AgentStepKind;
   linesAdded?: number;
   linesRemoved?: number;
   status: AgentStepStatus;
-  /** Short summary shown in the collapsed row */
   summary: string;
 }
 
 export interface AgentRunContext {
-  /** Elapsed time string, e.g. "1m 24s" */
   elapsed: string;
-  /** Agent model label */
   model: string;
-  /** Maps to OpenCode sessionId — used to subscribe to live events */
   sessionId?: string;
   steps: AgentStep[];
-  /** The task prompt this run is executing */
   taskTitle: string;
 }
-
-// ---------------------------------------------------------------------------
-// Placeholder — replace with real SDK subscription
-// ---------------------------------------------------------------------------
 
 export const PLACEHOLDER_RUN: AgentRunContext = {
   sessionId: "session_placeholder_001",
@@ -115,10 +95,6 @@ export const PLACEHOLDER_RUN: AgentRunContext = {
     },
   ],
 };
-
-// ---------------------------------------------------------------------------
-// Sub-components
-// ---------------------------------------------------------------------------
 
 const STEP_META: Record<
   AgentStepKind,
@@ -207,12 +183,7 @@ function StepRow({ step }: { step: AgentStep }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Main component
-// ---------------------------------------------------------------------------
-
 interface AgentOutputCardProps {
-  /** Accent colour that matches the source task card's label variant */
   accentClass?: string;
   className?: string;
   run: AgentRunContext;
@@ -229,12 +200,12 @@ export function AgentOutputCard({
   return (
     <div
       className={cn(
-        "flex flex-col gap-0 overflow-hidden rounded-xl border border-white/10 bg-white/[0.02]",
+        "flex flex-col gap-0 overflow-hidden rounded-xl border border-white/10 bg-white/2",
         className
       )}
     >
       {/* Visual link: coloured top bar connecting to source task */}
-      <div className="flex items-center gap-2 border-white/8 border-b bg-white/[0.015] px-3 py-2">
+      <div className="flex items-center gap-2 border-white/8 border-b bg-white/1.5 px-3 py-2">
         {/* Pulse dot */}
         <span className="relative flex size-2">
           {isLive && (
