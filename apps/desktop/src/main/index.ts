@@ -1,7 +1,10 @@
 import path from "node:path";
 import { app, BrowserWindow, shell } from "electron";
 
-const SERVE_URL = "http://localhost:2000";
+const SERVE_URL =
+  process.env.NODE_ENV === "production"
+    ? "http://localhost:2000"
+    : "http://localhost:3000";
 
 let mainWindow: BrowserWindow | null = null;
 

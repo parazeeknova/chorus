@@ -1,6 +1,6 @@
 {
   "name": "@chorus/desktop",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": true,
   "description": "Chorus desktop app using Electron",
   "main": "./dist/main/index.js",
