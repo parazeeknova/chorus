@@ -1,3 +1,5 @@
+import { blobToWav } from "@/lib/audio-wav-encoder";
+
 const VOICE_API_BASE =
   process.env.NEXT_PUBLIC_VOICE_API_URL ?? "http://localhost:2000";
 
@@ -6,10 +8,10 @@ export interface SpeechToTextResult {
   text: string;
   timestamp: string;
   words?: Array<{
-    word: string;
-    start: number;
-    end: number;
     confidence?: number;
+    end: number;
+    start: number;
+    word: string;
   }>;
 }
 
@@ -49,15 +51,16 @@ export async function transcribeSpeech(
     options,
   });
 
-  const arrayBuffer = await audioBlob.arrayBuffer();
+  const wavBuffer = await blobToWav(audioBlob);
   const base64 = btoa(
-    Array.from(new Uint8Array(arrayBuffer))
+    Array.from(new Uint8Array(wavBuffer))
       .map((byte) => String.fromCharCode(byte))
       .join("")
   );
 
   console.log("[voice-api] sending request to", `${VOICE_API_BASE}/voice/stt`, {
     base64Length: base64.length,
+    originalBlobType: audioBlob.type,
   });
 
   const response = await fetch(`${VOICE_API_BASE}/voice/stt`, {
@@ -67,8 +70,8 @@ export async function transcribeSpeech(
       audio: base64,
       modelId: options?.modelId,
       diarize: options?.diarize ?? false,
-      mimeType: audioBlob.type || "audio/webm",
-      filename: "recording.webm",
+      mimeType: "audio/wav",
+      filename: "recording.wav",
     }),
   });
 
