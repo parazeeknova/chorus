@@ -7,6 +7,11 @@ import {
 } from "@chorus/contracts";
 import { ArrowUp, Mic, MoreHorizontal, XIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import {
+  createModelKey,
+  DEFAULT_MODEL_KEY,
+  ModelPicker,
+} from "@/components/model-picker";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -30,15 +35,10 @@ const composerSelectContentClass =
 const composerSelectItemClass =
   "min-h-8 rounded-xs px-2.5 py-1.5 text-[12px] text-white/78 focus:bg-white/7 focus:!text-white/86 focus:**:!text-white/86 aria-selected:bg-white/10 aria-selected:!text-white aria-selected:**:!text-white data-[highlighted]:bg-white/7 data-[highlighted]:!text-white/86 data-[highlighted]:**:!text-white/86";
 
-const DEFAULT_MODEL_KEY = "default";
-
-function createModelKey(model: ModelSelection) {
-  return `${model.providerID}/${model.modelID}`;
-}
-
 export function PromptInput() {
   const [prompt, setPrompt] = useState("");
   const [selectedModelKey, setSelectedModelKey] = useState(DEFAULT_MODEL_KEY);
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [availableModels, setAvailableModels] = useState<
     OpencodeModelSummary[]
   >([]);
@@ -93,6 +93,8 @@ export function PromptInput() {
     let isCancelled = false;
 
     async function loadModels() {
+      setIsLoadingModels(true);
+
       try {
         const query = selectedDirectory
           ? `?directory=${encodeURIComponent(selectedDirectory)}`
@@ -112,9 +114,18 @@ export function PromptInput() {
 
         setAvailableModels(payload.models);
         setDefaultModel(payload.defaultModel);
-        setSelectedModelKey(DEFAULT_MODEL_KEY);
+        setSelectedModelKey((currentValue) =>
+          currentValue === DEFAULT_MODEL_KEY ||
+          payload.models.some((model) => createModelKey(model) === currentValue)
+            ? currentValue
+            : DEFAULT_MODEL_KEY
+        );
       } catch (error) {
         console.error("Failed to load OpenCode models", error);
+      } finally {
+        if (!isCancelled) {
+          setIsLoadingModels(false);
+        }
       }
     }
 
@@ -142,34 +153,6 @@ export function PromptInput() {
       modelID,
     } satisfies ModelSelection;
   }, [selectedModelKey]);
-
-  const defaultModelSummary = useMemo(() => {
-    if (!defaultModel) {
-      return null;
-    }
-
-    return (
-      availableModels.find(
-        (model) =>
-          model.providerID === defaultModel.providerID &&
-          model.modelID === defaultModel.modelID
-      ) ?? null
-    );
-  }, [availableModels, defaultModel]);
-  let defaultModelTitle = "Auto · OpenCode selection";
-  let defaultModelDescription = "Uses OpenCode's current model resolution";
-
-  if (availableModels.length === 0) {
-    defaultModelTitle = "No OpenCode models available";
-    defaultModelDescription =
-      "Use Settings -> OpenCode to enable a global provider";
-  } else if (defaultModelSummary) {
-    defaultModelTitle = `Auto · ${defaultModelSummary.name}`;
-  }
-
-  if (availableModels.length > 0 && defaultModel) {
-    defaultModelDescription = `${defaultModel.providerID}/${defaultModel.modelID}`;
-  }
 
   const handleVoiceButtonClick = async () => {
     if (isRecording) {
@@ -247,47 +230,14 @@ export function PromptInput() {
               />
               <div className="flex items-center justify-between opacity-80 transition-opacity focus-within:opacity-100">
                 <div className="flex items-center gap-2">
-                  <Select
-                    onValueChange={(value) =>
-                      value && setSelectedModelKey(value)
-                    }
+                  <ModelPicker
+                    availableModels={availableModels}
+                    className={composerSelectTriggerClass}
+                    defaultModel={defaultModel}
+                    loading={isLoadingModels}
+                    onValueChange={setSelectedModelKey}
                     value={selectedModelKey}
-                  >
-                    <SelectTrigger className={composerSelectTriggerClass}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent
-                      align="start"
-                      className={cn("min-w-56", composerSelectContentClass)}
-                    >
-                      <SelectItem
-                        className={composerSelectItemClass}
-                        value={DEFAULT_MODEL_KEY}
-                      >
-                        <span className="flex min-w-0 flex-col">
-                          <span className="truncate">{defaultModelTitle}</span>
-                          <span className="truncate text-[11px] text-white/40">
-                            {defaultModelDescription}
-                          </span>
-                        </span>
-                      </SelectItem>
-                      {availableModels.map((model) => (
-                        <SelectItem
-                          className={composerSelectItemClass}
-                          key={`${model.providerID}/${model.modelID}`}
-                          value={createModelKey(model)}
-                        >
-                          <span className="flex min-w-0 flex-col">
-                            <span className="truncate">{model.name}</span>
-                            <span className="truncate text-[11px] text-white/40">
-                              {model.providerName} · {model.providerID}/
-                              {model.modelID}
-                            </span>
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  />
                   {voices.length > 0 && (
                     <Select
                       onValueChange={(value) =>
@@ -379,18 +329,17 @@ export function PromptInput() {
                   >
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
-                  <Button
-                    className="h-7 w-7 rounded-xs bg-white text-black shadow-none transition-transform hover:bg-white/90 focus:ring-0 active:scale-95 disabled:scale-100 disabled:opacity-30 disabled:hover:bg-white dark:bg-white dark:text-black dark:hover:bg-white/90"
+                  <button
+                    className="h-7 w-7 rounded-xs bg-[#0f0f0f]/90 text-white/70 shadow-none transition-colors hover:bg-[#161616]/95 hover:text-white/90 focus:outline-none disabled:opacity-30"
                     disabled={
                       !(prompt.trim() && selectedBoard) ||
                       isBusy ||
                       hasActiveRun
                     }
-                    size="icon"
                     type="submit"
                   >
                     <ArrowUp className="h-4 w-4" />
-                  </Button>
+                  </button>
                 </div>
               </div>
             </div>

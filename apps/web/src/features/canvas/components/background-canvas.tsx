@@ -196,13 +196,13 @@ function CanvasControls() {
 
   return (
     <Panel
-      className="flex flex-col items-center gap-1 rounded-sm border border-white/10 bg-[#020617]/80 p-1.5 shadow-[0_4px_20px_rgba(0,0,0,0.5)] backdrop-blur-xl"
+      className="flex flex-col items-center gap-1 rounded-sm border border-white/10 bg-[#0f0f0f]/90 p-1.5 shadow-[0_4px_20px_rgba(0,0,0,0.5)] backdrop-blur-xl"
       position="bottom-right"
       style={{ margin: 0, bottom: "4.25rem", right: "1rem" }}
     >
       <button
         aria-label="Zoom in"
-        className="flex size-8 items-center justify-center rounded-xs text-white/35 transition-all duration-150 hover:bg-white/10 hover:text-white/60 active:scale-95"
+        className="flex size-8 items-center justify-center rounded-xs text-white/35 transition-colors duration-150 hover:bg-white/10 hover:text-white/60"
         onClick={() => zoomIn({ duration: 140 })}
         title="Zoom in (+)"
         type="button"
@@ -211,7 +211,7 @@ function CanvasControls() {
       </button>
       <button
         aria-label="Zoom out"
-        className="flex size-8 items-center justify-center rounded-xs text-white/35 transition-all duration-150 hover:bg-white/10 hover:text-white/60 active:scale-95"
+        className="flex size-8 items-center justify-center rounded-xs text-white/35 transition-colors duration-150 hover:bg-white/10 hover:text-white/60"
         onClick={() => zoomOut({ duration: 140 })}
         title="Zoom out (-)"
         type="button"
@@ -221,7 +221,7 @@ function CanvasControls() {
       <div className="mx-1 my-0.5 h-px w-6 bg-white/10" />
       <button
         aria-label="Fit view"
-        className="flex size-8 items-center justify-center rounded-xs text-white/35 transition-all duration-150 hover:bg-white/10 hover:text-white/60 active:scale-95"
+        className="flex size-8 items-center justify-center rounded-xs text-white/35 transition-colors duration-150 hover:bg-white/10 hover:text-white/60"
         onClick={() => fitView({ duration: 300, padding: 0.1 })}
         title="Fit view (F)"
         type="button"
@@ -597,7 +597,7 @@ export function BackgroundCanvas() {
           escape the z-10 stacking context imposed by the page layout wrapper. */}
       {isMounted &&
         createPortal(
-          <div className="fixed right-4 bottom-4 z-9999 flex flex-col items-end gap-2">
+          <div className="fixed right-4 bottom-8 z-9999 flex flex-col items-end gap-2">
             {showHelp && (
               <KeyboardHelpPanel onClose={() => setShowHelp(false)} />
             )}
@@ -608,7 +608,7 @@ export function BackgroundCanvas() {
                 "shadow-[0_4px_20px_rgba(0,0,0,0.5)] backdrop-blur-xl",
                 showHelp
                   ? "border-white/20 bg-white/15 text-white/80"
-                  : "border-white/10 bg-[#020617]/80 text-white/35 hover:border-white/15 hover:bg-white/10 hover:text-white/60",
+                  : "border-white/10 bg-[#0f0f0f]/90 text-white/35 hover:border-white/15 hover:bg-white/10 hover:text-white/60",
               ].join(" ")}
               onClick={handleToggleHelp}
               title="Keyboard shortcuts (?)"

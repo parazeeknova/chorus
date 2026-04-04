@@ -1013,7 +1013,7 @@ export function AppHeader() {
                   aria-label="Settings"
                   className="group relative flex h-12 w-12 items-center justify-center text-zinc-300 transition duration-300 hover:text-white"
                 >
-                  <div className="absolute inset-[5px] rounded-[1rem] border border-white/8 bg-zinc-900/80 transition duration-300 group-hover:border-cyan-300/18 group-hover:bg-zinc-900" />
+                  <div className="absolute inset-[5px] rounded-none border border-white/8 bg-zinc-900/80 transition duration-300 group-hover:border-cyan-300/18 group-hover:bg-zinc-900" />
                   <Settings className="relative z-10 h-4 w-4 transition duration-300 group-hover:rotate-45" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
