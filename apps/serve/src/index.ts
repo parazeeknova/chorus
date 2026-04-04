@@ -16,6 +16,7 @@ import { createProjectRoutes } from "./routes/projects";
 import { voiceRoutes } from "./routes/voice";
 import { createWorkspaceRoutes } from "./routes/workspace";
 import { BoardTaskService } from "./tasks/board-task-service";
+import { SessionWatchdog } from "./tasks/session-watchdog";
 import { serveWebFrontend } from "./web-frontend";
 import { WorkspaceStore } from "./workspace/store";
 import { createWsHandler } from "./ws/handler";
@@ -77,7 +78,58 @@ async function resolveWorkspaceSnapshotPath() {
 
 const workspaceStore = new WorkspaceStore(await resolveWorkspaceSnapshotPath());
 await workspaceStore.load();
-const boardTasks = new BoardTaskService(bridge, workspaceStore);
+
+const watchdog = new SessionWatchdog(bridge, {
+  onTimeout: (sessionId, info, message) => {
+    logger.warn("watchdog-timeout", {
+      sessionId,
+      boardId: info.boardId,
+      message,
+    });
+
+    workspaceStore
+      .applyAgentEvent({
+        type: "session.timeout",
+        sessionID: sessionId,
+        activity: "error",
+        error: message,
+        timestamp: Date.now(),
+      })
+      .then((snapshot) => {
+        if (!snapshot) {
+          return;
+        }
+        const board = snapshot.boards.find(
+          (b) => b.session.sessionId === sessionId
+        );
+        logger.info("workspace-snapshot-after-timeout", {
+          sessionID: sessionId,
+          boardId: board?.boardId,
+        });
+        wsManager.broadcastRaw(
+          JSON.stringify({
+            type: "workspace.updated",
+            payload: snapshot,
+            timestamp: Date.now(),
+          })
+        );
+      })
+      .catch((error) => {
+        logger.error(
+          "workspace-projection-failed-timeout",
+          error instanceof Error ? error : undefined,
+          { sessionID: sessionId }
+        );
+      });
+  },
+});
+
+const boardTasks = new BoardTaskService(
+  bridge,
+  workspaceStore,
+  undefined,
+  watchdog
+);
 const projectService = new ProjectService(
   config.opencodeBaseUrl,
   config.opencodeDirectory,
@@ -101,6 +153,8 @@ bridge.subscribe((event) => {
   if (!(event.sessionID && event.activity)) {
     return;
   }
+
+  watchdog.reset(event.sessionID);
 
   workspaceStore
     .applyAgentEvent(event)

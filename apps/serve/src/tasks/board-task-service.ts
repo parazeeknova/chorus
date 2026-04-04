@@ -8,6 +8,7 @@ import { createLogger } from "@chorus/logger";
 import type { OpenCodeBridge } from "../bridge/opencode/bridge";
 import type { WorkspaceStore } from "../workspace/store";
 import { BoardSessionRegistry } from "./board-session-registry";
+import type { SessionWatchdog } from "./session-watchdog";
 
 const logger = createLogger(
   { env: process.env.NODE_ENV === "production" ? "production" : "development" },
@@ -74,15 +75,18 @@ export class BoardTaskService {
   readonly #bridge: OpenCodeBridge;
   readonly #registry: BoardSessionRegistry;
   readonly #workspaceStore: WorkspaceStore;
+  readonly #watchdog: SessionWatchdog | null;
 
   constructor(
     bridge: OpenCodeBridge,
     workspaceStore: WorkspaceStore,
-    registry = new BoardSessionRegistry()
+    registry = new BoardSessionRegistry(),
+    watchdog: SessionWatchdog | null = null
   ) {
     this.#bridge = bridge;
     this.#workspaceStore = workspaceStore;
     this.#registry = registry;
+    this.#watchdog = watchdog;
   }
 
   get registry() {
@@ -183,6 +187,11 @@ export class BoardTaskService {
       model: input.model,
       agent: input.agent,
       parts: sdkParts.length > 0 ? sdkParts : undefined,
+    });
+
+    this.#watchdog?.start(sessionId, {
+      boardId: input.boardId,
+      directory: input.directory,
     });
 
     logger.info("queue-prompt:prompt-queued", {
