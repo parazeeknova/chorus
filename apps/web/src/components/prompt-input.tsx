@@ -55,6 +55,7 @@ function getBoardRepoName(board: WorkspaceBoard) {
 }
 
 export function PromptInput() {
+  const [isMounted, setIsMounted] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [selectedModelKey, setSelectedModelKey] = useState(DEFAULT_MODEL_KEY);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
@@ -108,6 +109,10 @@ export function PromptInput() {
     useVoiceRecording(handleTranscriptionComplete, {
       modelId: defaultSpeechModelId ?? undefined,
     });
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     let isCancelled = false;
@@ -274,6 +279,10 @@ export function PromptInput() {
       target.style.height = "auto";
     }
   };
+
+  if (!isMounted) {
+    return null;
+  }
 
   return (
     <div className="fixed right-0 bottom-8 left-0 z-40 flex justify-center px-4">

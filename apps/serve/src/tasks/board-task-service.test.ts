@@ -39,6 +39,7 @@ describe("BoardTaskService", () => {
         },
       ],
       preferences: {
+        boardViewMode: "relaxed",
         composerHintDismissed: false,
         speechVoiceId: null,
       },
@@ -99,6 +100,7 @@ describe("BoardTaskService", () => {
         },
       ],
       preferences: {
+        boardViewMode: "relaxed",
         composerHintDismissed: false,
         speechVoiceId: null,
       },

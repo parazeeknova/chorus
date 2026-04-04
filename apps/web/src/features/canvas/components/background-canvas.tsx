@@ -700,67 +700,69 @@ export function BackgroundCanvas() {
 
   return (
     <div className="h-full w-full" ref={containerRef}>
-      <ReactFlow
-        className="background-flow dark"
-        defaultViewport={DEFAULT_VIEWPORT}
-        edges={edges}
-        edgesFocusable={true}
-        elementsSelectable={true}
-        elevateNodesOnSelect={false}
-        maxZoom={4}
-        minZoom={0.15}
-        nodeExtent={WORLD_EXTENT}
-        nodes={nodes}
-        nodesConnectable={true}
-        nodesDraggable={true}
-        nodesFocusable={true}
-        nodeTypes={nodeTypes}
-        onConnect={onConnect}
-        onInit={(instance) => {
-          rfInstanceRef.current = instance;
-        }}
-        onlyRenderVisibleElements
-        onNodeClick={(_, node) => {
-          selectBoard(node.id);
-        }}
-        onNodeDragStop={(_, node) => {
-          updateBoardPosition(node.id, node.position);
-        }}
-        onNodesChange={(changes) => {
-          setNodes(
-            (currentNodes) =>
-              applyNodeChanges(
-                changes,
-                currentNodes
-              ) as Node<KanbanCardNodeData>[]
-          );
-        }}
-        onPaneClick={clearSelection}
-        panOnDrag
-        panOnScroll={false}
-        selectNodesOnDrag={true}
-        translateExtent={WORLD_EXTENT}
-        zoomOnDoubleClick={false}
-        zoomOnPinch
-        zoomOnScroll={false}
-      >
-        <KeyboardShortcuts
-          onApproveSelected={handleApproveSelected}
-          onNewTask={handleNewTask}
-          onRejectSelected={handleRejectSelected}
-          onRemoveSelected={handleRemoveSelected}
-          onToggleHelp={handleToggleHelp}
-        />
+      {isMounted ? (
+        <ReactFlow
+          className="background-flow dark"
+          defaultViewport={DEFAULT_VIEWPORT}
+          edges={edges}
+          edgesFocusable={true}
+          elementsSelectable={true}
+          elevateNodesOnSelect={false}
+          maxZoom={4}
+          minZoom={0.15}
+          nodeExtent={WORLD_EXTENT}
+          nodes={nodes}
+          nodesConnectable={true}
+          nodesDraggable={true}
+          nodesFocusable={true}
+          nodeTypes={nodeTypes}
+          onConnect={onConnect}
+          onInit={(instance) => {
+            rfInstanceRef.current = instance;
+          }}
+          onlyRenderVisibleElements
+          onNodeClick={(_, node) => {
+            selectBoard(node.id);
+          }}
+          onNodeDragStop={(_, node) => {
+            updateBoardPosition(node.id, node.position);
+          }}
+          onNodesChange={(changes) => {
+            setNodes(
+              (currentNodes) =>
+                applyNodeChanges(
+                  changes,
+                  currentNodes
+                ) as Node<KanbanCardNodeData>[]
+            );
+          }}
+          onPaneClick={clearSelection}
+          panOnDrag
+          panOnScroll={false}
+          selectNodesOnDrag={true}
+          translateExtent={WORLD_EXTENT}
+          zoomOnDoubleClick={false}
+          zoomOnPinch
+          zoomOnScroll={false}
+        >
+          <KeyboardShortcuts
+            onApproveSelected={handleApproveSelected}
+            onNewTask={handleNewTask}
+            onRejectSelected={handleRejectSelected}
+            onRemoveSelected={handleRemoveSelected}
+            onToggleHelp={handleToggleHelp}
+          />
 
-        <CanvasControls />
-        <Background
-          bgColor="#0a0a0a"
-          color="rgba(255, 255, 255, 0.4)"
-          gap={26}
-          size={1.8}
-          variant={BackgroundVariant.Dots}
-        />
-      </ReactFlow>
+          <CanvasControls />
+          <Background
+            bgColor="#0a0a0a"
+            color="rgba(255, 255, 255, 0.4)"
+            gap={26}
+            size={1.8}
+            variant={BackgroundVariant.Dots}
+          />
+        </ReactFlow>
+      ) : null}
 
       {/* Keyboard help panel + icon button — portalled to document.body to
           escape the z-10 stacking context imposed by the page layout wrapper. */}

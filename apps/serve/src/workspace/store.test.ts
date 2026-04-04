@@ -50,6 +50,7 @@ describe("WorkspaceStore", () => {
         },
       ],
       preferences: {
+        boardViewMode: "relaxed",
         composerHintDismissed: false,
         speechVoiceId: null,
       },
@@ -82,6 +83,7 @@ describe("WorkspaceStore", () => {
         },
       ],
       preferences: {
+        boardViewMode: "relaxed",
         composerHintDismissed: false,
         speechVoiceId: null,
       },
@@ -132,6 +134,7 @@ describe("WorkspaceStore", () => {
         },
       ],
       preferences: {
+        boardViewMode: "relaxed",
         composerHintDismissed: false,
         speechVoiceId: null,
       },
@@ -197,6 +200,7 @@ describe("WorkspaceStore", () => {
         },
       ],
       preferences: {
+        boardViewMode: "relaxed",
         composerHintDismissed: false,
         speechVoiceId: null,
       },

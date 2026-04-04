@@ -18,6 +18,7 @@ describe("workspace routes", () => {
     await store.replaceSnapshot({
       boards: [],
       preferences: {
+        boardViewMode: "relaxed",
         composerHintDismissed: false,
         speechVoiceId: null,
       },
@@ -36,6 +37,7 @@ describe("workspace routes", () => {
     await expect(response.json()).resolves.toEqual({
       boards: [],
       preferences: {
+        boardViewMode: "relaxed",
         composerHintDismissed: false,
         speechVoiceId: null,
       },
