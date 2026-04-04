@@ -17,6 +17,30 @@ export type VoiceNotificationPriority = z.infer<
   typeof VoiceNotificationPriorityEnum
 >;
 
+export const GroqTtsVoiceEnum = z.enum([
+  "autumn",
+  "diana",
+  "hannah",
+  "austin",
+  "daniel",
+  "troy",
+]);
+
+export type GroqTtsVoice = z.infer<typeof GroqTtsVoiceEnum>;
+
+export const GROQ_TTS_VOICES: Array<{
+  id: GroqTtsVoice;
+  name: string;
+  gender: string;
+}> = [
+  { id: "autumn", name: "Autumn", gender: "Female" },
+  { id: "diana", name: "Diana", gender: "Female" },
+  { id: "hannah", name: "Hannah", gender: "Female" },
+  { id: "austin", name: "Austin", gender: "Male" },
+  { id: "daniel", name: "Daniel", gender: "Male" },
+  { id: "troy", name: "Troy", gender: "Male" },
+];
+
 export const VoiceNotificationRequestSchema = z.object({
   type: VoiceNotificationTypeEnum,
   priority: VoiceNotificationPriorityEnum.default("normal"),

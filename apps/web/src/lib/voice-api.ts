@@ -1,5 +1,5 @@
 const VOICE_API_BASE =
-  process.env.NEXT_PUBLIC_VOICE_API_URL ?? "http://localhost:3001";
+  process.env.NEXT_PUBLIC_VOICE_API_URL ?? "http://localhost:2000";
 
 export interface SpeechToTextResult {
   confidence?: number;
@@ -13,6 +13,29 @@ export interface SpeechToTextResult {
   }>;
 }
 
+export interface GroqVoice {
+  gender: string;
+  id: string;
+  name: string;
+}
+
+export interface VoiceConfigResponse {
+  defaultModel: string;
+  defaultVoice: string;
+  timestamp: string;
+  voices: GroqVoice[];
+}
+
+export async function fetchVoiceConfig(): Promise<VoiceConfigResponse> {
+  const response = await fetch(`${VOICE_API_BASE}/voice/voices`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch voice config: ${response.status}`);
+  }
+
+  return response.json();
+}
+
 export async function transcribeSpeech(
   audioBlob: Blob,
   options?: {
@@ -20,12 +43,22 @@ export async function transcribeSpeech(
     diarize?: boolean;
   }
 ): Promise<SpeechToTextResult> {
+  console.log("[voice-api] transcribeSpeech called", {
+    blobSize: audioBlob.size,
+    blobType: audioBlob.type,
+    options,
+  });
+
   const arrayBuffer = await audioBlob.arrayBuffer();
   const base64 = btoa(
     Array.from(new Uint8Array(arrayBuffer))
       .map((byte) => String.fromCharCode(byte))
       .join("")
   );
+
+  console.log("[voice-api] sending request to", `${VOICE_API_BASE}/voice/stt`, {
+    base64Length: base64.length,
+  });
 
   const response = await fetch(`${VOICE_API_BASE}/voice/stt`, {
     method: "POST",
@@ -39,10 +72,16 @@ export async function transcribeSpeech(
     }),
   });
 
+  console.log("[voice-api] response status:", response.status);
+
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
+    console.error("[voice-api] error response:", error);
     throw new Error(error.error ?? `Voice API error: ${response.status}`);
   }
 
-  return response.json();
+  const data = await response.json();
+  console.log("[voice-api] response data:", data);
+
+  return data;
 }

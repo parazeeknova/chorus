@@ -1,51 +1,80 @@
+import { createLogger } from "@chorus/logger";
 import type {
   SpeechToTextRequest,
   SpeechToTextResult,
   VoiceNotificationRequest,
   VoiceNotificationResult,
 } from "@chorus/voice";
-import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
-import type {
-  SpeechToTextConvertRequestModelId,
-  TextToSpeechConvertRequestOutputFormat,
-} from "@elevenlabs/elevenlabs-js/api";
+import Groq from "groq-sdk";
 import { env } from "../../config/env";
 
+const logger = createLogger(
+  {
+    env: process.env.NODE_ENV === "production" ? "production" : "development",
+  },
+  "VOICE"
+);
+
 export class VoiceService {
-  private readonly client: ElevenLabsClient;
+  private readonly client: Groq;
 
   constructor() {
-    this.client = new ElevenLabsClient({
-      apiKey: env.ELEVENLABS_API_KEY,
+    this.client = new Groq({
+      apiKey: env.GROQ_API_KEY,
     });
   }
 
   async generateSpeech(
     request: VoiceNotificationRequest
   ): Promise<VoiceNotificationResult> {
-    const voiceId = request.voiceId ?? env.ELEVENLABS_DEFAULT_VOICE_ID;
-    const modelId = request.modelId ?? env.ELEVENLABS_DEFAULT_MODEL_ID;
-    const outputFormat =
-      env.ELEVENLABS_OUTPUT_FORMAT as TextToSpeechConvertRequestOutputFormat;
+    const voice = request.voiceId ?? env.GROQ_TTS_DEFAULT_VOICE;
+    const modelId = request.modelId ?? env.GROQ_TTS_DEFAULT_MODEL_ID;
+
+    const text = request.text;
+    const truncatedText = text.length > 200 ? text.slice(0, 200) : text;
+
+    if (text.length > 200) {
+      logger.warn("tts-text-truncated", {
+        originalLength: text.length,
+        truncatedLength: truncatedText.length,
+      });
+    }
+
+    logger.info("tts-start", {
+      voice,
+      modelId,
+      textLength: truncatedText.length,
+    });
 
     try {
-      const audio = await this.client.textToSpeech.convert(voiceId, {
-        text: request.text,
-        modelId,
-        outputFormat,
+      const response = await this.client.audio.speech.create({
+        model: modelId,
+        voice,
+        input: truncatedText,
+        response_format: "wav",
       });
 
-      const audioBuffer = await this.audioToBuffer(audio);
+      const audioBuffer = await response.arrayBuffer();
+
+      logger.info("tts-success", {
+        voice,
+        modelId,
+        bufferSize: audioBuffer.byteLength,
+      });
 
       return {
         id: crypto.randomUUID(),
         status: "generated",
         audioBuffer,
         audioBase64: Buffer.from(audioBuffer).toString("base64"),
-        mimeType: this.getMimeType(outputFormat),
+        mimeType: "audio/wav",
         generatedAt: new Date(),
       };
     } catch (error) {
+      logger.error("tts-failed", error instanceof Error ? error : undefined, {
+        voice,
+        modelId,
+      });
       return {
         id: crypto.randomUUID(),
         status: "failed",
@@ -58,109 +87,93 @@ export class VoiceService {
   async streamSpeech(
     request: VoiceNotificationRequest
   ): Promise<ReadableStream<Uint8Array>> {
-    const voiceId = request.voiceId ?? env.ELEVENLABS_DEFAULT_VOICE_ID;
-    const modelId = request.modelId ?? env.ELEVENLABS_DEFAULT_MODEL_ID;
-    const outputFormat =
-      env.ELEVENLABS_OUTPUT_FORMAT as TextToSpeechConvertRequestOutputFormat;
+    const voice = request.voiceId ?? env.GROQ_TTS_DEFAULT_VOICE;
+    const modelId = request.modelId ?? env.GROQ_TTS_DEFAULT_MODEL_ID;
 
-    const response = await this.client.textToSpeech.stream(voiceId, {
-      text: request.text,
-      modelId,
-      outputFormat: outputFormat as never,
+    const text = request.text;
+    const truncatedText = text.length > 200 ? text.slice(0, 200) : text;
+
+    const response = await this.client.audio.speech.create({
+      model: modelId,
+      voice,
+      input: truncatedText,
+      response_format: "wav",
     });
 
-    return response;
+    const buffer = Buffer.from(await response.arrayBuffer());
+
+    return new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array(buffer));
+        controller.close();
+      },
+    });
   }
 
   async transcribeSpeech(
     request: SpeechToTextRequest
   ): Promise<SpeechToTextResult> {
-    const modelId = (request.modelId ??
-      env.ELEVENLABS_STT_MODEL_ID) as SpeechToTextConvertRequestModelId;
+    const modelId = request.modelId ?? env.GROQ_STT_MODEL_ID;
 
-    const mimeType = request.mimeType ?? "audio/mpeg";
+    const mimeType = request.mimeType ?? "audio/wav";
     const filename =
       request.filename ?? `audio.${this.extFromMimeType(mimeType)}`;
 
+    logger.info("stt-start", {
+      modelId,
+      mimeType,
+      filename,
+      bufferSize: request.audioBuffer.byteLength,
+    });
+
     try {
-      const result = await this.client.speechToText.convert({
+      const result = await this.client.audio.transcriptions.create({
         file: new File([request.audioBuffer], filename, {
           type: mimeType,
         }),
+        model: modelId,
+        response_format: "verbose_json",
+        timestamp_granularities: ["word", "segment"],
+      });
+
+      const verboseResult = result as {
+        text: string;
+        words?: Array<{
+          word: string;
+          start: number;
+          end: number;
+        }>;
+      };
+
+      logger.info("stt-success", {
         modelId,
-        diarize: request.diarize ?? false,
+        textLength: result.text?.length ?? 0,
+        wordCount: verboseResult.words?.length ?? 0,
       });
 
       return {
         text: result.text ?? "",
         confidence: undefined,
         words:
-          result.words?.map((w) => ({
-            word: w.text ?? "",
-            start: w.start ?? 0,
-            end: w.end ?? 0,
-            confidence: undefined,
-          })) ?? undefined,
+          verboseResult.words?.map(
+            (w: { word: string; start: number; end: number }) => ({
+              word: w.word ?? "",
+              start: w.start ?? 0,
+              end: w.end ?? 0,
+              confidence: undefined,
+            })
+          ) ?? undefined,
       };
-    } catch (_error) {
+    } catch (error) {
+      logger.error("stt-failed", error instanceof Error ? error : undefined, {
+        modelId,
+      });
       return {
         text: "",
         confidence: 0,
         words: [],
       };
     }
-  }
-
-  private async audioToBuffer(
-    audio: ReadableStream<Uint8Array>
-  ): Promise<ArrayBuffer> {
-    const reader = audio.getReader();
-    const chunks: Uint8Array[] = [];
-
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          break;
-        }
-        if (value) {
-          chunks.push(value);
-        }
-      }
-    } finally {
-      reader.releaseLock();
-    }
-
-    const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-    const result = new Uint8Array(totalLength);
-    let offset = 0;
-    for (const chunk of chunks) {
-      result.set(chunk, offset);
-      offset += chunk.length;
-    }
-    return result.buffer;
-  }
-
-  private getMimeType(outputFormat: string): string {
-    if (outputFormat.startsWith("mp3")) {
-      return "audio/mpeg";
-    }
-    if (outputFormat.startsWith("pcm")) {
-      return "audio/pcm";
-    }
-    if (outputFormat.startsWith("wav")) {
-      return "audio/wav";
-    }
-    if (outputFormat.startsWith("ogg")) {
-      return "audio/ogg";
-    }
-    if (outputFormat.startsWith("flac")) {
-      return "audio/flac";
-    }
-    if (outputFormat.startsWith("aac")) {
-      return "audio/aac";
-    }
-    return "audio/mpeg";
   }
 
   private extFromMimeType(mimeType: string): string {
@@ -171,6 +184,6 @@ export class VoiceService {
       "audio/flac": "flac",
       "audio/aac": "aac",
     };
-    return map[mimeType] ?? "mp3";
+    return map[mimeType] ?? "wav";
   }
 }

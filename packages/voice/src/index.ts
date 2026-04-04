@@ -1,4 +1,5 @@
 export type {
+  GroqTtsVoice,
   SpeechToTextRequest,
   SpeechToTextResult,
   VoiceNotificationPriority,
@@ -10,6 +11,8 @@ export type {
 
 // biome-ignore lint/performance/noBarrelFile: Package boundary re-exports for clean API surface
 export {
+  GROQ_TTS_VOICES,
+  GroqTtsVoiceEnum,
   SpeechToTextRequestSchema,
   SpeechToTextResultSchema,
   VoiceNotificationPriorityEnum,

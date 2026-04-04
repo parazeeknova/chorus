@@ -1,4 +1,6 @@
+import { createLogger } from "@chorus/logger";
 import {
+  GROQ_TTS_VOICES,
   VoiceNotificationRequestSchema,
   type VoiceSettings,
 } from "@chorus/voice";
@@ -10,8 +12,15 @@ import {
 } from "../bridge/voice/message-builder";
 import { env } from "../config/env";
 
+const logger = createLogger(
+  {
+    env: process.env.NODE_ENV === "production" ? "production" : "development",
+  },
+  "VOICE-ROUTE"
+);
+
 const UNAVAILABLE = {
-  error: "Voice service not configured. Set ELEVENLABS_API_KEY to enable.",
+  error: "Voice service not configured. Set GROQ_API_KEY to enable.",
   timestamp: new Date().toISOString(),
 } as const;
 
@@ -19,7 +28,7 @@ let voiceService: VoiceService | undefined;
 
 function getVoiceService(): VoiceService | null {
   if (!voiceService) {
-    if (!env.ELEVENLABS_API_KEY) {
+    if (!env.GROQ_API_KEY) {
       return null;
     }
     voiceService = new VoiceService();
@@ -116,6 +125,14 @@ export const voiceRoutes = new Elysia({ prefix: "/voice" })
     async ({ body }) => {
       const { audio, modelId, diarize, mimeType, filename } = body;
 
+      logger.info("stt-route-received", {
+        audioLength: audio.length,
+        modelId,
+        diarize,
+        mimeType,
+        filename,
+      });
+
       const audioBytes = Buffer.from(audio, "base64");
       const audioBuffer = audioBytes.buffer.slice(
         audioBytes.byteOffset,
@@ -124,8 +141,14 @@ export const voiceRoutes = new Elysia({ prefix: "/voice" })
 
       const detectedMimeType = mimeType ?? detectMimeType(audioBuffer);
 
+      logger.info("stt-route-processing", {
+        audioBufferSize: audioBuffer.byteLength,
+        detectedMimeType,
+      });
+
       const svc = getVoiceService();
       if (!svc) {
+        logger.error("stt-route-no-service");
         return UNAVAILABLE;
       }
 
@@ -135,6 +158,13 @@ export const voiceRoutes = new Elysia({ prefix: "/voice" })
         diarize: diarize ?? false,
         mimeType: detectedMimeType,
         filename,
+      });
+
+      logger.info("stt-route-result", {
+        text: result.text,
+        textLength: result.text?.length,
+        wordCount: result.words?.length,
+        confidence: result.confidence,
       });
 
       return {
@@ -154,16 +184,23 @@ export const voiceRoutes = new Elysia({ prefix: "/voice" })
       }),
     }
   )
+  .get("/voices", () => ({
+    voices: GROQ_TTS_VOICES,
+    defaultVoice: env.GROQ_TTS_DEFAULT_VOICE,
+    defaultModel: env.GROQ_TTS_DEFAULT_MODEL_ID,
+    timestamp: new Date().toISOString(),
+  }))
   .get("/health", () => ({
-    status: env.ELEVENLABS_API_KEY ? "ok" : "unconfigured",
+    status: env.GROQ_API_KEY ? "ok" : "unconfigured",
     service: "voice",
+    provider: "groq",
     timestamp: new Date().toISOString(),
   }));
 
 function detectMimeType(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
   if (bytes.length < 4) {
-    return "audio/mpeg";
+    return "audio/wav";
   }
   if (
     bytes[0] === 0x52 &&
@@ -195,5 +232,5 @@ function detectMimeType(buffer: ArrayBuffer): string {
   ) {
     return "audio/mpeg";
   }
-  return "audio/mpeg";
+  return "audio/wav";
 }

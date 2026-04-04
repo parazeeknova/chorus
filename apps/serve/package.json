@@ -1,6 +1,6 @@
 {
   "name": "@chorus/serve",
-  "version": "0.0.15",
+  "version": "0.0.16",
   "private": true,
   "scripts": {
     "dev": "bun run --watch src/index.ts",
@@ -13,8 +13,9 @@
     "@chorus/oc-adapter": "*",
     "@chorus/policy-engine": "workspace:*",
     "@chorus/voice": "workspace:*",
-    "@elevenlabs/elevenlabs-js": "^2.41.1",
-    "elysia": "^1.4.28"
+    "@elysiajs/cors": "^1.4.1",
+    "elysia": "^1.4.28",
+    "groq-sdk": "^1.1.2"
   },
   "devDependencies": {
     "@t3-oss/env-core": "^0.13.11",
