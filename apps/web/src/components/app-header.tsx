@@ -15,6 +15,7 @@ import {
   ChevronRightIcon,
   CpuIcon,
   EyeIcon,
+  FolderIcon,
   HelpCircleIcon,
   MenuIcon,
   PlugZapIcon,
@@ -1143,7 +1144,9 @@ function MobileMenuDrawer({
               }}
               type="button"
             >
-              <span className="text-white/40">📁</span>
+              <span className="text-white/40">
+                <FolderIcon className="size-4" />
+              </span>
               {isOpeningFolder ? "Opening…" : "Open Folder…"}
             </button>
 
@@ -1464,7 +1467,7 @@ export function AppHeader() {
                       }}
                     >
                       <span className="flex items-center gap-2">
-                        <span>📁</span>
+                        <FolderIcon className="size-4 text-white/40" />
                         <span>
                           {isOpeningFolder ? "Opening…" : "Open Folder..."}
                         </span>
