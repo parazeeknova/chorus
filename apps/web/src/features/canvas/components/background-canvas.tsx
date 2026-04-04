@@ -6,16 +6,15 @@ import {
   Background,
   BackgroundVariant,
   type Connection,
-  ControlButton,
-  Controls,
   type CoordinateExtent,
   type Edge,
   type Node,
+  Panel,
   ReactFlow,
   useReactFlow,
   type Viewport,
 } from "@xyflow/react";
-import { KeyboardIcon, XIcon } from "lucide-react";
+import { KeyboardIcon, MinusIcon, PlusIcon, XIcon } from "lucide-react";
 import { useCallback, useEffect, useEffectEvent, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Columns } from "@/features/kanban/components/kanban";
@@ -182,49 +181,60 @@ function KeyboardShortcuts({
   return null;
 }
 
-function ResetViewportButton() {
-  const { setViewport } = useReactFlow();
+function CanvasControls() {
+  const { zoomIn, zoomOut, fitView } = useReactFlow();
 
   return (
-    <ControlButton
-      aria-label="Reset view"
-      onClick={() => {
-        setViewport(DEFAULT_VIEWPORT, { duration: 180 });
-      }}
-      title="Reset view (0)"
+    <Panel
+      className="flex flex-col items-center gap-1 rounded-xl border border-white/10 bg-[#020617]/80 p-1.5 shadow-[0_4px_20px_rgba(0,0,0,0.5)] backdrop-blur-xl"
+      position="bottom-right"
+      style={{ margin: 0, bottom: "4.25rem", right: "1rem" }}
     >
-      <span className="font-semibold text-xs tracking-[0.2em]">0</span>
-    </ControlButton>
-  );
-}
-
-function FitViewButton() {
-  const { fitView } = useReactFlow();
-
-  return (
-    <ControlButton
-      aria-label="Fit view"
-      onClick={() => fitView({ duration: 300, padding: 0.1 })}
-      title="Fit view (F)"
-    >
-      <svg
-        aria-hidden="true"
-        fill="none"
-        height="14"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="2"
-        viewBox="0 0 24 24"
-        width="14"
-        xmlns="http://www.w3.org/2000/svg"
+      <button
+        aria-label="Zoom in"
+        className="flex size-8 items-center justify-center rounded-lg text-white/35 transition-all duration-150 hover:bg-white/10 hover:text-white/60 active:scale-95"
+        onClick={() => zoomIn({ duration: 140 })}
+        title="Zoom in (+)"
+        type="button"
       >
-        <polyline points="15 3 21 3 21 9" />
-        <polyline points="9 21 3 21 3 15" />
-        <line x1="21" x2="14" y1="3" y2="10" />
-        <line x1="3" x2="10" y1="21" y2="14" />
-      </svg>
-    </ControlButton>
+        <PlusIcon className="size-4" />
+      </button>
+      <button
+        aria-label="Zoom out"
+        className="flex size-8 items-center justify-center rounded-lg text-white/35 transition-all duration-150 hover:bg-white/10 hover:text-white/60 active:scale-95"
+        onClick={() => zoomOut({ duration: 140 })}
+        title="Zoom out (-)"
+        type="button"
+      >
+        <MinusIcon className="size-4" />
+      </button>
+      <div className="mx-1 my-0.5 h-px w-6 bg-white/10" />
+      <button
+        aria-label="Fit view"
+        className="flex size-8 items-center justify-center rounded-lg text-white/35 transition-all duration-150 hover:bg-white/10 hover:text-white/60 active:scale-95"
+        onClick={() => fitView({ duration: 300, padding: 0.1 })}
+        title="Fit view (F)"
+        type="button"
+      >
+        <svg
+          aria-hidden="true"
+          fill="none"
+          height="14"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="2"
+          viewBox="0 0 24 24"
+          width="14"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <polyline points="15 3 21 3 21 9" />
+          <polyline points="9 21 3 21 3 15" />
+          <line x1="21" x2="14" y1="3" y2="10" />
+          <line x1="3" x2="10" y1="21" y2="14" />
+        </svg>
+      </button>
+    </Panel>
   );
 }
 
@@ -472,17 +482,7 @@ export function BackgroundCanvas() {
           onToggleHelp={handleToggleHelp}
         />
 
-        <Controls
-          className="background-flow__controls"
-          orientation="vertical"
-          position="bottom-right"
-          showFitView={false}
-          showInteractive={false}
-          style={{ bottom: "3.5rem" }}
-        >
-          <FitViewButton />
-          <ResetViewportButton />
-        </Controls>
+        <CanvasControls />
         <Background
           bgColor="#0a0a0a"
           color="rgba(255, 255, 255, 0.4)"
@@ -503,7 +503,7 @@ export function BackgroundCanvas() {
             <button
               aria-label="Keyboard shortcuts"
               className={[
-                "flex size-9 items-center justify-center rounded-xl border transition-all duration-150",
+                "flex size-[44px] items-center justify-center rounded-xl border transition-all duration-150",
                 "shadow-[0_4px_20px_rgba(0,0,0,0.5)] backdrop-blur-xl",
                 showHelp
                   ? "border-white/20 bg-white/15 text-white/80"

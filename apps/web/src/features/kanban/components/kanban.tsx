@@ -23,18 +23,17 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { cva } from "class-variance-authority";
 import {
-  AlertCircle,
+  ArchiveIcon,
+  CheckCircle2Icon,
   CheckIcon,
-  CircleCheckIcon,
-  CircleDot,
-  CircleIcon,
-  ClipboardListIcon,
+  CogIcon,
   EyeIcon,
-  PartyPopperIcon,
+  ListTodoIcon,
+  LoaderIcon,
   PlayIcon,
   PlusIcon,
   RotateCcwIcon,
-  SparklesIcon,
+  SearchCheckIcon,
   XIcon,
 } from "lucide-react";
 import {
@@ -436,49 +435,49 @@ const COLUMNS: Record<
 > = {
   queue: {
     title: "Queue",
-    icon: <CircleIcon className="size-3.5 text-white/25" />,
+    icon: <ListTodoIcon className="size-4.5 text-white/35" />,
     bg: "dark:bg-white/[0.015]",
     border: "dark:border-white/[0.04]",
     badge: "dark:bg-white/6 dark:text-white/45",
     cardGlow:
       "dark:hover:border-white/14 dark:hover:shadow-[0_4px_20px_rgba(255,255,255,0.03)]",
-    emptyIcon: ClipboardListIcon,
+    emptyIcon: ListTodoIcon,
     emptyHeadline: "Nothing lined up yet",
     emptyHint: 'Hit "Create Task" to give the agents something to chew on.',
   },
   in_progress: {
     title: "In Progress",
-    icon: <CircleDot className="size-3.5 text-sky-400/50" />,
+    icon: <LoaderIcon className="size-4.5 text-sky-400/60" />,
     bg: "dark:bg-sky-950/10",
     border: "dark:border-sky-500/[0.07]",
     badge: "dark:bg-sky-500/10 dark:text-sky-300/60",
     cardGlow:
       "dark:hover:border-sky-500/15 dark:hover:shadow-[0_4px_20px_rgba(14,165,233,0.04)]",
-    emptyIcon: SparklesIcon,
+    emptyIcon: CogIcon,
     emptyHeadline: "All quiet on the agent front",
     emptyHint: "Agents will appear here once a task is running.",
   },
   approve: {
     title: "Review",
-    icon: <AlertCircle className="size-3.5 text-amber-400/50" />,
+    icon: <EyeIcon className="size-4.5 text-amber-400/60" />,
     bg: "dark:bg-amber-950/8",
     border: "dark:border-amber-500/[0.06]",
     badge: "dark:bg-amber-500/10 dark:text-amber-300/55",
     cardGlow:
       "dark:hover:border-amber-500/14 dark:hover:shadow-[0_4px_20px_rgba(245,158,11,0.04)]",
-    emptyIcon: EyeIcon,
+    emptyIcon: SearchCheckIcon,
     emptyHeadline: "Nothing needs your eyes",
     emptyHint: "Completed tasks awaiting a human call will land here.",
   },
   done: {
     title: "Done",
-    icon: <CircleCheckIcon className="size-3.5 text-emerald-400/50" />,
+    icon: <CheckCircle2Icon className="size-4.5 text-emerald-400/60" />,
     bg: "dark:bg-emerald-950/8",
     border: "dark:border-emerald-500/[0.06]",
     badge: "dark:bg-emerald-500/10 dark:text-emerald-300/55",
     cardGlow:
       "dark:hover:border-emerald-500/14 dark:hover:shadow-[0_4px_20px_rgba(52,211,153,0.04)]",
-    emptyIcon: PartyPopperIcon,
+    emptyIcon: ArchiveIcon,
     emptyHeadline: "The slate is clean",
     emptyHint: "Shipped work stacks up here. Start something great.",
   },
@@ -494,10 +493,8 @@ function ColumnEmptyState({
   hint: string;
 }) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-2.5 px-4 py-8 text-center">
-      <div className="flex size-9 items-center justify-center rounded-xl border border-white/6 bg-white/3">
-        <Icon className="size-4 text-white/20" />
-      </div>
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 px-4 py-8 text-center">
+      <Icon className="size-8 text-zinc-800" />
       <div className="flex flex-col gap-1">
         <p className="font-medium text-[0.75rem] text-white/30">{headline}</p>
         <p className="text-[0.68rem] text-white/18 leading-relaxed">{hint}</p>
@@ -733,6 +730,113 @@ function defaultColumns(boardId = "board"): Columns {
   };
 }
 
+function AutoAcceptToggle({
+  autoAccept,
+  onToggle,
+}: {
+  autoAccept: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      className="flex items-center gap-1.5 rounded-md px-1.5 py-0.5 transition-colors hover:bg-white/5"
+      onClick={onToggle}
+      title={autoAccept ? "Switch to manual review" : "Switch to auto-accept"}
+      type="button"
+    >
+      <span
+        className={cn(
+          "font-medium text-[0.6rem] uppercase tracking-wider transition-colors",
+          autoAccept ? "text-emerald-400" : "text-white/25"
+        )}
+      >
+        {autoAccept ? "Auto" : "Manual"}
+      </span>
+      <span
+        className={cn(
+          "relative inline-flex h-3.5 w-6 shrink-0 items-center rounded-full transition-all duration-200",
+          autoAccept
+            ? "bg-emerald-500/35 shadow-[0_0_8px_rgba(52,211,153,0.25)]"
+            : "bg-white/10"
+        )}
+      >
+        <span
+          className={cn(
+            "absolute size-2.5 rounded-full shadow-sm transition-all duration-200",
+            autoAccept
+              ? "left-[calc(100%-2px)] -translate-x-full bg-emerald-400"
+              : "left-[2px] bg-white/35"
+          )}
+        />
+      </span>
+    </button>
+  );
+}
+
+function ColumnHeader({
+  columnId,
+  tasks,
+  autoAccept,
+  onAutoAcceptChange,
+}: {
+  columnId: string;
+  tasks: Task[];
+  autoAccept: boolean;
+  onAutoAcceptChange: (value: boolean) => void;
+}) {
+  const col = COLUMNS[columnId];
+  const isReview = columnId === "approve";
+
+  return (
+    <div className="flex items-center gap-2 px-1 pt-0.5 pb-0.5">
+      {col.icon}
+      <h3 className="truncate font-semibold text-[0.7rem] text-muted-foreground uppercase tracking-widest dark:text-white/40">
+        {col.title}
+      </h3>
+      <div
+        className={cn(
+          "ml-auto flex size-5 shrink-0 items-center justify-center rounded-full font-semibold text-[10px]",
+          col.badge
+        )}
+      >
+        {tasks.length}
+      </div>
+      {isReview && (
+        <AutoAcceptToggle
+          autoAccept={autoAccept}
+          onToggle={() => onAutoAcceptChange(!autoAccept)}
+        />
+      )}
+    </div>
+  );
+}
+
+function TaskList({
+  columnId,
+  tasks,
+  autoAccept,
+  col,
+}: {
+  columnId: string;
+  tasks: Task[];
+  autoAccept: boolean;
+  col: (typeof COLUMNS)[string];
+}) {
+  return tasks.map((task) => (
+    <TaskCard
+      asHandle
+      cardGlow={col.cardGlow}
+      draggable={columnId === "queue"}
+      key={task.id}
+      showApprovalControls={columnId === "approve" && !autoAccept}
+      showDone={columnId === "done"}
+      showOutput={columnId === "in_progress"}
+      showPlay={columnId === "queue"}
+      task={task}
+    />
+  ));
+}
+
 function KanbanColumnRenderer({
   columnId,
   tasks,
@@ -746,7 +850,6 @@ function KanbanColumnRenderer({
 }) {
   const col = COLUMNS[columnId];
   const isQueue = columnId === "queue";
-  const isReview = columnId === "approve";
 
   return (
     <ResizablePanel
@@ -764,72 +867,13 @@ function KanbanColumnRenderer({
               col.border
             )}
           >
-            {/* Column header */}
-            <div className="flex items-center gap-2 px-1 pt-0.5 pb-0.5">
-              {col.icon}
-              <h3 className="truncate font-semibold text-[0.7rem] text-muted-foreground uppercase tracking-widest dark:text-white/40">
-                {col.title}
-              </h3>
-              {isReview ? (
-                <div className="ml-auto flex items-center gap-2">
-                  <button
-                    className="flex items-center gap-1.5 rounded-md px-1.5 py-0.5 transition-colors hover:bg-white/5"
-                    onClick={() => onAutoAcceptChange(!autoAccept)}
-                    title={
-                      autoAccept
-                        ? "Switch to manual review"
-                        : "Switch to auto-accept"
-                    }
-                    type="button"
-                  >
-                    <span
-                      className={cn(
-                        "font-medium text-[0.6rem] uppercase tracking-wider transition-colors",
-                        autoAccept ? "text-emerald-400" : "text-white/25"
-                      )}
-                    >
-                      {autoAccept ? "Auto" : "Manual"}
-                    </span>
-                    <span
-                      className={cn(
-                        "relative inline-flex h-3.5 w-6 shrink-0 items-center rounded-full transition-all duration-200",
-                        autoAccept
-                          ? "bg-emerald-500/35 shadow-[0_0_8px_rgba(52,211,153,0.25)]"
-                          : "bg-white/10"
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "absolute size-2.5 rounded-full shadow-sm transition-all duration-200",
-                          autoAccept
-                            ? "left-[calc(100%-2px)] -translate-x-full bg-emerald-400"
-                            : "left-[2px] bg-white/35"
-                        )}
-                      />
-                    </span>
-                  </button>
-                  <div
-                    className={cn(
-                      "flex size-5 shrink-0 items-center justify-center rounded-full font-semibold text-[10px]",
-                      col.badge
-                    )}
-                  >
-                    {tasks.length}
-                  </div>
-                </div>
-              ) : (
-                <div
-                  className={cn(
-                    "ml-auto flex size-5 shrink-0 items-center justify-center rounded-full font-semibold text-[10px]",
-                    col.badge
-                  )}
-                >
-                  {tasks.length}
-                </div>
-              )}
-            </div>
+            <ColumnHeader
+              autoAccept={autoAccept}
+              columnId={columnId}
+              onAutoAcceptChange={onAutoAcceptChange}
+              tasks={tasks}
+            />
 
-            {/* Queue: create task button */}
             {isQueue && (
               <button
                 className={cn(
@@ -858,19 +902,12 @@ function KanbanColumnRenderer({
                   icon={col.emptyIcon}
                 />
               ) : (
-                tasks.map((task) => (
-                  <TaskCard
-                    asHandle
-                    cardGlow={col.cardGlow}
-                    draggable={columnId === "queue"}
-                    key={task.id}
-                    showApprovalControls={columnId === "approve" && !autoAccept}
-                    showDone={columnId === "done"}
-                    showOutput={columnId === "in_progress"}
-                    showPlay={columnId === "queue"}
-                    task={task}
-                  />
-                ))
+                <TaskList
+                  autoAccept={autoAccept}
+                  col={col}
+                  columnId={columnId}
+                  tasks={tasks}
+                />
               )}
             </KanbanColumnContent>
           </div>
