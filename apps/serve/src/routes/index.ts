@@ -3,7 +3,7 @@ import { createLogger } from "@chorus/logger";
 import { Elysia, t } from "elysia";
 import type { OpenCodeBridge } from "../bridge/opencode/bridge";
 import type { WsClientManager } from "../events/broadcaster";
-import { getDiff, restore, track } from "../snapshot";
+import { getDiff, getGitStatus, restore, track } from "../snapshot";
 import { getRevertState } from "../snapshot/session-revert";
 import type { BoardTaskService } from "../tasks/board-task-service";
 import { createWorkspaceMessage } from "./workspace";
@@ -122,6 +122,69 @@ export function createHttpRoutes(
       {
         params: t.Object({
           sessionID: t.String(),
+        }),
+      }
+    )
+
+    .get(
+      "/tasks/:sessionID/questions",
+      async ({ params }) => {
+        const questions = await bridge.listQuestions(params.sessionID);
+        return { questions, timestamp: Date.now() };
+      },
+      {
+        params: t.Object({
+          sessionID: t.String(),
+        }),
+      }
+    )
+
+    .post(
+      "/tasks/:sessionID/questions/:requestID/reply",
+      async ({ params, body }) => {
+        await bridge.replyQuestion({
+          requestID: params.requestID,
+          answers: body.answers,
+        });
+
+        return {
+          sessionID: params.sessionID,
+          requestID: params.requestID,
+          timestamp: Date.now(),
+        };
+      },
+      {
+        params: t.Object({
+          sessionID: t.String(),
+          requestID: t.String(),
+        }),
+        body: t.Object({
+          answers: t.Array(
+            t.Object({
+              questionIndex: t.Number(),
+              optionIndices: t.Optional(t.Array(t.Number())),
+              customAnswer: t.Optional(t.String()),
+            })
+          ),
+        }),
+      }
+    )
+
+    .post(
+      "/tasks/:sessionID/questions/:requestID/reject",
+      async ({ params }) => {
+        await bridge.rejectQuestion(params.requestID);
+
+        return {
+          sessionID: params.sessionID,
+          requestID: params.requestID,
+          timestamp: Date.now(),
+        };
+      },
+      {
+        params: t.Object({
+          sessionID: t.String(),
+          requestID: t.String(),
         }),
       }
     )
@@ -358,6 +421,26 @@ export function createHttpRoutes(
       {
         params: t.Object({
           sessionID: t.String(),
+        }),
+      }
+    )
+
+    .get(
+      "/git/status",
+      async ({ query }) => {
+        try {
+          const status = await getGitStatus(query.directory);
+          return { ...status, timestamp: Date.now() };
+        } catch (error) {
+          logger.error("Failed to get git status", error, {
+            directory: query.directory,
+          });
+          throw error;
+        }
+      },
+      {
+        query: t.Object({
+          directory: t.String(),
         }),
       }
     );

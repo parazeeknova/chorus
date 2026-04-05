@@ -53,6 +53,21 @@ const WS_PAYLOAD_SCHEMAS = {
     text: t.String(),
     baseTitle: t.Optional(t.String()),
   }),
+  [WS_MESSAGE_TYPE.TASK_QUESTION_REPLY]: t.Object({
+    requestID: t.String(),
+    sessionID: t.String(),
+    answers: t.Array(
+      t.Object({
+        questionIndex: t.Number(),
+        optionIndices: t.Optional(t.Array(t.Number())),
+        customAnswer: t.Optional(t.String()),
+      })
+    ),
+  }),
+  [WS_MESSAGE_TYPE.TASK_QUESTION_REJECT]: t.Object({
+    requestID: t.String(),
+    sessionID: t.String(),
+  }),
   [WS_MESSAGE_TYPE.VIEWPORT_SYNC]: t.Object({
     projectId: t.String(),
     viewport: t.Object({
@@ -294,6 +309,47 @@ async function handleMessage(
         type: WS_RESPONSE_TYPE.TASK_RACE_STARTED,
         payload: {
           raceSessions: sessions.map((s) => s.id),
+        },
+        timestamp: Date.now(),
+      });
+      break;
+    }
+
+    case WS_MESSAGE_TYPE.TASK_QUESTION_REPLY: {
+      const payload = validate(
+        WS_MESSAGE_TYPE.TASK_QUESTION_REPLY,
+        msg.payload
+      );
+
+      await bridge.replyQuestion({
+        requestID: payload.requestID,
+        answers: payload.answers,
+      });
+
+      wsSend({
+        type: WS_RESPONSE_TYPE.TASK_QUESTION_REPLIED,
+        payload: {
+          sessionID: payload.sessionID,
+          requestID: payload.requestID,
+        },
+        timestamp: Date.now(),
+      });
+      break;
+    }
+
+    case WS_MESSAGE_TYPE.TASK_QUESTION_REJECT: {
+      const payload = validate(
+        WS_MESSAGE_TYPE.TASK_QUESTION_REJECT,
+        msg.payload
+      );
+
+      await bridge.rejectQuestion(payload.requestID);
+
+      wsSend({
+        type: WS_RESPONSE_TYPE.TASK_QUESTION_REJECTED,
+        payload: {
+          sessionID: payload.sessionID,
+          requestID: payload.requestID,
         },
         timestamp: Date.now(),
       });

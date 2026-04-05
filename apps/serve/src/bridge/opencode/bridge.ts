@@ -3,6 +3,8 @@ import type {
   EventStreamHandle,
   NormalizedAgentEvent,
   PermissionHandlerInput,
+  QuestionReplyInput,
+  QuestionRequest,
   SessionCreateInput,
   SessionForkInput,
   SessionPromptInput,
@@ -131,6 +133,18 @@ export class OpenCodeBridge {
 
   replyPermission(input: PermissionHandlerInput) {
     return this.adapter.permissions.reply(input);
+  }
+
+  listQuestions(directory?: string): Promise<QuestionRequest[]> {
+    return this.adapter.questions.list(directory);
+  }
+
+  replyQuestion(input: QuestionReplyInput) {
+    return this.adapter.questions.reply(input);
+  }
+
+  rejectQuestion(requestID: string) {
+    return this.adapter.questions.reject(requestID);
   }
 
   forkSession(input: SessionForkInput) {
