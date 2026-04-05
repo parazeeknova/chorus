@@ -2,6 +2,12 @@ name: CI
 
 on:
   push:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "Publish as GitHub Release"
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -9,6 +15,7 @@ concurrency:
 
 permissions:
   contents: read
+  # Elevated to write for release job when workflow_dispatch triggers with release=true
 
 jobs:
   lint-and-types:
@@ -70,7 +77,7 @@ jobs:
   build-desktop:
     name: Build Electron Desktop App
     needs: lint-and-types
-    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     strategy:
       matrix:
         os: [macos-latest, windows-latest, ubuntu-latest]
@@ -111,7 +118,7 @@ jobs:
   release:
     name: Create Electron Release
     needs: build-desktop
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release == true)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
