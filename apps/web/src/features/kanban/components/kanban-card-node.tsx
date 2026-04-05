@@ -31,7 +31,12 @@ import {
   type KanbanCardData,
 } from "@/features/kanban/components/kanban";
 import { useWorkspace } from "@/features/workspace/workspace-context";
-import { fetchSessionDiff, type SessionFileDiff } from "@/lib/opencode-client";
+import {
+  fetchGitStatus,
+  fetchSessionDiff,
+  type GitStatus,
+  type SessionFileDiff,
+} from "@/lib/opencode-client";
 import { cn } from "@/lib/utils";
 
 export const KANBAN_CARD_NODE_TYPE = "kanbanCard";
@@ -41,6 +46,7 @@ export interface KanbanCardNodeData {
   columns: KanbanCardData["columns"];
   filePath?: string;
   gitBranch?: string;
+  gitStatus?: GitStatus | null;
   onRemove?: (id: string) => void;
   onUpdateColumns?: (id: string, columns: KanbanCardData["columns"]) => void;
   projectName?: string;
@@ -77,6 +83,78 @@ function GitBranch({ branch }: { branch: string }) {
       <span className="font-mono text-[0.65rem] text-white/50 leading-none">
         {branch}
       </span>
+    </span>
+  );
+}
+
+interface GitDiffIndicatorProps {
+  status: GitStatus;
+}
+
+function GitDiffIndicator({ status }: GitDiffIndicatorProps) {
+  const hasChanges =
+    status.untracked > 0 ||
+    status.modified > 0 ||
+    status.staged > 0 ||
+    status.linesAdded > 0 ||
+    status.linesRemoved > 0;
+
+  if (!hasChanges) {
+    return null;
+  }
+
+  return (
+    <span className="flex items-center gap-1.5 rounded-xs border border-white/8 bg-white/5 px-1.5 py-0.5">
+      {status.untracked > 0 && (
+        <span
+          className="font-mono text-[0.6rem] text-amber-400/80 leading-none"
+          title={`${status.untracked} untracked files`}
+        >
+          ?{status.untracked}
+        </span>
+      )}
+      {status.modified > 0 && (
+        <span
+          className="font-mono text-[0.6rem] text-orange-400/80 leading-none"
+          title={`${status.modified} modified files`}
+        >
+          ~{status.modified}
+        </span>
+      )}
+      {status.staged > 0 && (
+        <span
+          className="font-mono text-[0.6rem] text-emerald-400/80 leading-none"
+          title={`${status.staged} staged files`}
+        >
+          +{status.staged}
+        </span>
+      )}
+      {status.linesAdded > 0 && (
+        <span className="font-mono text-[0.6rem] text-emerald-400/80 leading-none">
+          +{status.linesAdded}
+        </span>
+      )}
+      {status.linesRemoved > 0 && (
+        <span className="font-mono text-[0.6rem] text-red-400/80 leading-none">
+          -{status.linesRemoved}
+        </span>
+      )}
+      {status.ahead > 0 && (
+        <span
+          className="font-mono text-[0.6rem] text-cyan-400/80 leading-none"
+          title={`${status.ahead} commits ahead`}
+        >
+          ↑{status.ahead}
+        </span>
+      )}
+      {status.behind > 0 && (
+        <span
+          className="font-mono text-[0.6rem] text-purple-400/80 leading-none"
+          title={`${status.behind} commits behind`}
+        >
+          ↓{status.behind}
+        </span>
+      )}
     </span>
   );
 }
@@ -196,6 +274,9 @@ function KanbanCardNodeComponent({
     useState<SessionFileDiff | null>(null);
   const [isLoadingDiff, setIsLoadingDiff] = useState(false);
   const [localColumns, setLocalColumns] = useState<Columns>(cardData.columns);
+  const [localGitStatus, setLocalGitStatus] = useState<GitStatus | null>(
+    cardData.gitStatus ?? null
+  );
 
   const { kanbanHistory, restorePrompt } = useWorkspace();
 
@@ -204,6 +285,28 @@ function KanbanCardNodeComponent({
   }, [cardData.columns]);
 
   const filePath = cardData.filePath ?? cardData.projectName ?? cardData.title;
+
+  useEffect(() => {
+    if (!filePath) {
+      return;
+    }
+
+    let cancelled = false;
+
+    fetchGitStatus(filePath)
+      .then((status) => {
+        if (!cancelled && status) {
+          setLocalGitStatus(status);
+        }
+      })
+      .catch(() => {
+        // Silently fail - git status is not critical
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [filePath]);
 
   const handleColumnsChange = useCallback(
     (columns: Columns) => {
@@ -322,6 +425,8 @@ function KanbanCardNodeComponent({
             {cardData.gitBranch ? (
               <GitBranch branch={cardData.gitBranch} />
             ) : null}
+
+            {localGitStatus && <GitDiffIndicator status={localGitStatus} />}
 
             <span className="h-3.5 w-px bg-white/10" />
 
