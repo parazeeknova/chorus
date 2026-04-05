@@ -198,3 +198,47 @@ export async function fetchSessionDiff(
     return [];
   }
 }
+
+export interface GitStatus {
+  ahead: number;
+  behind: number;
+  branch: string;
+  linesAdded: number;
+  linesRemoved: number;
+  modified: number;
+  staged: number;
+  timestamp: number;
+  tracking: string | null;
+  untracked: number;
+}
+
+export async function fetchGitStatus(
+  directory: string
+): Promise<GitStatus | null> {
+  try {
+    const params = new URLSearchParams({ directory });
+    const response = await fetch(`/api/git/status?${params}`, {
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) {
+      console.error("[opencode-client] Failed to fetch git status", {
+        directory,
+        status: response.status,
+      });
+      return null;
+    }
+    const text = await response.text();
+    if (!text) {
+      return null;
+    }
+    return JSON.parse(text) as GitStatus;
+  } catch (error) {
+    if (IS_DEV) {
+      console.error("[opencode-client] Fetch git status failed", {
+        directory,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
+    }
+    return null;
+  }
+}
