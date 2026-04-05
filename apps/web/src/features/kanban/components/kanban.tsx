@@ -24,16 +24,20 @@ import { CSS } from "@dnd-kit/utilities";
 import { cva } from "class-variance-authority";
 import {
   ArchiveIcon,
+  BrainIcon,
   CheckCircle2Icon,
   CheckIcon,
   CogIcon,
   EyeIcon,
   ListTodoIcon,
   LoaderIcon,
+  MessageSquareIcon,
   PlayIcon,
   PlusIcon,
   RotateCcwIcon,
   SearchCheckIcon,
+  TerminalIcon,
+  WrenchIcon,
   XIcon,
 } from "lucide-react";
 import {
@@ -61,6 +65,48 @@ import {
 } from "@/features/kanban/components/agent-output-card";
 import { cn } from "@/lib/utils";
 import { type GroupedStep, groupSteps } from "../utils/group-steps";
+import { QuestionCard } from "./question-card";
+
+function extractChangedFiles(steps: AgentStep[]): ChangedFile[] {
+  const fileMap = new Map<string, { added: number; removed: number }>();
+  for (const step of steps) {
+    if (step.kind === "file_edit" && step.filePath) {
+      const existing = fileMap.get(step.filePath) ?? { added: 0, removed: 0 };
+      fileMap.set(step.filePath, {
+        added: existing.added + (step.linesAdded ?? 0),
+        removed: existing.removed + (step.linesRemoved ?? 0),
+      });
+    }
+  }
+  return [...fileMap.entries()].map(([path, stats]) => ({
+    path,
+    ...stats,
+  }));
+}
+
+function computeDiffTotals(steps: AgentStep[]): {
+  added: number;
+  fileCount: number;
+  removed: number;
+} {
+  let added = 0;
+  let removed = 0;
+  let fileCount = 0;
+  const seenFiles = new Set<string>();
+  for (const step of steps) {
+    added += step.linesAdded ?? 0;
+    removed += step.linesRemoved ?? 0;
+    if (
+      step.kind === "file_edit" &&
+      step.filePath &&
+      !seenFiles.has(step.filePath)
+    ) {
+      seenFiles.add(step.filePath);
+      fileCount++;
+    }
+  }
+  return { added, removed, fileCount };
+}
 
 export interface ChangedFile {
   added: number;
@@ -549,19 +595,17 @@ interface TaskCardProps {
 }
 
 function DoneStepRow({ step }: { step: AgentStep }) {
-  const kindIcons: Record<AgentStep["kind"], string> = {
-    thinking: "💭",
-    response: "💬",
-    tool_call: "⚙️",
-    file_edit: "📝",
-    command: "⌨️",
+  const kindIcons: Record<AgentStep["kind"], React.ReactNode> = {
+    thinking: <BrainIcon className="size-3 text-white/30" />,
+    response: <MessageSquareIcon className="size-3 text-white/30" />,
+    tool_call: <WrenchIcon className="size-3 text-white/30" />,
+    file_edit: <CogIcon className="size-3 text-white/30" />,
+    command: <TerminalIcon className="size-3 text-white/30" />,
   };
 
   return (
     <div className="flex items-start gap-1.5">
-      <span className="mt-0.5 font-mono text-[0.62rem] text-white/30">
-        {kindIcons[step.kind] ?? "•"}
-      </span>
+      <span className="mt-0.5 shrink-0">{kindIcons[step.kind] ?? "•"}</span>
       <span className="min-w-0 flex-1 font-mono text-[0.68rem] text-white/50 leading-relaxed">
         {step.summary}
       </span>
@@ -575,8 +619,12 @@ function DoneGroupedStepRow({ group }: { group: GroupedStep }) {
     case "response":
       return (
         <div className="flex items-start gap-1.5">
-          <span className="mt-0.5 font-mono text-[0.62rem] text-white/30">
-            {group.kind === "thinking" ? "💭" : "💬"}
+          <span className="mt-0.5 shrink-0">
+            {group.kind === "thinking" ? (
+              <BrainIcon className="size-3 text-white/30" />
+            ) : (
+              <MessageSquareIcon className="size-3 text-white/30" />
+            )}
           </span>
           <span className="min-w-0 flex-1 font-mono text-[0.68rem] text-white/50 leading-relaxed">
             {group.summary}
@@ -598,6 +646,42 @@ function DoneGroupedStepRow({ group }: { group: GroupedStep }) {
   }
 }
 
+function TaskCardDiffSection({
+  changedFiles,
+  diffTotals,
+}: {
+  changedFiles: ChangedFile[];
+  diffTotals: { added: number; removed: number };
+}) {
+  if (changedFiles.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-col gap-1 border-white/5 border-t pt-2.5">
+      {changedFiles.map((f) => (
+        <ChangedFileRow file={f} key={f.path} />
+      ))}
+      <div className="flex items-center gap-1.5 pt-0.5">
+        {diffTotals.added > 0 && (
+          <span className="inline-flex items-center gap-0.5 rounded-xs bg-emerald-500/15 px-1.5 py-0.5 font-medium font-mono text-[0.62rem] text-emerald-400">
+            <PlusIcon className="size-2.5" />+{diffTotals.added}
+          </span>
+        )}
+        {diffTotals.removed > 0 && (
+          <span className="inline-flex items-center gap-0.5 rounded-xs bg-red-500/15 px-1.5 py-0.5 font-medium font-mono text-[0.62rem] text-red-400">
+            <XIcon className="size-2.5" />-{diffTotals.removed}
+          </span>
+        )}
+        <span className="font-medium text-[0.62rem] text-white/30">
+          {changedFiles.length} file{changedFiles.length === 1 ? "" : "s"}{" "}
+          changed
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function TaskCard({
   task,
   asHandle,
@@ -607,6 +691,16 @@ function TaskCard({
   showApprovalControls,
   showPlay,
 }: TaskCardProps) {
+  const changedFiles = task.run
+    ? extractChangedFiles(task.run.steps)
+    : (task.changedFiles ?? []);
+  const diffTotals = task.run
+    ? computeDiffTotals(task.run.steps)
+    : { added: task.linesAdded ?? 0, removed: task.linesRemoved ?? 0 };
+  const questionStep = task.run?.steps.find(
+    (s) => s.kind === "response" && s.content?.startsWith("question:")
+  );
+  const questionRequestID = questionStep?.content?.replace("question:", "");
   const content = (
     <div
       className={cn(
@@ -615,7 +709,12 @@ function TaskCard({
         "dark:border-white/8 dark:bg-white/2.5"
       )}
     >
-      <span className="font-medium text-[0.85rem] text-foreground leading-snug dark:text-white/85">
+      <span
+        className={cn(
+          "font-medium text-[0.85rem] text-foreground leading-snug dark:text-white/85",
+          showDone && "line-through decoration-2 decoration-white/30"
+        )}
+      >
         {task.title}
       </span>
 
@@ -641,24 +740,10 @@ function TaskCard({
               {task.summary}
             </p>
           )}
-          {(task.linesAdded !== undefined ||
-            task.linesRemoved !== undefined) && (
-            <div className="flex items-center gap-1.5">
-              {task.linesAdded !== undefined && task.linesAdded > 0 && (
-                <span className="inline-flex items-center rounded-xs bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[0.62rem] text-emerald-400/80">
-                  +{task.linesAdded}
-                </span>
-              )}
-              {task.linesRemoved !== undefined && task.linesRemoved > 0 && (
-                <span className="inline-flex items-center rounded-xs bg-red-500/10 px-1.5 py-0.5 font-mono text-[0.62rem] text-red-400/70">
-                  -{task.linesRemoved}
-                </span>
-              )}
-              <span className="text-[0.62rem] text-white/20">
-                lines changed
-              </span>
-            </div>
-          )}
+          <TaskCardDiffSection
+            changedFiles={changedFiles}
+            diffTotals={diffTotals}
+          />
         </div>
       )}
 
@@ -698,6 +783,10 @@ function TaskCard({
             ))}
           </div>
         )}
+
+      {showApprovalControls && questionRequestID && task.run?.sessionId && (
+        <QuestionCard sessionID={task.run.sessionId} />
+      )}
 
       {showApprovalControls && (
         <div className="flex items-center justify-end gap-1.5 pt-0.5">
@@ -916,6 +1005,27 @@ function ColumnHeader({
 }) {
   const col = COLUMNS[columnId];
   const isReview = columnId === "approve";
+  const isDone = columnId === "done";
+
+  const doneTotals = isDone
+    ? tasks.reduce(
+        (acc, task) => {
+          const totals = task.run
+            ? computeDiffTotals(task.run.steps)
+            : {
+                added: task.linesAdded ?? 0,
+                removed: task.linesRemoved ?? 0,
+                fileCount: task.changedFiles?.length ?? 0,
+              };
+          return {
+            added: acc.added + totals.added,
+            removed: acc.removed + totals.removed,
+            fileCount: acc.fileCount + totals.fileCount,
+          };
+        },
+        { added: 0, removed: 0, fileCount: 0 }
+      )
+    : null;
 
   return (
     <div className="flex items-center gap-2 px-1 pt-0.5 pb-0.5">
@@ -926,6 +1036,11 @@ function ColumnHeader({
       <div className="ml-auto flex size-5 shrink-0 items-center justify-center rounded-full bg-white/6 font-semibold text-[10px] text-white/45">
         {tasks.length}
       </div>
+      {isDone && doneTotals && doneTotals.fileCount > 0 && (
+        <span className="shrink-0 rounded-xs bg-white/5 px-1.5 py-0.5 font-mono text-[0.55rem] text-white/35">
+          {doneTotals.fileCount} file{doneTotals.fileCount === 1 ? "" : "s"}
+        </span>
+      )}
       {isReview && (
         <AutoAcceptToggle
           autoAccept={autoAccept}

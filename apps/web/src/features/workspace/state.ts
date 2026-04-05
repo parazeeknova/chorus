@@ -46,7 +46,8 @@ function makeLabelVariant(columnId: keyof Columns): Task["labelVariant"] {
 
 function makeStepId(event: NormalizedAgentEvent): string {
   if (event.partID) {
-    return `part-${event.partID}`;
+    const msgPrefix = event.messageID ? `msg-${event.messageID}-` : "";
+    return `part-${msgPrefix}${event.partID}`;
   }
   return `${event.type}-${event.timestamp}-${Math.random()
     .toString(36)
@@ -106,6 +107,17 @@ function buildStep(event: NormalizedAgentEvent): AgentStep | null {
       status: "running",
       summary: "Awaiting approval",
       content: event.permissionID,
+    };
+  }
+
+  if (event.activity === "waiting_for_question") {
+    const header = event.questions?.[0]?.header ?? "Question";
+    return {
+      id: makeStepId(event),
+      kind: "response",
+      status: "running",
+      summary: header,
+      content: event.questionID,
     };
   }
 
@@ -200,9 +212,10 @@ function appendRunStep(task: Task, event: NormalizedAgentEvent): Task {
   const startedAt = previousRun.startedAt ?? event.timestamp;
 
   if (event.delta && event.partID) {
-    const deltaStepId = `part-${event.partID}`;
-    const existingStepIdx = previousRun.steps.findIndex(
-      (s) => s.id === deltaStepId
+    const msgPrefix = event.messageID ? `msg-${event.messageID}-` : "";
+    const deltaStepId = `part-${msgPrefix}${event.partID}`;
+    const existingStepIdx = previousRun.steps.findIndex((s) =>
+      s.id.endsWith(deltaStepId)
     );
 
     if (existingStepIdx !== -1) {
@@ -241,6 +254,8 @@ function appendRunStep(task: Task, event: NormalizedAgentEvent): Task {
           )
           .concat(step);
 
+  const rekeyedSteps = steps.map((s, i) => ({ ...s, id: `${s.id}-${i}` }));
+
   return {
     ...task,
     run: {
@@ -248,7 +263,7 @@ function appendRunStep(task: Task, event: NormalizedAgentEvent): Task {
       elapsed: formatElapsed(startedAt),
       startedAt,
       sessionId: event.sessionID ?? previousRun.sessionId,
-      steps,
+      steps: rekeyedSteps,
     },
     runId: event.sessionID ?? task.runId,
   };
@@ -401,7 +416,10 @@ export function applyAgentEventToBoard(
     ),
   };
 
-  if (event.activity === "waiting_for_approval") {
+  if (
+    event.activity === "waiting_for_approval" ||
+    event.activity === "waiting_for_question"
+  ) {
     nextBoard = {
       ...nextBoard,
       columns: moveTask(

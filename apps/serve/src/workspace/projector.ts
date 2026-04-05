@@ -91,7 +91,8 @@ function formatElapsed(startedAt: number) {
 
 function makeStepId(event: NormalizedAgentEvent): string {
   if (event.partID) {
-    return `part-${event.partID}`;
+    const msgPrefix = event.messageID ? `msg-${event.messageID}-` : "";
+    return `part-${msgPrefix}${event.partID}`;
   }
   return `${event.type}-${event.timestamp}-${Math.random()
     .toString(36)
@@ -154,6 +155,17 @@ function buildStep(event: NormalizedAgentEvent): AgentStep | null {
     };
   }
 
+  if (event.activity === "waiting_for_question") {
+    const header = event.questions?.[0]?.header ?? "Question";
+    return {
+      id: makeStepId(event),
+      kind: "response",
+      status: "running",
+      summary: header,
+      content: event.questionID,
+    };
+  }
+
   if (event.activity === "error") {
     return {
       id: makeStepId(event),
@@ -181,8 +193,8 @@ function appendRunStep(task: Task, event: NormalizedAgentEvent): Task {
 
   if (event.delta && event.partID) {
     const deltaStepId = `part-${event.partID}`;
-    const existingStepIdx = previousRun.steps.findIndex(
-      (s) => s.id === deltaStepId
+    const existingStepIdx = previousRun.steps.findIndex((s) =>
+      s.id.endsWith(deltaStepId)
     );
 
     if (existingStepIdx !== -1) {
@@ -224,6 +236,8 @@ function appendRunStep(task: Task, event: NormalizedAgentEvent): Task {
           )
           .concat(step);
 
+  const rekeyedSteps = steps.map((s, i) => ({ ...s, id: `${s.id}-${i}` }));
+
   return {
     ...task,
     run: {
@@ -231,7 +245,7 @@ function appendRunStep(task: Task, event: NormalizedAgentEvent): Task {
       elapsed: formatElapsed(startedAt),
       startedAt,
       sessionId: event.sessionID ?? previousRun.sessionId,
-      steps,
+      steps: rekeyedSteps,
     },
     runId: event.sessionID ?? task.runId,
   };
@@ -286,7 +300,10 @@ export function applyAgentEventToBoard(
     ),
   };
 
-  if (event.activity === "waiting_for_approval") {
+  if (
+    event.activity === "waiting_for_approval" ||
+    event.activity === "waiting_for_question"
+  ) {
     nextBoard = {
       ...nextBoard,
       columns: moveTask(
@@ -327,7 +344,7 @@ export function applyAgentEventToBoard(
     };
   }
 
-  if (event.activity === "error") {
+  if (event.activity === "error" && event.type !== "session.timeout") {
     nextBoard = {
       ...nextBoard,
       columns: moveTask(nextBoard.columns, board.session.currentTaskId, "done"),
@@ -337,6 +354,13 @@ export function applyAgentEventToBoard(
         errorMessage: event.error,
         state: "error",
       },
+    };
+  }
+
+  if (event.type === "session.timeout") {
+    nextBoard = {
+      ...nextBoard,
+      columns: moveTask(nextBoard.columns, board.session.currentTaskId, "done"),
     };
   }
 
