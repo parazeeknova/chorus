@@ -129,3 +129,18 @@ export interface AcknowledgeUiCommandInput {
   error?: string;
   status: "acknowledged" | "executed" | "failed";
 }
+
+export interface RecordAgentOutputInput {
+  chunk: string;
+  outputType: "log" | "error" | "result";
+  taskId: string;
+}
+
+export interface SendMobilePromptInput {
+  taskId: string;
+  text: string;
+}
+
+export interface ConsumeMobilePromptInput {
+  promptId: string;
+}

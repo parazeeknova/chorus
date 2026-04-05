@@ -19,6 +19,7 @@ export type {
   AcknowledgeUiCommandInput,
   AttachAgentSessionInput,
   CompleteCardInput,
+  ConsumeMobilePromptInput,
   CreateBoardInput,
   CreateBoardResult,
   CreateCardInput,
@@ -31,11 +32,13 @@ export type {
   LinkDependencyResult,
   QueueCardInput,
   RecordAgentEventInput,
+  RecordAgentOutputInput,
   RecordPolicyDecisionInput,
   RedirectCardInput,
   RequestApprovalInput,
   RequestApprovalResult,
   ResolveApprovalInput,
+  SendMobilePromptInput,
   TriggerDownstreamCardsInput,
 } from "./reducers/inputs";
 
@@ -53,6 +56,8 @@ export type {
 } from "./tables/events";
 
 export type {
+  AgentOutput,
+  AgentPrompt,
   AgentSession,
   ApprovalRequest,
   AudioNotification,

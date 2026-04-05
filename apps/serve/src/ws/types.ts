@@ -13,6 +13,9 @@ export const WS_MESSAGE_TYPE = {
   TASK_QUESTION_REJECT: "task.question.reject",
   VIEWPORT_SYNC: "viewport.sync",
   PRESENCE_PING: "presence.ping",
+  AGENT_OUTPUT: "agent.output",
+  MOBILE_PROMPT: "mobile.prompt",
+  MOBILE_PROMPT_ACK: "mobile.prompt.ack",
 } as const;
 
 export const WS_RESPONSE_TYPE = {
@@ -28,6 +31,8 @@ export const WS_RESPONSE_TYPE = {
   TASK_QUESTION_REJECTED: "task.question.rejected",
   PRESENCE_PONG: "presence.pong",
   UNKNOWN_MESSAGE: "unknown.message",
+  AGENT_OUTPUT: "agent.output",
+  MOBILE_PROMPT_RECEIVED: "mobile.prompt.received",
 } as const;
 
 export const SUPPORTED_MESSAGE_TYPES = [
@@ -41,6 +46,8 @@ export const SUPPORTED_MESSAGE_TYPES = [
   WS_MESSAGE_TYPE.TASK_QUESTION_REJECT,
   WS_MESSAGE_TYPE.VIEWPORT_SYNC,
   WS_MESSAGE_TYPE.PRESENCE_PING,
+  WS_MESSAGE_TYPE.AGENT_OUTPUT,
+  WS_MESSAGE_TYPE.MOBILE_PROMPT,
 ] as const;
 
 export interface WsSession {
@@ -69,7 +76,12 @@ export type WsMessage =
       payload: QuestionRejectPayload;
     }
   | { type: typeof WS_MESSAGE_TYPE.VIEWPORT_SYNC; payload: ViewportSyncPayload }
-  | { type: typeof WS_MESSAGE_TYPE.PRESENCE_PING };
+  | { type: typeof WS_MESSAGE_TYPE.PRESENCE_PING }
+  | { type: typeof WS_MESSAGE_TYPE.AGENT_OUTPUT; payload: AgentOutputPayload }
+  | {
+      type: typeof WS_MESSAGE_TYPE.MOBILE_PROMPT;
+      payload: MobilePromptPayload;
+    };
 
 export type QueueTaskPayload = QueueBoardPromptInput;
 
@@ -120,6 +132,21 @@ export interface RacePayload {
 export interface ViewportSyncPayload {
   projectId: string;
   viewport: { x: number; y: number; zoom: number };
+}
+
+export interface AgentOutputPayload {
+  chunk: string;
+  outputType: "log" | "error" | "result";
+  sessionId: string;
+  taskId: string;
+  timestamp: number;
+}
+
+export interface MobilePromptPayload {
+  promptId: string;
+  sessionId: string;
+  taskId: string;
+  text: string;
 }
 
 export interface WsResponse<T = unknown> {

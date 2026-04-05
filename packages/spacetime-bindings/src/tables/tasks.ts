@@ -103,3 +103,20 @@ export interface AudioNotification {
   playedAt?: bigint;
   status: "pending" | "generated" | "played" | "failed";
 }
+
+export interface AgentOutput {
+  chunk: string;
+  id: string;
+  outputType: "log" | "error" | "result";
+  taskId: string;
+  timestamp: bigint;
+}
+
+export interface AgentPrompt {
+  consumed: boolean;
+  id: string;
+  source: "mobile";
+  taskId: string;
+  text: string;
+  timestamp: bigint;
+}

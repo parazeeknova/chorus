@@ -49,6 +49,7 @@ export interface KanbanCardNodeData {
   filePath?: string;
   gitBranch?: string;
   gitStatus?: GitStatus | null;
+  hasMobilePrompt?: boolean;
   onRemove?: (id: string) => void;
   onUpdateColumns?: (id: string, columns: KanbanCardData["columns"]) => void;
   projectName?: string;
@@ -632,6 +633,18 @@ function KanbanCardNodeComponent({
               sessionId={cardData.sessionId}
               state={cardData.sessionState}
             />
+
+            {cardData.hasMobilePrompt && (
+              <span
+                className={cn(
+                  kanbanHeaderControlClass,
+                  "gap-1 border border-cyan-400/20 bg-cyan-400/10 px-2"
+                )}
+                title="Mobile prompt waiting"
+              >
+                <span className="text-cyan-300/80">📱</span>
+              </span>
+            )}
 
             <span className="h-3.5 w-px bg-white/10" />
 

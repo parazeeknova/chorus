@@ -1,12 +1,13 @@
 {
   "name": "@chorus/spacetime",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "private": true,
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
     "./connection/real": "./src/connection/real.ts",
-    "./reducers/chorus-reducers": "./src/reducers/chorus-reducers.ts"
+    "./reducers/chorus-reducers": "./src/reducers/chorus-reducers.ts",
+    "./generated": "./generated/index.ts"
   },
   "scripts": {
     "check-types": "tsc --noEmit",

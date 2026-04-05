@@ -100,3 +100,5 @@ export function registerSpacetimeModule({ builder }: ModuleDbConnection): void {
     }
   );
 }
+
+export type { DbConnection as SpacetimeDbConnection } from "@chorus/spacetime/generated";

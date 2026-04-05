@@ -76,6 +76,23 @@ const WS_PAYLOAD_SCHEMAS = {
       zoom: t.Number(),
     }),
   }),
+  [WS_MESSAGE_TYPE.AGENT_OUTPUT]: t.Object({
+    taskId: t.String(),
+    sessionId: t.String(),
+    chunk: t.String(),
+    outputType: t.Union([
+      t.Literal("log"),
+      t.Literal("error"),
+      t.Literal("result"),
+    ]),
+    timestamp: t.Number(),
+  }),
+  [WS_MESSAGE_TYPE.MOBILE_PROMPT]: t.Object({
+    promptId: t.String(),
+    taskId: t.String(),
+    sessionId: t.String(),
+    text: t.String(),
+  }),
 } as const;
 
 export function createWsHandler(
@@ -378,6 +395,57 @@ async function handleMessage(
         },
         timestamp: Date.now(),
       });
+      break;
+    }
+
+    case WS_MESSAGE_TYPE.AGENT_OUTPUT: {
+      const payload = validate(WS_MESSAGE_TYPE.AGENT_OUTPUT, msg.payload);
+      console.log(
+        `[ws] agent output received for task ${payload.taskId}: ${payload.chunk.slice(0, 50)}...`
+      );
+      wsSend({
+        type: WS_RESPONSE_TYPE.AGENT_OUTPUT,
+        payload: {
+          received: true,
+          taskId: payload.taskId,
+        },
+        timestamp: Date.now(),
+      });
+      break;
+    }
+
+    case WS_MESSAGE_TYPE.MOBILE_PROMPT: {
+      const payload = validate(WS_MESSAGE_TYPE.MOBILE_PROMPT, msg.payload);
+      console.log(
+        `[ws] mobile prompt received for task ${payload.taskId}: ${payload.text.slice(0, 50)}...`
+      );
+
+      try {
+        await bridge.promptSession({
+          sessionID: payload.sessionId,
+          text: `[Mobile prompt] ${payload.text}`,
+        });
+
+        wsSend({
+          type: WS_RESPONSE_TYPE.MOBILE_PROMPT_RECEIVED,
+          payload: {
+            promptId: payload.promptId,
+            accepted: true,
+          },
+          timestamp: Date.now(),
+        });
+      } catch (error) {
+        console.error("[ws] failed to inject mobile prompt:", error);
+        wsSend({
+          type: WS_RESPONSE_TYPE.MOBILE_PROMPT_RECEIVED,
+          payload: {
+            promptId: payload.promptId,
+            accepted: false,
+            error: error instanceof Error ? error.message : "unknown error",
+          },
+          timestamp: Date.now(),
+        });
+      }
       break;
     }
 
