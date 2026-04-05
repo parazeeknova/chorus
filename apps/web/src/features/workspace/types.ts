@@ -94,4 +94,8 @@ export interface WorkspaceContextValue {
     boardId: string,
     position: { x: number; y: number }
   ) => void;
+  updateBoardReviewMode: (
+    boardId: string,
+    reviewMode: "manual" | "auto"
+  ) => void;
 }

@@ -110,6 +110,7 @@ export class BoardTaskService {
       model: input.model
         ? `${input.model.providerID}/${input.model.modelID}`
         : undefined,
+      reviewMode: input.reviewMode,
       textPreview: input.text.slice(0, 100),
     });
 
@@ -167,27 +168,45 @@ export class BoardTaskService {
       state: "active",
     });
 
-    logger.info("queue-prompt:sending-async", {
-      sessionId,
-      boardId: input.boardId,
-      directory: input.directory,
-      model: input.model
-        ? `${input.model.providerID}/${input.model.modelID}`
-        : undefined,
-    });
-
     const sdkParts = input.parts
       ? convertPartsToSdk(input.parts, input.directory)
       : [];
 
-    await this.#bridge.promptSessionAsync({
-      sessionID: sessionId,
-      directory: input.directory,
-      text: input.text,
-      model: input.model,
-      agent: input.agent,
-      parts: sdkParts.length > 0 ? sdkParts : undefined,
-    });
+    if (input.reviewMode === "manual") {
+      logger.info("queue-prompt:manual-review-mode", {
+        sessionId,
+        boardId: input.boardId,
+      });
+
+      await this.#workspaceStore.updateBoardReviewMode(input.boardId, "manual");
+
+      await this.#bridge.promptSessionAsync({
+        sessionID: sessionId,
+        directory: input.directory,
+        text: input.text,
+        model: input.model,
+        agent: "plan",
+        parts: sdkParts.length > 0 ? sdkParts : undefined,
+      });
+    } else {
+      logger.info("queue-prompt:sending-async", {
+        sessionId,
+        boardId: input.boardId,
+        directory: input.directory,
+        model: input.model
+          ? `${input.model.providerID}/${input.model.modelID}`
+          : undefined,
+      });
+
+      await this.#bridge.promptSessionAsync({
+        sessionID: sessionId,
+        directory: input.directory,
+        text: input.text,
+        model: input.model,
+        agent: input.agent,
+        parts: sdkParts.length > 0 ? sdkParts : undefined,
+      });
+    }
 
     this.#watchdog?.start(sessionId, {
       boardId: input.boardId,

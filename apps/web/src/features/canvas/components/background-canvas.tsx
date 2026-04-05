@@ -351,6 +351,7 @@ function createKanbanCardNode(
       filePath: board.repo.directory,
       gitBranch: board.repo.branch,
       projectName: board.repo.projectName,
+      reviewMode: board.reviewMode ?? "auto",
       sessionId: board.session.sessionId,
       sessionState: board.session.state,
       onRemove,

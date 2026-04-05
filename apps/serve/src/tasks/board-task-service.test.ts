@@ -9,6 +9,7 @@ function makeMockBridge() {
     createSession: mock(async () => ({ id: "sess-123" })),
     promptSession: mock(async () => undefined),
     promptSessionAsync: mock(async () => undefined),
+    subscribeDirectory: mock(async () => undefined),
   };
 }
 
@@ -37,6 +38,7 @@ describe("BoardTaskService", () => {
           },
           session: { state: "uninitialized" },
           title: "Repo Board",
+          reviewMode: "auto",
         },
       ],
       preferences: {
@@ -53,6 +55,7 @@ describe("BoardTaskService", () => {
       boardId: "board-1",
       directory: "/tmp/repo",
       text: "build feature",
+      reviewMode: "auto",
     });
 
     expect(result.boardId).toBe("board-1");
@@ -100,6 +103,7 @@ describe("BoardTaskService", () => {
             state: "active",
           },
           title: "Repo Board",
+          reviewMode: "auto",
         },
       ],
       preferences: {
@@ -116,6 +120,7 @@ describe("BoardTaskService", () => {
       boardId: "board-1",
       directory: "/tmp/repo",
       text: "follow up",
+      reviewMode: "auto",
     });
 
     expect(result.createdSession).toBe(false);

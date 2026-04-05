@@ -48,6 +48,7 @@ describe("WorkspaceStore", () => {
             state: "uninitialized",
           },
           title: "Repo Board",
+          reviewMode: "auto",
         },
       ],
       preferences: {
@@ -83,6 +84,7 @@ describe("WorkspaceStore", () => {
             state: "uninitialized",
           },
           title: "Repo Board",
+          reviewMode: "auto",
         },
       ],
       preferences: {
@@ -136,6 +138,7 @@ describe("WorkspaceStore", () => {
             state: "uninitialized",
           },
           title: "Repo Board",
+          reviewMode: "auto",
         },
       ],
       preferences: {
@@ -204,6 +207,7 @@ describe("WorkspaceStore", () => {
             state: "active",
           },
           title: "Repo Board",
+          reviewMode: "auto",
         },
       ],
       preferences: {

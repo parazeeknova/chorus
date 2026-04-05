@@ -109,6 +109,43 @@ export function createHttpRoutes(
     )
 
     .post(
+      "/tasks/:sessionID/finalize-review",
+      async ({ params, body }) => {
+        logger.info("finalize-review", {
+          sessionID: params.sessionID,
+          planPreview: body.plan?.slice(0, 100),
+        });
+
+        await bridge.promptSessionAsync({
+          sessionID: params.sessionID,
+          text: `The plan has been reviewed and finalized. Here is the final plan:\n\n${body.plan}\n\n${body.questions && body.questions.length > 0 ? `Answers to your questions:\n${body.questions.map((q: { question: string; answer: string }) => `- ${q.question}: ${q.answer}`).join("\n")}\n\n` : ""}Please proceed with implementing this plan.`,
+        });
+
+        return {
+          sessionID: params.sessionID,
+          accepted: true,
+          timestamp: Date.now(),
+        };
+      },
+      {
+        params: t.Object({
+          sessionID: t.String(),
+        }),
+        body: t.Object({
+          plan: t.String(),
+          questions: t.Optional(
+            t.Array(
+              t.Object({
+                question: t.String(),
+                answer: t.String(),
+              })
+            )
+          ),
+        }),
+      }
+    )
+
+    .post(
       "/tasks/:sessionID/abort",
       async ({ params }) => {
         const result = await bridge.abortSession(params.sessionID);

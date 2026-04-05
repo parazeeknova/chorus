@@ -241,6 +241,34 @@ function appendRunStep(task: Task, event: NormalizedAgentEvent): Task {
         runId: event.sessionID ?? task.runId,
       };
     }
+
+    const step = buildStep({
+      ...event,
+      delta: undefined,
+    });
+
+    if (step) {
+      const steps = previousRun.steps
+        .map<AgentStep>((entry) =>
+          entry.status === "running" ? { ...entry, status: "done" } : entry
+        )
+        .concat({
+          ...step,
+          content: event.delta,
+          summary: event.delta.slice(0, 72),
+        });
+      return {
+        ...task,
+        run: {
+          ...previousRun,
+          elapsed: formatElapsed(startedAt),
+          startedAt,
+          sessionId: event.sessionID ?? previousRun.sessionId,
+          steps,
+        },
+        runId: event.sessionID ?? task.runId,
+      };
+    }
   }
 
   const step = buildStep(event);
@@ -282,6 +310,7 @@ export function createBoardFromSeed(
       y: BOARD_Y_START + index * BOARD_Y_OFFSET,
     },
     columns: createEmptyColumns(),
+    reviewMode: "auto",
     modelSelection: null,
     session: {
       state: "uninitialized",
@@ -396,6 +425,23 @@ export function attachSessionToBoard(
   };
 }
 
+function extractPlanFromSteps(steps: AgentStep[]): string | null {
+  const responseSteps = steps.filter(
+    (s) => s.kind === "response" || s.kind === "thinking"
+  );
+
+  if (responseSteps.length === 0) {
+    return null;
+  }
+
+  const planParts = responseSteps
+    .map((s) => s.content ?? s.summary)
+    .filter(Boolean)
+    .join("\n\n");
+
+  return planParts.length > 0 ? planParts : null;
+}
+
 export function applyAgentEventToBoard(
   board: WorkspaceBoard,
   event: NormalizedAgentEvent
@@ -449,15 +495,38 @@ export function applyAgentEventToBoard(
   }
 
   if (event.activity === "idle") {
+    const isManualReview = board.reviewMode === "manual";
+    const allTasks: Task[] = Object.values(nextBoard.columns).flat() as Task[];
+    const currentTask = allTasks.find(
+      (t) => t.id === board.session.currentTaskId
+    );
+
+    const planText = extractPlanFromSteps(currentTask?.run?.steps ?? []);
+    const targetColumn = isManualReview ? "approve" : "done";
+
     nextBoard = {
       ...nextBoard,
-      columns: moveTask(nextBoard.columns, board.session.currentTaskId, "done"),
+      columns: moveTask(
+        nextBoard.columns,
+        board.session.currentTaskId,
+        targetColumn
+      ),
       session: {
         ...nextBoard.session,
         currentTaskId: undefined,
         state: "active",
       },
     };
+
+    if (isManualReview && planText && currentTask) {
+      nextBoard = {
+        ...nextBoard,
+        columns: withTaskUpdated(nextBoard.columns, currentTask.id, (task) => ({
+          ...task,
+          plan: planText,
+        })),
+      };
+    }
   }
 
   if (event.activity === "error") {
@@ -493,5 +562,31 @@ export function updateBoardColumns(
   return {
     ...board,
     columns,
+  };
+}
+
+export function updateBoardReviewMode(
+  board: WorkspaceBoard,
+  reviewMode: "manual" | "auto"
+): WorkspaceBoard {
+  return {
+    ...board,
+    reviewMode,
+  };
+}
+
+export function updateTaskPlan(
+  board: WorkspaceBoard,
+  taskId: string,
+  plan: string,
+  questions?: string[]
+): WorkspaceBoard {
+  return {
+    ...board,
+    columns: withTaskUpdated(board.columns, taskId, (task) => ({
+      ...task,
+      plan,
+      questions: questions ?? task.questions,
+    })),
   };
 }

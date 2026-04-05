@@ -291,6 +291,8 @@ export function applyAgentEventToBoard(
     return board;
   }
 
+  const isManualReview = board.reviewMode === "manual";
+
   let nextBoard: WorkspaceBoard = {
     ...board,
     columns: withTaskUpdated(
@@ -333,15 +335,37 @@ export function applyAgentEventToBoard(
   }
 
   if (event.activity === "idle") {
+    const currentTask = Object.values(nextBoard.columns)
+      .flat()
+      .find((t) => t.id === board.session.currentTaskId);
+
+    const planText = extractPlanFromSteps(currentTask?.run?.steps ?? []);
+
+    const targetColumn = isManualReview ? "approve" : "done";
+
     nextBoard = {
       ...nextBoard,
-      columns: moveTask(nextBoard.columns, board.session.currentTaskId, "done"),
+      columns: moveTask(
+        nextBoard.columns,
+        board.session.currentTaskId,
+        targetColumn
+      ),
       session: {
         ...nextBoard.session,
         currentTaskId: undefined,
         state: "active",
       },
     };
+
+    if (isManualReview && planText && currentTask) {
+      nextBoard = {
+        ...nextBoard,
+        columns: withTaskUpdated(nextBoard.columns, currentTask.id, (task) => ({
+          ...task,
+          plan: planText,
+        })),
+      };
+    }
   }
 
   if (event.activity === "error" && event.type !== "session.timeout") {
@@ -365,4 +389,21 @@ export function applyAgentEventToBoard(
   }
 
   return nextBoard;
+}
+
+function extractPlanFromSteps(steps: AgentStep[]): string | null {
+  const responseSteps = steps.filter(
+    (s) => s.kind === "response" || s.kind === "thinking"
+  );
+
+  if (responseSteps.length === 0) {
+    return null;
+  }
+
+  const planParts = responseSteps
+    .map((s) => s.content ?? s.summary)
+    .filter(Boolean)
+    .join("\n\n");
+
+  return planParts.length > 0 ? planParts : null;
 }

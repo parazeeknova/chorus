@@ -19,6 +19,7 @@ import {
   createPromptTask,
   updateBoardColumns as nextBoardColumns,
   updateBoardPosition as nextBoardPosition,
+  updateBoardReviewMode as nextBoardReviewMode,
 } from "./state";
 import type {
   AgentEventEnvelope,
@@ -482,6 +483,7 @@ export function ChorusWorkspaceProvider({
             agent: input.agent,
             model: input.model,
             parts: input.parts,
+            reviewMode: selectedBoard.reviewMode ?? "auto",
           }),
         });
 
@@ -727,6 +729,28 @@ export function ChorusWorkspaceProvider({
         )
       ).catch((error) => {
         console.error("Failed to update board position", error);
+      });
+    },
+    updateBoardReviewMode: (boardId, reviewMode) => {
+      setBoards((currentBoards) =>
+        currentBoards.map((board) =>
+          board.boardId === boardId
+            ? nextBoardReviewMode(board, reviewMode)
+            : board
+        )
+      );
+      mutateWorkspace(
+        createWorkspaceMutation(
+          clientIdRef.current,
+          revisionRef.current,
+          "board.review_mode.set",
+          {
+            boardId,
+            reviewMode,
+          }
+        )
+      ).catch((error) => {
+        console.error("Failed to update board review mode", error);
       });
     },
     setBoardModel: (boardId, model) => {

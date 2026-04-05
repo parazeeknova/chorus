@@ -10,6 +10,7 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
+    "types": ["node", "electron"],
     "paths": {
       "@/*": ["./src/*"]
     }

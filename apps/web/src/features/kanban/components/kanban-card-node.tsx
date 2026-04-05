@@ -15,6 +15,7 @@ import {
   Undo2Icon,
   XIcon,
 } from "lucide-react";
+import posthog from "posthog-js";
 import { memo, useCallback, useEffect, useState } from "react";
 import {
   DropdownMenu,
@@ -29,6 +30,7 @@ import {
   type Columns,
   KanbanCardContent,
   type KanbanCardData,
+  type Task,
 } from "@/features/kanban/components/kanban";
 import { useWorkspace } from "@/features/workspace/workspace-context";
 import {
@@ -50,6 +52,7 @@ export interface KanbanCardNodeData {
   onRemove?: (id: string) => void;
   onUpdateColumns?: (id: string, columns: KanbanCardData["columns"]) => void;
   projectName?: string;
+  reviewMode?: "manual" | "auto";
   sessionId?: string;
   sessionState: "uninitialized" | "starting" | "active" | "error";
   title: string;
@@ -278,7 +281,8 @@ function KanbanCardNodeComponent({
     cardData.gitStatus ?? null
   );
 
-  const { kanbanHistory, restorePrompt } = useWorkspace();
+  const { kanbanHistory, restorePrompt, updateBoardReviewMode } =
+    useWorkspace();
 
   useEffect(() => {
     setLocalColumns(cardData.columns);
@@ -388,6 +392,200 @@ function KanbanCardNodeComponent({
   const handleCloseDiff = useCallback(() => {
     setDiffVisible(false);
   }, []);
+
+  const findTaskInApprove = useCallback(
+    (taskId: string) => {
+      const approveTasks = localColumns.approve ?? [];
+      return approveTasks.find((t: Task) => t.id === taskId);
+    },
+    [localColumns]
+  );
+
+  const handleApprove = useCallback(
+    async (taskId: string, plan: string, answers: string[]) => {
+      const task = findTaskInApprove(taskId);
+      if (!cardData.sessionId) {
+        posthog.capture("kanban_review_approve_error", {
+          reason: "no_session",
+          boardId: cardData.boardId,
+        });
+        return;
+      }
+
+      posthog.capture("kanban_review_approve_start", {
+        boardId: cardData.boardId,
+        sessionId: cardData.sessionId,
+        taskId,
+        hasPlan: !!plan,
+        hasAnswers: answers.some((a) => a.length > 0),
+      });
+
+      // Move task from approve → in_progress immediately
+      if (!task) {
+        return;
+      }
+      const updatedTask: Task = {
+        ...task,
+        plan: plan || task.plan || task.title,
+      };
+      const nextColumns = {
+        ...localColumns,
+        approve: (localColumns.approve ?? []).filter(
+          (t: Task) => t.id !== taskId
+        ),
+        in_progress: [...(localColumns.in_progress ?? []), updatedTask],
+      };
+      setLocalColumns(nextColumns);
+      cardData.onUpdateColumns?.(id, nextColumns);
+
+      try {
+        const planText = plan || task?.plan || task?.title || "";
+        const questionPairs =
+          task?.questions?.map((q: string, i: number) => ({
+            question: q,
+            answer: answers[i] ?? "",
+          })) ?? [];
+
+        const response = await fetch(
+          `/api/tasks/${cardData.sessionId}/finalize-review`,
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              plan: planText,
+              questions: questionPairs.length > 0 ? questionPairs : undefined,
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          posthog.capture("kanban_review_finalize_failed", {
+            boardId: cardData.boardId,
+            sessionId: cardData.sessionId,
+            taskId,
+            status: response.status,
+          });
+          return;
+        }
+
+        posthog.capture("kanban_review_finalize_success", {
+          boardId: cardData.boardId,
+          sessionId: cardData.sessionId,
+          taskId,
+        });
+      } catch (error) {
+        posthog.capture("kanban_review_finalize_error", {
+          boardId: cardData.boardId,
+          sessionId: cardData.sessionId,
+          taskId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    },
+    [
+      cardData.boardId,
+      cardData.sessionId,
+      cardData.onUpdateColumns,
+      findTaskInApprove,
+      id,
+      localColumns,
+    ]
+  );
+
+  const handleReject = useCallback(
+    async (taskId: string) => {
+      if (!cardData.sessionId) {
+        posthog.capture("kanban_review_reject_error", {
+          reason: "no_session",
+          boardId: cardData.boardId,
+        });
+        return;
+      }
+
+      posthog.capture("kanban_review_reject_start", {
+        boardId: cardData.boardId,
+        sessionId: cardData.sessionId,
+        taskId,
+      });
+
+      // Delete task from approve column
+      const nextColumns = {
+        ...localColumns,
+        approve: (localColumns.approve ?? []).filter(
+          (t: Task) => t.id !== taskId
+        ),
+      };
+      setLocalColumns(nextColumns);
+      cardData.onUpdateColumns?.(id, nextColumns);
+
+      try {
+        const response = await fetch(`/api/tasks/${cardData.sessionId}/abort`, {
+          method: "POST",
+        });
+
+        if (!response.ok) {
+          posthog.capture("kanban_review_abort_failed", {
+            boardId: cardData.boardId,
+            sessionId: cardData.sessionId,
+            taskId,
+            status: response.status,
+          });
+          return;
+        }
+
+        posthog.capture("kanban_review_abort_success", {
+          boardId: cardData.boardId,
+          sessionId: cardData.sessionId,
+          taskId,
+        });
+      } catch (error) {
+        posthog.capture("kanban_review_abort_error", {
+          boardId: cardData.boardId,
+          sessionId: cardData.sessionId,
+          taskId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    },
+    [
+      cardData.boardId,
+      cardData.sessionId,
+      cardData.onUpdateColumns,
+      id,
+      localColumns,
+    ]
+  );
+
+  const handlePlanChange = useCallback(
+    (_taskId: string, plan: string) => {
+      posthog.capture("kanban_review_plan_updated", {
+        boardId: cardData.boardId,
+        planLength: plan.length,
+      });
+    },
+    [cardData.boardId]
+  );
+
+  const handleQuestionsAnswered = useCallback(
+    (_taskId: string, answers: string[]) => {
+      posthog.capture("kanban_review_questions_answered", {
+        boardId: cardData.boardId,
+        answerCount: answers.length,
+      });
+    },
+    [cardData.boardId]
+  );
+
+  const handleReviewModeChange = useCallback(
+    (mode: "manual" | "auto") => {
+      posthog.capture("kanban_review_mode_changed", {
+        boardId: cardData.boardId,
+        mode,
+      });
+      updateBoardReviewMode(cardData.boardId, mode);
+    },
+    [cardData.boardId, updateBoardReviewMode]
+  );
 
   return (
     <>
@@ -582,8 +780,14 @@ function KanbanCardNodeComponent({
                   id: cardData.boardId,
                   title: cardData.title,
                   columns: cardData.columns,
+                  reviewMode: cardData.reviewMode ?? "auto",
                 }}
+                onApprove={handleApprove}
                 onColumnsChange={handleColumnsChange}
+                onPlanChange={handlePlanChange}
+                onQuestionsAnswered={handleQuestionsAnswered}
+                onReject={handleReject}
+                onReviewModeChange={handleReviewModeChange}
               />
             </div>
           )}
