@@ -99,6 +99,7 @@ export type NormalizedActivity =
   | "writing"
   | "thinking"
   | "waiting_for_approval"
+  | "waiting_for_question"
   | "error"
   | "idle";
 
@@ -110,6 +111,19 @@ export interface FileDiffInfo {
   filePath: string;
 }
 
+export interface QuestionOption {
+  description: string;
+  label: string;
+}
+
+export interface QuestionInfo {
+  custom?: boolean;
+  header: string;
+  multiple?: boolean;
+  options: QuestionOption[];
+  question: string;
+}
+
 export interface NormalizedAgentEvent {
   activity?: NormalizedActivity;
   delta?: string;
@@ -119,6 +133,8 @@ export interface NormalizedAgentEvent {
   partID?: string;
   partType?: "text" | "reasoning" | "tool";
   permissionID?: string;
+  questionID?: string;
+  questions?: QuestionInfo[];
   sessionID?: string;
   text?: string;
   timestamp: number;
@@ -358,6 +374,27 @@ export function normalizeEvent(raw: OCEvent): NormalizedAgentEvent {
         sessionID: raw.properties.sessionID,
         activity: "waiting_for_approval",
         permissionID: raw.properties.id,
+      };
+    case "question.asked":
+      return {
+        ...base,
+        sessionID: raw.properties.sessionID,
+        activity: "waiting_for_question",
+        questionID: raw.properties.id,
+        questions: raw.properties.questions.map(
+          (q: Record<string, unknown>) => ({
+            question: String(q.question ?? ""),
+            header: String(q.header ?? ""),
+            options: ((q.options as Record<string, unknown>[]) ?? []).map(
+              (o) => ({
+                label: String(o.label ?? ""),
+                description: String(o.description ?? ""),
+              })
+            ),
+            multiple: q.multiple === true,
+            custom: q.custom !== false,
+          })
+        ),
       };
     case "session.error":
       return {

@@ -6,6 +6,7 @@ import { InstanceManager } from "./features/instance/instance-manager";
 import { PermissionHandler } from "./features/permissions/permission-handler";
 import { ProjectManager } from "./features/projects/project-manager";
 import { ProviderManager } from "./features/providers/provider-manager";
+import { QuestionHandler } from "./features/questions/question-handler";
 import { RaceManager } from "./features/race/race-manager";
 import { SessionManager } from "./features/session/session-manager";
 import { TuiManager } from "./features/tui/tui-manager";
@@ -49,6 +50,10 @@ export type {
   OpencodeProviderOauthAuthorization,
   OpencodeProviderStatus,
 } from "./features/providers/provider-manager";
+export type {
+  QuestionReplyInput,
+  QuestionRequest,
+} from "./features/questions/question-handler";
 export type { RaceConfig, RaceResult } from "./features/race/race-manager";
 export type {
   SessionCommandInput,
@@ -79,6 +84,7 @@ export class OpenCodeAdapter {
   readonly events: EventStream;
   readonly instances: InstanceManager;
   readonly permissions: PermissionHandler;
+  readonly questions: QuestionHandler;
   readonly projects: ProjectManager;
   readonly providers: ProviderManager;
   readonly races: RaceManager;
@@ -91,6 +97,7 @@ export class OpenCodeAdapter {
     this.events = new EventStream(client);
     this.instances = new InstanceManager(client);
     this.permissions = new PermissionHandler(client);
+    this.questions = new QuestionHandler(client);
     this.projects = new ProjectManager(client);
     this.providers = new ProviderManager(client);
     this.races = new RaceManager(client);
