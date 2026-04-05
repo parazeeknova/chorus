@@ -1,6 +1,8 @@
 appId: "sh.chorus.desktop"
 productName: "Chorus"
 
+artifactName: "${productName}-${version}-${arch}.${ext}"
+
 directories:
   output: "release"
   buildResources: "build"
@@ -30,6 +32,11 @@ linux:
     - deb
   category: "Office"
   icon: "build/icon.png"
+
+deb:
+  packageCategory: "utility"
+  synopsis: "Chorus Desktop Application"
+  artifactName: "Chorus-${version}-${arch}.${ext}"
 
 nsis:
   oneClick: false

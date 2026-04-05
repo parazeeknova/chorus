@@ -1,6 +1,6 @@
 {
   "name": "@chorus/desktop",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "private": true,
   "description": "Chorus Desktop Application",
   "homepage": "https://github.com/parazeeknova/chorus",
@@ -12,6 +12,7 @@
   "scripts": {
     "dev": "bun run build && electron .",
     "build": "electron-vite build",
+    "prepackage": "mkdir -p release/@chorus",
     "package": "electron-builder",
     "check-types": "tsc --noEmit"
   },
