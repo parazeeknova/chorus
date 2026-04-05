@@ -10,10 +10,11 @@ import {
   FilePenLineIcon,
   Loader2Icon,
   MessageSquareIcon,
+  SquareIcon,
   TerminalIcon,
   WrenchIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
@@ -472,6 +473,21 @@ export function AgentOutputCard({
   const doneCount = run.steps.filter((s) => s.status === "done").length;
   const isLive = run.steps.some((s) => s.status === "running");
   const groupedSteps = groupSteps(run.steps);
+  const [aborting, setAborting] = useState(false);
+
+  const handleAbort = useCallback(async () => {
+    if (!run.sessionId || aborting) {
+      return;
+    }
+    setAborting(true);
+    try {
+      await fetch(`/api/tasks/${run.sessionId}/abort`, { method: "POST" });
+    } catch {
+      // abort failed — UI will update via WS events regardless
+    } finally {
+      setAborting(false);
+    }
+  }, [run.sessionId, aborting]);
 
   return (
     <div
@@ -500,6 +516,24 @@ export function AgentOutputCard({
         <span className="shrink-0 rounded-xs border border-white/8 bg-white/5 px-1.5 py-0.5 font-mono text-[0.6rem] text-white/40">
           {run.model}
         </span>
+
+        {isLive && (
+          <button
+            className={cn(
+              "flex items-center gap-1 rounded-xs border px-1.5 py-0.5 font-medium text-[0.6rem] transition-colors",
+              aborting
+                ? "cursor-not-allowed border-white/10 bg-white/5 text-white/20"
+                : "border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300"
+            )}
+            disabled={aborting}
+            onClick={handleAbort}
+            title="Interrupt agent"
+            type="button"
+          >
+            <SquareIcon className="size-2.5" />
+            {aborting ? "Stopping" : "Stop"}
+          </button>
+        )}
       </div>
 
       <div className="flex flex-col gap-3 px-3 py-3">
