@@ -127,6 +127,19 @@ jobs:
     steps:
       - name: Check Out Repository
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve Release Tag
+        id: tag
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          else
+            VERSION=$(node -p "require('./apps/desktop/package.json').version")
+            echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Download All Artifacts
         uses: actions/download-artifact@v8
@@ -136,6 +149,7 @@ jobs:
       - name: Create Electron Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.tag.outputs.tag }}
           files: release-artifacts/**/*
           generate_release_notes: true
           draft: false
