@@ -1,5 +1,5 @@
 >[!NOTE]
-> This is an MVP built in 36 hours at HackByte 4.0, IIITDM Jabalpur. The codebase here is the hackathon submission as-is. Active development has moved to [Singularity Works](https://github.com/singularityworks-xyz/chorus) org's repository.
+> This is an MVP built in 48 hours at HackByte 4.0, IIITDM Jabalpur. The codebase here is the hackathon submission as-is. Active development has moved to [Singularity Works](https://github.com/singularityworks-xyz/chorus) org's repository.
 
 <img width="1381" height="485" alt="chorus-banner-1" src="https://github.com/user-attachments/assets/7ba9115d-1650-4d2d-92f4-e274436efec0" />
 
@@ -25,13 +25,18 @@ Chorus sits between you and your AI coding agents. Instead of a chat thread that
 
 - **Surprise changes.** Agents go off-script and touch things you never asked for. Chorus adds approval gates before any destructive operation goes through.
 
-- **No parallel oversight.** You cannot manage multiple agents working across multiple projects at once. Chorus gives you a single canvas to route, pause, and redirect everything -- with a master agent you can query mid-run for a full progress report.
+- **No parallel oversight.** You cannot manage multiple agents working across multiple projects at once. Chorus gives you a single canvas to route, pause, and redirect everything with a master agent you can query mid-run for a full progress report.
 
 - **Ephemeral history.** Chat threads get too long to parse or disappear entirely. Chorus persists task state, decisions, and outcomes on a canvas you can always revisit.
 
 - **Single provider lock-in.** Most tools tie you to one model. Chorus runs different providers on different tasks simultaneously built on top of opencode's model harness, giving you 100+ providers and 4000+ models out of the box.
 
-- **Port conflicts in multi-project dev.** Running two projects with dev servers on the same port breaks agent tooling. Chorus integrates portless so every project gets a stable named localhost URL -- agents always hit the right server.
+- **Port conflicts in multi-project dev.** Running two projects with dev servers on the same port breaks agent tooling. Chorus integrates portless so every project gets a stable named localhost URL agents always hit the right server.
+
+
+## Preview
+
+<img width="1592" height="1032" alt="chorus" src="https://github.com/user-attachments/assets/77c9672a-d3b6-4a33-b7d4-bc39e7f2b849" />
 
 >[!TIP]
 > The name comes from the Chorus Fruit in Minecraft it teleports you somewhere unexpected. That felt right for a tool that moves your work somewhere you did not expect it to go.
